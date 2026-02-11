@@ -7,17 +7,23 @@ import type { ReservationStatus } from '../../types.js'
 import { VALID_STATUS_TRANSITIONS } from '../../types.js'
 
 export const validateStatusTransition = (): CollectionBeforeChangeHook =>
-  ({ context, data, operation, originalDoc }) => {
+  ({ context, data, operation, originalDoc, req }) => {
     if (context?.skipReservationHooks) {return data}
 
     const newStatus = data?.status as ReservationStatus | undefined
 
     if (operation === 'create') {
-      if (newStatus && newStatus !== 'pending') {
+      const isAdmin = Boolean(req.user)
+      const allowedOnCreate: ReservationStatus[] = isAdmin
+        ? ['pending', 'confirmed']
+        : ['pending']
+
+      if (newStatus && !allowedOnCreate.includes(newStatus)) {
+        const allowed = allowedOnCreate.map((s) => `"${s}"`).join(' or ')
         throw new ValidationError({
           errors: [
             {
-              message: 'New reservations must start with "pending" status.',
+              message: `New reservations must start with ${allowed} status.`,
               path: 'status',
             },
           ],

@@ -40,6 +40,22 @@
   gap: 4px;
 }
 
+.createButton {
+  background: var(--theme-elevation-500);
+  color: var(--theme-bg);
+  border: 1px solid var(--theme-elevation-500);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.createButton:hover {
+  opacity: 0.85;
+}
+
 .viewToggleButton {
   background: var(--theme-elevation-100);
   border: 1px solid var(--theme-elevation-200);
@@ -76,6 +92,11 @@
   padding: 4px;
   background: var(--theme-bg);
   vertical-align: top;
+  cursor: pointer;
+}
+
+.dayCell:hover {
+  background: var(--theme-elevation-50);
 }
 
 .dayCellOtherMonth {
@@ -153,6 +174,11 @@
   background: var(--theme-bg);
   min-height: 40px;
   position: relative;
+  cursor: pointer;
+}
+
+.weekCell:hover {
+  background: var(--theme-elevation-50);
 }
 
 .dayView {
@@ -167,10 +193,47 @@
   padding: 4px;
   background: var(--theme-bg);
   min-height: 48px;
+  position: relative;
+  cursor: pointer;
+}
+
+.dayViewCell:hover {
+  background: var(--theme-elevation-50);
 }
 
 .loading {
   text-align: center;
   padding: 40px;
   color: var(--theme-elevation-400);
+}
+
+.statusLegend {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.currentTimeLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  z-index: 2;
+  pointer-events: none;
 }

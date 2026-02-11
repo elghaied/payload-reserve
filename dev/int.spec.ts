@@ -282,6 +282,49 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
     expect(updated.status).toBe('confirmed')
   })
 
+  test('admin user can create reservation as confirmed', async () => {
+    const { docs: users } = await payload.find({
+      collection: 'users',
+      where: { email: { equals: 'dev@payloadcms.com' } },
+    })
+    const adminUser = users[0]
+
+    const reservation = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customerId,
+        resource: resourceId,
+        service: serviceId,
+        startTime: '2025-08-10T10:00:00.000Z',
+        status: 'confirmed',
+      },
+      user: adminUser,
+    })
+    expect(reservation.status).toBe('confirmed')
+  })
+
+  test('admin user cannot create reservation as completed', async () => {
+    const { docs: users } = await payload.find({
+      collection: 'users',
+      where: { email: { equals: 'dev@payloadcms.com' } },
+    })
+    const adminUser = users[0]
+
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          customer: customerId,
+          resource: resourceId,
+          service: serviceId,
+          startTime: '2025-08-11T10:00:00.000Z',
+          status: 'completed',
+        },
+        user: adminUser,
+      }),
+    ).rejects.toThrow()
+  })
+
   test('rejects completed -> pending transition', async () => {
     const reservation = await payload.create({
       collection: col('reservations'),

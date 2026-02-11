@@ -40,7 +40,12 @@ A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Design
 - **Status State Machine** - Enforced workflow: pending -> confirmed -> completed/cancelled/no-show
 - **Auto End Time** - Automatically calculates reservation end time from service duration
 - **Cancellation Policy** - Configurable notice period enforcement
+- **Admin Quick-Confirm** - Authenticated admin users can create reservations directly as "confirmed" for walk-ins
 - **Calendar View** - Month/week/day calendar replacing the default reservations list view
+- **Click-to-Create** - Click any calendar cell to create a reservation with the start time pre-filled
+- **Event Tooltips** - Hover events to see full details (service, time range, customer, resource, status)
+- **Status Legend** - Color key displayed in the calendar explaining each status color
+- **Current Time Indicator** - Red line in week/day views marking the current time
 - **Dashboard Widget** - Server component showing today's booking stats at a glance
 - **Availability Grid** - Weekly overview of resource availability vs. booked slots
 - **Recurring & Manual Schedules** - Flexible schedule types with exception dates
@@ -376,7 +381,8 @@ pending ------+               +-> cancelled
 ```
 
 **Rules:**
-- **On create:** Status must be `pending` (or not set, defaults to `pending`)
+- **On create (public/unauthenticated):** Status must be `pending` (or not set, defaults to `pending`)
+- **On create (authenticated admin):** Status can be `pending` or `confirmed` — this allows staff to create walk-in reservations that are already confirmed without a second step
 - **On update:** Only valid transitions are allowed:
   - `pending` -> `confirmed`, `cancelled`
   - `confirmed` -> `completed`, `cancelled`, `no-show`
@@ -408,13 +414,15 @@ await payload.create({
     resource: resourceId,
     customer: customerId,
     startTime: '2025-06-15T10:00:00.000Z',
-    status: 'confirmed', // Normally would fail (must start as pending)
+    status: 'completed', // Normally would fail (only pending/confirmed allowed on create)
   },
   context: {
     skipReservationHooks: true,
   },
 })
 ```
+
+> **Note:** Authenticated admin users can create reservations with `'confirmed'` status without the escape hatch. The escape hatch is only needed for statuses that are never allowed on create (e.g., `'completed'`, `'cancelled'`, `'no-show'`) or to bypass conflict detection and cancellation policy checks.
 
 ---
 
@@ -454,7 +462,16 @@ A CSS Grid-based calendar (no external dependencies) with three view modes:
   - Completed: Green
   - Cancelled: Gray
   - No-show: Red
-- Click any reservation to open a Payload document drawer for editing
+- **Status legend** displayed below the header explaining what each color means
+- **Click-to-create:** Click any calendar cell to open a new reservation drawer with the start time pre-filled
+  - Month view: clicking a day cell pre-fills start time at 9:00 AM on that date
+  - Week/day views: clicking a time cell pre-fills the exact hour for that slot
+- Click any existing reservation to open a Payload document drawer for editing
+- **Enhanced event display:**
+  - Month view (compact): shows time + service name
+  - Week/day views (full): shows time + service name + customer name
+- **Tooltips:** Hover any reservation event to see full details (service, time range, customer, resource, status) via native browser tooltip
+- **Current time indicator:** A red horizontal line in week/day views showing the current time position within the matching hour cell
 - Fetches data via REST API for the visible date range
 
 ### Availability Overview
@@ -499,6 +516,249 @@ Schedule resolution helpers used by admin components:
 | `combineDateAndTime(date, time)` | Merge a date with a "HH:mm" time string |
 | `isExceptionDate(date, exceptions)` | Check if a date is an exception |
 | `resolveScheduleForDate(schedule, date)` | Resolve concrete time ranges for a date |
+
+---
+
+## Frontend Reservation Guide
+
+The plugin is backend-only — it adds collections, hooks, and admin UI to Payload but does not include any customer-facing pages. However, you can build a full booking flow using Payload's built-in Local API (from Server Components / Server Actions) or REST API. No custom endpoints are needed.
+
+### Step 1: Configure Access Control
+
+By default all collections use Payload's default access control (authenticated users only). To allow public booking, pass `access` overrides in your plugin config:
+
+```ts
+import { reservationPlugin } from '@gshelllabs/reservation-plugin'
+
+reservationPlugin({
+  access: {
+    services: {
+      read: () => true,       // anyone can browse services
+    },
+    resources: {
+      read: () => true,       // anyone can browse resources
+    },
+    schedules: {
+      read: () => true,       // anyone can check availability
+    },
+    customers: {
+      create: () => true,     // guests can register themselves
+    },
+    reservations: {
+      create: () => true,     // guests can book
+      read: ({ req }) => {
+        // customers can only read their own reservations
+        if (req.user) return true
+        return false
+      },
+    },
+  },
+})
+```
+
+> **Important:** Always use `overrideAccess: false` in your frontend queries so these rules are enforced. Without it, Payload bypasses access control entirely.
+
+### Step 2: Fetch Available Services
+
+Use a React Server Component to list active services:
+
+```tsx
+// app/book/page.tsx
+import { getPayload } from 'payload'
+import config from '@payload-config'
+
+export default async function BookingPage() {
+  const payload = await getPayload({ config })
+
+  const { docs: services } = await payload.find({
+    collection: 'reservation-services',
+    overrideAccess: false,
+    where: { active: { equals: true } },
+  })
+
+  return (
+    <ul>
+      {services.map((service) => (
+        <li key={service.id}>
+          {service.name} — {service.duration} min — ${service.price}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### Step 3: Fetch Resources for a Service
+
+Once a customer picks a service, load the resources that offer it:
+
+```ts
+const { docs: resources } = await payload.find({
+  collection: 'reservation-resources',
+  overrideAccess: false,
+  where: {
+    services: { contains: selectedServiceId },
+    active: { equals: true },
+  },
+})
+```
+
+### Step 4: Check Availability
+
+Fetch the resource's schedule and existing reservations for the target date, then compute open slots:
+
+```ts
+import {
+  resolveScheduleForDate,
+  addMinutes,
+  doRangesOverlap,
+  computeBlockedWindow,
+} from '@gshelllabs/reservation-plugin'
+
+// 1. Get the resource's active schedule
+const { docs: schedules } = await payload.find({
+  collection: 'reservation-schedules',
+  overrideAccess: false,
+  where: {
+    resource: { equals: resourceId },
+    active: { equals: true },
+  },
+})
+
+// 2. Resolve available time ranges for the target date
+const targetDate = new Date('2025-03-15')
+const availableRanges = schedules.flatMap((schedule) =>
+  resolveScheduleForDate(schedule, targetDate),
+)
+
+// 3. Fetch existing reservations for that resource on that date
+const dayStart = new Date(targetDate)
+dayStart.setHours(0, 0, 0, 0)
+const dayEnd = new Date(targetDate)
+dayEnd.setHours(23, 59, 59, 999)
+
+const { docs: existingReservations } = await payload.find({
+  collection: 'reservations',
+  overrideAccess: false,
+  where: {
+    resource: { equals: resourceId },
+    startTime: { greater_than_equal: dayStart.toISOString() },
+    startTime: { less_than: dayEnd.toISOString() },
+    status: { not_equals: 'cancelled' },
+  },
+})
+
+// 4. Generate slots by stepping through available ranges
+//    and filtering out conflicts with existing reservations
+const slots = []
+for (const range of availableRanges) {
+  let cursor = range.start
+  while (addMinutes(cursor, serviceDuration) <= range.end) {
+    const slotEnd = addMinutes(cursor, serviceDuration)
+    const blocked = existingReservations.some((res) => {
+      const window = computeBlockedWindow(
+        new Date(res.startTime),
+        new Date(res.endTime),
+        service.bufferTimeBefore ?? 0,
+        service.bufferTimeAfter ?? 0,
+      )
+      return doRangesOverlap(cursor, slotEnd, window.start, window.end)
+    })
+    if (!blocked) slots.push(cursor)
+    cursor = addMinutes(cursor, 15) // 15-minute step
+  }
+}
+```
+
+### Step 5: Create the Reservation
+
+Use a Server Action to create the reservation. The plugin's `beforeChange` hooks automatically calculate the end time, validate conflicts, and enforce status transitions:
+
+```ts
+'use server'
+
+import { getPayload } from 'payload'
+import config from '@payload-config'
+
+export async function createReservation(data: {
+  service: string
+  resource: string
+  customerName: string
+  customerEmail: string
+  startTime: string
+  notes?: string
+}) {
+  const payload = await getPayload({ config })
+
+  // Find or create the customer
+  const existing = await payload.find({
+    collection: 'reservation-customers',
+    overrideAccess: false,
+    where: { email: { equals: data.customerEmail } },
+  })
+
+  let customerId: string
+  if (existing.docs.length > 0) {
+    customerId = String(existing.docs[0].id)
+  } else {
+    const customer = await payload.create({
+      collection: 'reservation-customers',
+      overrideAccess: false,
+      data: { name: data.customerName, email: data.customerEmail },
+    })
+    customerId = String(customer.id)
+  }
+
+  // Create the reservation — hooks handle endTime calculation and conflict checks
+  const reservation = await payload.create({
+    collection: 'reservations',
+    overrideAccess: false,
+    data: {
+      service: data.service,
+      resource: data.resource,
+      customer: customerId,
+      startTime: data.startTime,
+      notes: data.notes,
+      // status defaults to 'pending'
+    },
+  })
+
+  return reservation
+}
+```
+
+If the time slot is already booked, the `validateConflicts` hook will throw a `ValidationError` — catch it in your UI and prompt the user to pick a different slot.
+
+### Security Notes
+
+- **Always pass `overrideAccess: false`** — without it, Payload skips access control and any user can read/write anything.
+- Validate and sanitize all user input before passing it to `payload.create`.
+- Consider adding rate limiting to your Server Actions or API routes to prevent abuse.
+- The plugin's hooks enforce conflict detection server-side, so double-bookings are prevented even if the frontend has stale data.
+
+### Alternative: REST API
+
+If you prefer a client-side-only approach (e.g., a separate SPA), use Payload's auto-generated REST API:
+
+```ts
+// Fetch services
+const res = await fetch('https://your-site.com/api/reservation-services?where[active][equals]=true')
+const { docs: services } = await res.json()
+
+// Create a reservation
+const res = await fetch('https://your-site.com/api/reservations', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    service: serviceId,
+    resource: resourceId,
+    customer: customerId,
+    startTime: '2025-03-15T10:00:00.000Z',
+  }),
+})
+```
+
+The same hooks and access control rules apply to REST API requests.
 
 ---
 
@@ -660,7 +920,7 @@ import type {
 
 ### Integration Test Coverage
 
-The plugin ships with 11 integration tests covering:
+The plugin ships with 15 integration tests covering:
 
 | Test | What It Verifies |
 |------|-----------------|
@@ -672,8 +932,10 @@ The plugin ships with 11 integration tests covering:
 | Auto endTime | endTime = startTime + duration |
 | Conflict: same resource | Double-booking is rejected |
 | Conflict: different resource | Same time on different resource is allowed |
-| Status: must start pending | Creating with non-pending status fails |
+| Status: must start pending | Creating with non-pending status fails (public context) |
 | Status: valid transition | pending -> confirmed succeeds |
+| Status: admin create confirmed | Admin user can create reservation as confirmed |
+| Status: admin create completed | Admin user cannot create reservation as completed |
 | Status: invalid transition | completed -> pending fails |
 | Cancel: too late | Cancellation within notice period fails |
 | Cancel: sufficient notice | Cancellation with enough notice succeeds |

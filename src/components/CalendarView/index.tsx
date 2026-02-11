@@ -26,6 +26,22 @@ const STATUS_CLASS_MAP: Record<string, string> = {
   pending: styles.statusPending,
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  cancelled: '#e5e7eb',
+  completed: '#d1fae5',
+  confirmed: '#dbeafe',
+  'no-show': '#fee2e2',
+  pending: '#fef3c7',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  cancelled: 'Cancelled',
+  completed: 'Completed',
+  confirmed: 'Confirmed',
+  'no-show': 'No-show',
+  pending: 'Pending',
+}
+
 export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const { config } = useConfig()
   const slugs = config.admin?.custom?.reservationSlugs
@@ -36,6 +52,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(true)
   const [drawerDocId, setDrawerDocId] = useState<null | string>(null)
+  const [initialData, setInitialData] = useState<Record<string, unknown> | undefined>(undefined)
 
   const [DocumentDrawer, , { openDrawer }] = useDocumentDrawer({
     id: drawerDocId ?? undefined,
@@ -62,32 +79,35 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     return { rangeEnd: end, rangeStart: start }
   }, [currentDate, viewMode])
 
-  useEffect(() => {
-    const fetchReservations = async () => {
-      setLoading(true)
-      try {
-        const apiUrl = `${config.serverURL ?? ''}${config.routes.api}/${reservationSlug}`
-        const params = new URLSearchParams({
-          depth: '1',
-          limit: '500',
-          sort: 'startTime',
-          'where[startTime][greater_than_equal]': rangeStart.toISOString(),
-          'where[startTime][less_than_equal]': rangeEnd.toISOString(),
-        })
-        const response = await fetch(`${apiUrl}?${params}`)
-        const result = await response.json()
-        setReservations(result.docs ?? [])
-      } catch {
-        setReservations([])
-      }
-      setLoading(false)
+  const fetchReservations = useCallback(async () => {
+    setLoading(true)
+    try {
+      const apiUrl = `${config.serverURL ?? ''}${config.routes.api}/${reservationSlug}`
+      const params = new URLSearchParams({
+        depth: '1',
+        limit: '500',
+        sort: 'startTime',
+        'where[startTime][greater_than_equal]': rangeStart.toISOString(),
+        'where[startTime][less_than_equal]': rangeEnd.toISOString(),
+      })
+      const response = await fetch(`${apiUrl}?${params}`)
+      const result = await response.json()
+      setReservations(result.docs ?? [])
+    } catch {
+      setReservations([])
     }
-    void fetchReservations()
+    setLoading(false)
   }, [rangeStart, rangeEnd, config.routes.api, config.serverURL, reservationSlug])
 
+  useEffect(() => {
+    void fetchReservations()
+  }, [fetchReservations])
+
   const handleEventClick = useCallback(
-    (id: string) => {
+    (e: React.MouseEvent, id: string) => {
+      e.stopPropagation()
       setDrawerDocId(id)
+      setInitialData(undefined)
       openDrawer()
     },
     [openDrawer],
@@ -97,10 +117,28 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     (e: React.KeyboardEvent, id: string) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
-        handleEventClick(id)
+        e.stopPropagation()
+        setDrawerDocId(id)
+        setInitialData(undefined)
+        openDrawer()
       }
     },
-    [handleEventClick],
+    [openDrawer],
+  )
+
+  const handleCreateNew = useCallback(() => {
+    setDrawerDocId(null)
+    setInitialData(undefined)
+    openDrawer()
+  }, [openDrawer])
+
+  const handleDateClick = useCallback(
+    (date: Date) => {
+      setDrawerDocId(null)
+      setInitialData({ startTime: date.toISOString() })
+      openDrawer()
+    },
+    [openDrawer],
   )
 
   const navigate = useCallback(
@@ -122,28 +160,79 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
 
   const goToToday = useCallback(() => setCurrentDate(new Date()), [])
 
-  const getEventLabel = (r: Reservation) => {
+  const getResName = (field: { name?: string } | string | undefined): string => {
+    if (!field) return ''
+    if (typeof field === 'string') return ''
+    return field.name ?? ''
+  }
+
+  const getEventLabel = (r: Reservation, compact: boolean) => {
     const time = new Date(r.startTime).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     })
-    const serviceName =
-      typeof r.service === 'object' && r.service?.name ? r.service.name : ''
-    return `${time} ${serviceName}`.trim()
+    const serviceName = getResName(r.service)
+    if (compact) {
+      return `${time} ${serviceName}`.trim()
+    }
+    const customerName = getResName(r.customer)
+    const parts = [time, serviceName, customerName].filter(Boolean)
+    return parts.join(' - ')
   }
 
-  const renderEventItem = (r: Reservation) => (
+  const getEventTooltip = (r: Reservation): string => {
+    const serviceName = getResName(r.service) || 'Unknown service'
+    const startStr = new Date(r.startTime).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    const endStr = r.endTime
+      ? new Date(r.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '?'
+    const customerName = getResName(r.customer) || 'Unknown customer'
+    const resourceName = getResName(r.resource) || 'Unknown resource'
+    const status = STATUS_LABELS[r.status] ?? r.status
+    return `${serviceName}\n${startStr} - ${endStr}\nCustomer: ${customerName}\nResource: ${resourceName}\nStatus: ${status}`
+  }
+
+  const renderEventItem = (r: Reservation, compact: boolean) => (
     <div
       className={`${styles.eventItem} ${STATUS_CLASS_MAP[r.status] ?? ''}`}
       key={r.id}
-      onClick={() => handleEventClick(r.id)}
+      onClick={(e) => handleEventClick(e, r.id)}
       onKeyDown={(e) => handleEventKeyDown(e, r.id)}
       role="button"
       tabIndex={0}
+      title={getEventTooltip(r)}
     >
-      {getEventLabel(r)}
+      {getEventLabel(r, compact)}
     </div>
   )
+
+  const renderStatusLegend = () => (
+    <div className={styles.statusLegend}>
+      {Object.entries(STATUS_LABELS).map(([key, label]) => (
+        <div className={styles.legendItem} key={key}>
+          <span className={styles.legendDot} style={{ background: STATUS_COLORS[key] }} />
+          {label}
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderCurrentTimeLine = (cellDate: Date, cellHour: number) => {
+    const now = new Date()
+    if (
+      now.getFullYear() !== cellDate.getFullYear() ||
+      now.getMonth() !== cellDate.getMonth() ||
+      now.getDate() !== cellDate.getDate() ||
+      now.getHours() !== cellHour
+    ) {
+      return null
+    }
+    const topPercent = (now.getMinutes() / 60) * 100
+    return <div className={styles.currentTimeLine} style={{ top: `${topPercent}%` }} />
+  }
 
   const renderMonthView = () => {
     const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
@@ -180,13 +269,25 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             )
           })
 
+          const clickDate = new Date(day)
+          clickDate.setHours(9, 0, 0, 0)
+
           return (
             <div
               className={`${styles.dayCell} ${isOtherMonth ? styles.dayCellOtherMonth : ''} ${isToday ? styles.dayCellToday : ''}`}
               key={i}
+              onClick={() => handleDateClick(clickDate)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleDateClick(clickDate)
+                }
+              }}
             >
               <div className={styles.dayNumber}>{day.getDate()}</div>
-              {dayReservations.map(renderEventItem)}
+              {dayReservations.map((r) => renderEventItem(r, true))}
             </div>
           )
         })}
@@ -231,9 +332,24 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   rDate.getHours() === hour
                 )
               })
+              const clickDate = new Date(day)
+              clickDate.setHours(hour, 0, 0, 0)
               return (
-                <div className={styles.weekCell} key={`cell-${hour}-${di}`}>
-                  {cellReservations.map(renderEventItem)}
+                <div
+                  className={styles.weekCell}
+                  key={`cell-${hour}-${di}`}
+                  onClick={() => handleDateClick(clickDate)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleDateClick(clickDate)
+                    }
+                  }}
+                >
+                  {renderCurrentTimeLine(day, hour)}
+                  {cellReservations.map((r) => renderEventItem(r, false))}
                 </div>
               )
             })}
@@ -258,13 +374,27 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               rDate.getHours() === hour
             )
           })
+          const clickDate = new Date(currentDate)
+          clickDate.setHours(hour, 0, 0, 0)
           return (
             <Fragment key={`row-${hour}`}>
               <div className={styles.timeLabel}>
                 {hour.toString().padStart(2, '0')}:00
               </div>
-              <div className={styles.dayViewCell}>
-                {hourReservations.map(renderEventItem)}
+              <div
+                className={styles.dayViewCell}
+                onClick={() => handleDateClick(clickDate)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleDateClick(clickDate)
+                  }
+                }}
+              >
+                {renderCurrentTimeLine(currentDate, hour)}
+                {hourReservations.map((r) => renderEventItem(r, false))}
               </div>
             </Fragment>
           )
@@ -312,6 +442,9 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           <span className={styles.currentDate}>{dateLabel}</span>
         </div>
         <div className={styles.viewToggle}>
+          <button className={styles.createButton} onClick={handleCreateNew} type="button">
+            Create New
+          </button>
           {(['month', 'week', 'day'] as ViewMode[]).map((mode) => (
             <button
               className={`${styles.viewToggleButton} ${viewMode === mode ? styles.viewToggleButtonActive : ''}`}
@@ -324,10 +457,11 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           ))}
         </div>
       </div>
+      {renderStatusLegend()}
       {viewMode === 'month' && renderMonthView()}
       {viewMode === 'week' && renderWeekView()}
       {viewMode === 'day' && renderDayView()}
-      {drawerDocId && <DocumentDrawer />}
+      <DocumentDrawer initialData={initialData} onSave={fetchReservations} />
     </div>
   )
 }
