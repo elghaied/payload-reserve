@@ -59,9 +59,8 @@ const buildConfigWithMemoryDB = async () => {
     },
     plugins: [
       reservationPlugin({
-        collections: {
-          posts: true,
-        },
+        cancellationNoticePeriod: 24,
+        defaultBufferTime: 10,
       }),
     ],
     secret: process.env.PAYLOAD_SECRET || 'test-secret_key',

@@ -1,0 +1,176 @@
+.wrapper {
+  padding: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.navButtons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navButton {
+  background: var(--theme-elevation-100);
+  border: 1px solid var(--theme-elevation-200);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.navButton:hover {
+  background: var(--theme-elevation-200);
+}
+
+.currentDate {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 4px;
+}
+
+.viewToggleButton {
+  background: var(--theme-elevation-100);
+  border: 1px solid var(--theme-elevation-200);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.viewToggleButtonActive {
+  background: var(--theme-elevation-500);
+  color: var(--theme-bg);
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--theme-elevation-150);
+  border: 1px solid var(--theme-elevation-150);
+}
+
+.dayHeader {
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--theme-elevation-50);
+}
+
+.dayCell {
+  min-height: 80px;
+  padding: 4px;
+  background: var(--theme-bg);
+  vertical-align: top;
+}
+
+.dayCellOtherMonth {
+  opacity: 0.4;
+}
+
+.dayCellToday {
+  background: var(--theme-elevation-50);
+}
+
+.dayNumber {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.eventItem {
+  font-size: 0.625rem;
+  padding: 2px 4px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eventItem:hover {
+  opacity: 0.8;
+}
+
+.statusPending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusConfirmed {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.statusCompleted {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.statusCancelled {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.statusNoShow {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.weekView {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  gap: 1px;
+  background: var(--theme-elevation-150);
+  border: 1px solid var(--theme-elevation-150);
+}
+
+.timeLabel {
+  padding: 4px;
+  font-size: 0.625rem;
+  text-align: right;
+  background: var(--theme-bg);
+  min-height: 40px;
+}
+
+.weekCell {
+  padding: 2px;
+  background: var(--theme-bg);
+  min-height: 40px;
+  position: relative;
+}
+
+.dayView {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 1px;
+  background: var(--theme-elevation-150);
+  border: 1px solid var(--theme-elevation-150);
+}
+
+.dayViewCell {
+  padding: 4px;
+  background: var(--theme-bg);
+  min-height: 48px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--theme-elevation-400);
+}

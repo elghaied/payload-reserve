@@ -1,0 +1,103 @@
+.wrapper {
+  padding: 20px;
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: 1.25rem;
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.navButton {
+  background: var(--theme-elevation-100);
+  border: 1px solid var(--theme-elevation-200);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.navButton:hover {
+  background: var(--theme-elevation-200);
+}
+
+.weekLabel {
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  gap: 1px;
+  background: var(--theme-elevation-150);
+  border: 1px solid var(--theme-elevation-150);
+}
+
+.headerCell {
+  padding: 8px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--theme-elevation-50);
+}
+
+.resourceName {
+  padding: 8px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  background: var(--theme-bg);
+  display: flex;
+  align-items: center;
+}
+
+.cell {
+  padding: 4px;
+  background: var(--theme-bg);
+  min-height: 60px;
+}
+
+.slotAvailable {
+  font-size: 0.625rem;
+  padding: 2px 4px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.slotBooked {
+  font-size: 0.625rem;
+  padding: 2px 4px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.slotException {
+  font-size: 0.625rem;
+  padding: 2px 4px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--theme-elevation-400);
+}
+
+.noResources {
+  text-align: center;
+  padding: 40px;
+  color: var(--theme-elevation-400);
+  font-style: italic;
+}

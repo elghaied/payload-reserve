@@ -1,0 +1,57 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 4px;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--theme-elevation-100);
+  border-radius: 4px;
+}
+
+.statValue {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  color: var(--theme-elevation-500);
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+.nextAppointment {
+  padding: 12px;
+  background: var(--theme-elevation-50);
+  border-radius: 4px;
+}
+
+.nextAppointment p {
+  margin: 4px 0;
+}
+
+.noData {
+  color: var(--theme-elevation-400);
+  font-style: italic;
+}
