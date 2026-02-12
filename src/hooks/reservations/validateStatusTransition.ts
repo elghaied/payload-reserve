@@ -2,6 +2,7 @@ import type { CollectionBeforeChangeHook } from 'payload'
 
 import { ValidationError } from 'payload'
 
+import type { PluginT } from '../../translations/index.js'
 import type { ReservationStatus } from '../../types.js'
 
 import { VALID_STATUS_TRANSITIONS } from '../../types.js'
@@ -23,7 +24,7 @@ export const validateStatusTransition = (): CollectionBeforeChangeHook =>
         throw new ValidationError({
           errors: [
             {
-              message: `New reservations must start with ${allowed} status.`,
+              message: (req.t as PluginT)('reservation:errorInvalidCreateStatus', { allowed }),
               path: 'status',
             },
           ],
@@ -42,7 +43,10 @@ export const validateStatusTransition = (): CollectionBeforeChangeHook =>
           throw new ValidationError({
             errors: [
               {
-                message: `Cannot transition from "${previousStatus}" to "${newStatus}".`,
+                message: (req.t as PluginT)('reservation:errorInvalidTransition', {
+                  from: previousStatus,
+                  to: newStatus,
+                }),
                 path: 'status',
               },
             ],

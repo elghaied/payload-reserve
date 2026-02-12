@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 export function createServicesCollection(config: ResolvedReservationPluginConfig): CollectionConfig {
@@ -24,7 +25,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
       {
         name: 'duration',
         type: 'number',
-        label: 'Duration (minutes)',
+        label: ({ t }) => (t as PluginT)('reservation:fieldDurationMinutes'),
         min: 1,
         required: true,
       },
@@ -40,14 +41,14 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         name: 'bufferTimeBefore',
         type: 'number',
         defaultValue: 0,
-        label: 'Buffer Time Before (minutes)',
+        label: ({ t }) => (t as PluginT)('reservation:fieldBufferTimeBefore'),
         min: 0,
       },
       {
         name: 'bufferTimeAfter',
         type: 'number',
         defaultValue: 0,
-        label: 'Buffer Time After (minutes)',
+        label: ({ t }) => (t as PluginT)('reservation:fieldBufferTimeAfter'),
         min: 0,
       },
       {

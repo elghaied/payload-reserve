@@ -1,8 +1,10 @@
 'use client'
 import type { AdminViewServerProps } from 'payload'
 
-import { useConfig, useDocumentDrawer } from '@payloadcms/ui'
+import { useConfig, useDocumentDrawer, useTranslation } from '@payloadcms/ui'
 import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+import type { PluginT } from '../../translations/index.js'
 
 import styles from './CalendarView.module.css'
 
@@ -34,16 +36,21 @@ const STATUS_COLORS: Record<string, string> = {
   pending: '#fef3c7',
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  cancelled: 'Cancelled',
-  completed: 'Completed',
-  confirmed: 'Confirmed',
-  'no-show': 'No-show',
-  pending: 'Pending',
-}
-
 export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const { config } = useConfig()
+  const { t: _t } = useTranslation()
+  const t = _t as PluginT
+
+  const STATUS_LABELS = useMemo<Record<string, string>>(
+    () => ({
+      cancelled: t('reservation:statusCancelled'),
+      completed: t('reservation:statusCompleted'),
+      confirmed: t('reservation:statusConfirmed'),
+      'no-show': t('reservation:statusNoShowLabel'),
+      pending: t('reservation:statusPending'),
+    }),
+    [t],
+  )
   const slugs = config.admin?.custom?.reservationSlugs
   const reservationSlug = slugs?.reservations ?? 'reservations'
 
@@ -161,8 +168,8 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const goToToday = useCallback(() => setCurrentDate(new Date()), [])
 
   const getResName = (field: { name?: string } | string | undefined): string => {
-    if (!field) return ''
-    if (typeof field === 'string') return ''
+    if (!field) {return ''}
+    if (typeof field === 'string') {return ''}
     return field.name ?? ''
   }
 
@@ -181,7 +188,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   }
 
   const getEventTooltip = (r: Reservation): string => {
-    const serviceName = getResName(r.service) || 'Unknown service'
+    const serviceName = getResName(r.service) || t('reservation:calendarUnknownService')
     const startStr = new Date(r.startTime).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
@@ -189,10 +196,10 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     const endStr = r.endTime
       ? new Date(r.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '?'
-    const customerName = getResName(r.customer) || 'Unknown customer'
-    const resourceName = getResName(r.resource) || 'Unknown resource'
+    const customerName = getResName(r.customer) || t('reservation:calendarUnknownCustomer')
+    const resourceName = getResName(r.resource) || t('reservation:calendarUnknownResource')
     const status = STATUS_LABELS[r.status] ?? r.status
-    return `${serviceName}\n${startStr} - ${endStr}\nCustomer: ${customerName}\nResource: ${resourceName}\nStatus: ${status}`
+    return `${serviceName}\n${startStr} - ${endStr}\n${t('reservation:tooltipCustomer')} ${customerName}\n${t('reservation:tooltipResource')} ${resourceName}\n${t('reservation:tooltipStatus')} ${status}`
   }
 
   const renderEventItem = (r: Reservation, compact: boolean) => (
@@ -251,7 +258,15 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
 
     return (
       <div className={styles.monthGrid}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+        {[
+          t('reservation:dayShortSun'),
+          t('reservation:dayShortMon'),
+          t('reservation:dayShortTue'),
+          t('reservation:dayShortWed'),
+          t('reservation:dayShortThu'),
+          t('reservation:dayShortFri'),
+          t('reservation:dayShortSat'),
+        ].map((d) => (
           <div className={styles.dayHeader} key={d}>
             {d}
           </div>
@@ -277,14 +292,14 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               className={`${styles.dayCell} ${isOtherMonth ? styles.dayCellOtherMonth : ''} ${isToday ? styles.dayCellToday : ''}`}
               key={i}
               onClick={() => handleDateClick(clickDate)}
-              role="button"
-              tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
                   handleDateClick(clickDate)
                 }
               }}
+              role="button"
+              tabIndex={0}
             >
               <div className={styles.dayNumber}>{day.getDate()}</div>
               {dayReservations.map((r) => renderEventItem(r, true))}
@@ -339,14 +354,14 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   className={styles.weekCell}
                   key={`cell-${hour}-${di}`}
                   onClick={() => handleDateClick(clickDate)}
-                  role="button"
-                  tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
                       handleDateClick(clickDate)
                     }
                   }}
+                  role="button"
+                  tabIndex={0}
                 >
                   {renderCurrentTimeLine(day, hour)}
                   {cellReservations.map((r) => renderEventItem(r, false))}
@@ -384,14 +399,14 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               <div
                 className={styles.dayViewCell}
                 onClick={() => handleDateClick(clickDate)}
-                role="button"
-                tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
                     handleDateClick(clickDate)
                   }
                 }}
+                role="button"
+                tabIndex={0}
               >
                 {renderCurrentTimeLine(currentDate, hour)}
                 {hourReservations.map((r) => renderEventItem(r, false))}
@@ -423,7 +438,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   }, [currentDate, viewMode])
 
   if (loading) {
-    return <div className={styles.loading}>Loading reservations...</div>
+    return <div className={styles.loading}>{t('reservation:calendarLoading')}</div>
   }
 
   return (
@@ -434,7 +449,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             &larr;
           </button>
           <button className={styles.navButton} onClick={goToToday} type="button">
-            Today
+            {t('reservation:calendarToday')}
           </button>
           <button className={styles.navButton} onClick={() => navigate(1)} type="button">
             &rarr;
@@ -443,16 +458,20 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         </div>
         <div className={styles.viewToggle}>
           <button className={styles.createButton} onClick={handleCreateNew} type="button">
-            Create New
+            {t('reservation:calendarCreateNew')}
           </button>
-          {(['month', 'week', 'day'] as ViewMode[]).map((mode) => (
+          {([
+            { key: 'month' as ViewMode, label: t('reservation:calendarMonth') },
+            { key: 'week' as ViewMode, label: t('reservation:calendarWeek') },
+            { key: 'day' as ViewMode, label: t('reservation:calendarDay') },
+          ]).map(({ key, label }) => (
             <button
-              className={`${styles.viewToggleButton} ${viewMode === mode ? styles.viewToggleButtonActive : ''}`}
-              key={mode}
-              onClick={() => setViewMode(mode)}
+              className={`${styles.viewToggleButton} ${viewMode === key ? styles.viewToggleButtonActive : ''}`}
+              key={key}
+              onClick={() => setViewMode(key)}
               type="button"
             >
-              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              {label}
             </button>
           ))}
         </div>

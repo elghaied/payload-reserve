@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 export function createSchedulesCollection(
@@ -29,8 +30,14 @@ export function createSchedulesCollection(
         type: 'select',
         defaultValue: 'recurring',
         options: [
-          { label: 'Recurring', value: 'recurring' },
-          { label: 'Manual', value: 'manual' },
+          {
+            label: ({ t }) => (t as PluginT)('reservation:scheduleTypeRecurring'),
+            value: 'recurring',
+          },
+          {
+            label: ({ t }) => (t as PluginT)('reservation:scheduleTypeManual'),
+            value: 'manual',
+          },
         ],
       },
       {
@@ -44,13 +51,13 @@ export function createSchedulesCollection(
             name: 'day',
             type: 'select',
             options: [
-              { label: 'Monday', value: 'mon' },
-              { label: 'Tuesday', value: 'tue' },
-              { label: 'Wednesday', value: 'wed' },
-              { label: 'Thursday', value: 'thu' },
-              { label: 'Friday', value: 'fri' },
-              { label: 'Saturday', value: 'sat' },
-              { label: 'Sunday', value: 'sun' },
+              { label: ({ t }) => (t as PluginT)('reservation:dayMonday'), value: 'mon' },
+              { label: ({ t }) => (t as PluginT)('reservation:dayTuesday'), value: 'tue' },
+              { label: ({ t }) => (t as PluginT)('reservation:dayWednesday'), value: 'wed' },
+              { label: ({ t }) => (t as PluginT)('reservation:dayThursday'), value: 'thu' },
+              { label: ({ t }) => (t as PluginT)('reservation:dayFriday'), value: 'fri' },
+              { label: ({ t }) => (t as PluginT)('reservation:daySaturday'), value: 'sat' },
+              { label: ({ t }) => (t as PluginT)('reservation:daySunday'), value: 'sun' },
             ],
             required: true,
           },
@@ -60,7 +67,7 @@ export function createSchedulesCollection(
             admin: {
               placeholder: '09:00',
             },
-            label: 'Start Time (HH:mm)',
+            label: ({ t }) => (t as PluginT)('reservation:fieldStartTimeHHmm'),
             required: true,
           },
           {
@@ -69,7 +76,7 @@ export function createSchedulesCollection(
             admin: {
               placeholder: '17:00',
             },
-            label: 'End Time (HH:mm)',
+            label: ({ t }) => (t as PluginT)('reservation:fieldEndTimeHHmm'),
             required: true,
           },
         ],
@@ -97,7 +104,7 @@ export function createSchedulesCollection(
             admin: {
               placeholder: '09:00',
             },
-            label: 'Start Time (HH:mm)',
+            label: ({ t }) => (t as PluginT)('reservation:fieldStartTimeHHmm'),
             required: true,
           },
           {
@@ -106,7 +113,7 @@ export function createSchedulesCollection(
             admin: {
               placeholder: '17:00',
             },
-            label: 'End Time (HH:mm)',
+            label: ({ t }) => (t as PluginT)('reservation:fieldEndTimeHHmm'),
             required: true,
           },
         ],

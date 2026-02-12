@@ -1,8 +1,10 @@
 'use client'
 import type { AdminViewServerProps } from 'payload'
 
-import { useConfig } from '@payloadcms/ui'
+import { useConfig, useTranslation } from '@payloadcms/ui'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+
+import type { PluginT } from '../../translations/index.js'
 
 import styles from './AvailabilityOverview.module.css'
 
@@ -30,7 +32,6 @@ type Reservation = {
   status: string
 }
 
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DAY_MAP: Record<string, number> = {
   fri: 5,
   mon: 1,
@@ -43,7 +44,22 @@ const DAY_MAP: Record<string, number> = {
 
 export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const { config } = useConfig()
+  const { t: _t } = useTranslation()
+  const t = _t as PluginT
   const slugs = config.admin?.custom?.reservationSlugs
+
+  const DAY_NAMES = useMemo(
+    () => [
+      t('reservation:dayShortSun'),
+      t('reservation:dayShortMon'),
+      t('reservation:dayShortTue'),
+      t('reservation:dayShortWed'),
+      t('reservation:dayShortThu'),
+      t('reservation:dayShortFri'),
+      t('reservation:dayShortSat'),
+    ],
+    [t],
+  )
 
   const [weekStart, setWeekStart] = useState(() => {
     const now = new Date()
@@ -151,7 +167,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
       if (exception) {
         slots.push({
           type: 'exception',
-          label: exception.reason || 'Unavailable',
+          label: exception.reason || t('reservation:availabilityUnavailable'),
         })
         continue
       }
@@ -194,11 +210,11 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   }
 
   if (!slugs) {
-    return <div className={styles.noResources}>Reservation plugin not configured.</div>
+    return <div className={styles.noResources}>{t('reservation:availabilityNotConfigured')}</div>
   }
 
   if (loading) {
-    return <div className={styles.loading}>Loading availability...</div>
+    return <div className={styles.loading}>{t('reservation:availabilityLoading')}</div>
   }
 
   const weekLabel = `${weekDays[0].toLocaleDateString([], { day: 'numeric', month: 'short' })} - ${weekDays[6].toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}`
@@ -207,13 +223,13 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
 
   return (
     <div className={styles.wrapper}>
-      <h2 className={styles.title}>Availability Overview</h2>
+      <h2 className={styles.title}>{t('reservation:availabilityTitle')}</h2>
       <div className={styles.navigation}>
         <button className={styles.navButton} onClick={() => navigateWeek(-1)} type="button">
           &larr;
         </button>
         <button className={styles.navButton} onClick={goToThisWeek} type="button">
-          This Week
+          {t('reservation:availabilityThisWeek')}
         </button>
         <button className={styles.navButton} onClick={() => navigateWeek(1)} type="button">
           &rarr;
@@ -222,11 +238,11 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
       </div>
 
       {resources.length === 0 ? (
-        <div className={styles.noResources}>No active resources found.</div>
+        <div className={styles.noResources}>{t('reservation:availabilityNoResources')}</div>
       ) : (
         <div className={styles.grid} style={{ gridTemplateColumns: gridColumns }}>
           {/* Header row */}
-          <div className={styles.headerCell}>Resource</div>
+          <div className={styles.headerCell}>{t('reservation:availabilityResource')}</div>
           {weekDays.map((day, i) => (
             <div className={styles.headerCell} key={i}>
               {DAY_NAMES[day.getDay()]} {day.getDate()}
@@ -263,7 +279,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}{' '}
-                        Booked
+                        {t('reservation:availabilityBooked')}
                       </div>
                     ))}
                   </div>

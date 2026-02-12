@@ -2,6 +2,7 @@ import type { CollectionBeforeChangeHook, Where } from 'payload'
 
 import { ValidationError } from 'payload'
 
+import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { computeBlockedWindow } from '../../utilities/slotUtils.js'
@@ -73,7 +74,7 @@ export const validateConflicts =
       throw new ValidationError({
         errors: [
           {
-            message: 'This time slot conflicts with an existing reservation for this resource.',
+            message: (req.t as PluginT)('reservation:errorConflict'),
             path: 'startTime',
           },
         ],

@@ -2,13 +2,14 @@ import type { CollectionBeforeChangeHook } from 'payload'
 
 import { ValidationError } from 'payload'
 
+import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { hoursUntil } from '../../utilities/slotUtils.js'
 
 export const validateCancellation =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
-  ({ context, data, operation, originalDoc }) => {
+  ({ context, data, operation, originalDoc, req }) => {
     if (context?.skipReservationHooks) {return data}
 
     if (operation !== 'update') {return data}
@@ -29,7 +30,10 @@ export const validateCancellation =
       throw new ValidationError({
         errors: [
           {
-            message: `Cancellations require at least ${config.cancellationNoticePeriod} hours notice. Only ${Math.round(hours)} hours until the appointment.`,
+            message: (req.t as PluginT)('reservation:errorCancellationNotice', {
+              hours: String(Math.round(hours)),
+              period: String(config.cancellationNoticePeriod),
+            }),
             path: 'status',
           },
         ],

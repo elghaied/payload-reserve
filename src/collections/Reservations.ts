@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { calculateEndTime } from '../hooks/reservations/calculateEndTime.js'
@@ -69,11 +70,11 @@ export function createReservationsCollection(
         type: 'select',
         defaultValue: 'pending',
         options: [
-          { label: 'Pending', value: 'pending' },
-          { label: 'Confirmed', value: 'confirmed' },
-          { label: 'Completed', value: 'completed' },
-          { label: 'Cancelled', value: 'cancelled' },
-          { label: 'No Show', value: 'no-show' },
+          { label: ({ t }) => (t as PluginT)('reservation:statusPending'), value: 'pending' },
+          { label: ({ t }) => (t as PluginT)('reservation:statusConfirmed'), value: 'confirmed' },
+          { label: ({ t }) => (t as PluginT)('reservation:statusCompleted'), value: 'completed' },
+          { label: ({ t }) => (t as PluginT)('reservation:statusCancelled'), value: 'cancelled' },
+          { label: ({ t }) => (t as PluginT)('reservation:statusNoShow'), value: 'no-show' },
         ],
       },
       {

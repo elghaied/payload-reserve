@@ -1,9 +1,12 @@
 import type { ServerComponentProps } from 'payload'
 
+import type { PluginT } from '../../translations/index.js'
+
 import styles from './DashboardWidget.module.css'
 
 export const DashboardWidgetServer = async (props: ServerComponentProps) => {
-  const { payload } = props
+  const { i18n, payload } = props
+  const t = i18n.t as PluginT
 
   const slugs = payload.config.admin?.custom?.reservationSlugs
   if (!slugs) {
@@ -47,35 +50,35 @@ export const DashboardWidgetServer = async (props: ServerComponentProps) => {
 
   return (
     <div className={styles.wrapper}>
-      <h3 className={styles.title}>Today&apos;s Reservations</h3>
+      <h3 className={styles.title}>{t('reservation:dashboardTitle')}</h3>
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
           <span className={styles.statValue}>{total}</span>
-          <span className={styles.statLabel}>Total</span>
+          <span className={styles.statLabel}>{t('reservation:dashboardTotal')}</span>
         </div>
         <div className={styles.statCard}>
           <span className={styles.statValue}>{upcoming}</span>
-          <span className={styles.statLabel}>Upcoming</span>
+          <span className={styles.statLabel}>{t('reservation:dashboardUpcoming')}</span>
         </div>
         <div className={styles.statCard}>
           <span className={styles.statValue}>{completed}</span>
-          <span className={styles.statLabel}>Completed</span>
+          <span className={styles.statLabel}>{t('reservation:dashboardCompleted')}</span>
         </div>
         <div className={styles.statCard}>
           <span className={styles.statValue}>{cancelled}</span>
-          <span className={styles.statLabel}>Cancelled</span>
+          <span className={styles.statLabel}>{t('reservation:dashboardCancelled')}</span>
         </div>
       </div>
       {nextAppointment ? (
         <div className={styles.nextAppointment}>
-          <strong>Next Appointment</strong>
+          <strong>{t('reservation:dashboardNextAppointment')}</strong>
           <p>
-            Time: {new Date(nextAppointment.startTime as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {t('reservation:dashboardTime')} {new Date(nextAppointment.startTime as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </p>
-          <p>Status: {nextAppointment.status as string}</p>
+          <p>{t('reservation:dashboardStatus')} {nextAppointment.status as string}</p>
         </div>
       ) : (
-        <p className={styles.noData}>No upcoming appointments today.</p>
+        <p className={styles.noData}>{t('reservation:dashboardNoUpcoming')}</p>
       )}
     </div>
   )

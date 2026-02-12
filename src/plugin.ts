@@ -1,5 +1,7 @@
 import type { Config } from 'payload'
 
+import { deepMergeSimple } from 'payload/shared'
+
 import type { ReservationPluginConfig } from './types.js'
 
 import { createCustomersCollection } from './collections/Customers.js'
@@ -8,6 +10,7 @@ import { createResourcesCollection } from './collections/Resources.js'
 import { createSchedulesCollection } from './collections/Schedules.js'
 import { createServicesCollection } from './collections/Services.js'
 import { resolveConfig } from './defaults.js'
+import { translations } from './translations/index.js'
 
 export const reservationPlugin =
   (pluginOptions: ReservationPluginConfig = {}) =>
@@ -55,6 +58,13 @@ export const reservationPlugin =
       Component: 'reservation-plugin/client#AvailabilityOverview',
       path: '/reservation-availability',
     }
+
+    // Merge plugin translations (user translations take precedence)
+    if (!config.i18n) {config.i18n = {}}
+    ;(config.i18n as Record<string, unknown>).translations = deepMergeSimple(
+      translations,
+      (config.i18n as Record<string, unknown>).translations ?? {},
+    )
 
     return config
   }
