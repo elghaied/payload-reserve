@@ -20,8 +20,10 @@ A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Design
   - [Auto End Time Calculation](#auto-end-time-calculation)
   - [Conflict Detection](#conflict-detection)
   - [Status Transition Enforcement](#status-transition-enforcement)
+  - [Common Workflows](#common-workflows)
   - [Cancellation Policy](#cancellation-policy)
   - [Escape Hatch](#escape-hatch)
+  - [Integration Patterns](#integration-patterns)
 - [Admin UI Components](#admin-ui-components)
   - [Dashboard Widget](#dashboard-widget)
   - [Calendar View](#calendar-view)
@@ -308,6 +310,18 @@ The core booking records. Each reservation links a customer to a service perform
 
 **Status Options:** `pending`, `confirmed`, `completed`, `cancelled`, `no-show`
 
+#### Status Definitions
+
+| Status | Meaning | Terminal? |
+|--------|---------|-----------|
+| `pending` | Reservation created but not yet confirmed. Awaiting admin review, payment, or other verification. This is the default status for all new public reservations. | No |
+| `confirmed` | Reservation is locked in. Payment received, admin approved, or created as a walk-in by staff. The time slot is committed. | No |
+| `completed` | Appointment took place successfully. Set by admin after the service is delivered. | Yes |
+| `cancelled` | Reservation was cancelled before the appointment (by customer or admin). Subject to the cancellation notice period. | Yes |
+| `no-show` | Customer did not show up for a confirmed appointment. Set by admin after the scheduled time passes. | Yes |
+
+Terminal statuses cannot transition to any other status. Once a reservation is `completed`, `cancelled`, or `no-show`, it is permanently closed.
+
 **Example:**
 ```typescript
 // Create a reservation (endTime is auto-calculated)
@@ -342,6 +356,8 @@ Automatically computes `endTime` from `startTime + service.duration` on every cr
 endTime = startTime + service.duration (minutes)
 ```
 
+**Why this matters:** Prevents manual calculation errors and ensures the calendar view and conflict detection always have accurate time ranges. Without auto-calculation, admins could accidentally enter wrong end times, causing invisible scheduling gaps or double-bookings that conflict detection wouldn't catch.
+
 ### Conflict Detection
 
 **Hook:** `validateConflicts`
@@ -365,6 +381,8 @@ Another booking at 10:20 on the same resource -> CONFLICT ERROR
 Another booking at 10:45 on the same resource -> OK
 Another booking at 10:20 on a DIFFERENT resource -> OK
 ```
+
+**Why this matters:** Protects against double-booking even when multiple users book simultaneously or when frontend data is stale. The server-side check is the single source of truth. Buffer times account for real-world setup and cleanup between appointments — a stylist needs time to clean their station, a room needs to be prepared, etc.
 
 ### Status Transition Enforcement
 
@@ -390,6 +408,59 @@ pending ------+               +-> cancelled
 
 Invalid transitions throw a `ValidationError`.
 
+**Why this matters:** The state machine ensures data integrity by preventing nonsensical transitions (e.g., marking a cancelled reservation as completed). Terminal states (`completed`, `cancelled`, `no-show`) prevent accidental reopening of closed reservations. The admin quick-confirm feature supports walk-in workflows without bypassing the state machine — staff can create a reservation as `confirmed` in one step, but they still cannot skip directly to `completed`.
+
+### Common Workflows
+
+These workflows show how the status lifecycle and hooks work together in real-world scenarios.
+
+**1. Online Booking (standard)**
+```
+Customer visits booking page → selects service, resource, time slot
+  → payload.create({ status: 'pending' })          [hooks: endTime calculated, conflicts checked]
+  → Admin reviews in admin panel
+  → payload.update({ status: 'confirmed' })         [hooks: transition validated]
+  → Appointment takes place
+  → payload.update({ status: 'completed' })          [hooks: transition validated]
+```
+
+**2. Walk-In Booking**
+```
+Customer walks in, staff creates booking in admin panel
+  → payload.create({ status: 'confirmed' })          [admin user, hooks: endTime + conflicts]
+  → Appointment takes place
+  → payload.update({ status: 'completed' })
+```
+Skips the `pending` step entirely — authenticated admin users can create directly as `confirmed`.
+
+**3. Payment-Gated Booking**
+```
+Customer selects time slot on your frontend
+  → payload.create({ status: 'pending' })            [slot is now held]
+  → Your app creates a Stripe Checkout Session
+  → Customer completes payment
+  → Stripe webhook fires → payload.update({ status: 'confirmed' })
+  → Appointment takes place → 'completed'
+```
+The `pending → confirmed` transition fits payment flows naturally. The slot is held from the moment of creation (conflict detection ran on create), so no one else can book the same time while payment processes. See [Integration Patterns](#integration-patterns) for a full code example.
+
+**4. Customer Cancellation**
+```
+Customer requests cancellation (from 'pending' or 'confirmed')
+  → payload.update({ status: 'cancelled', cancellationReason: '...' })
+  → Hook checks: hours_until_appointment >= cancellationNoticePeriod
+  → If enough notice: cancellation succeeds
+  → If too late: ValidationError thrown, reservation unchanged
+```
+
+**5. No-Show Handling**
+```
+Appointment time passes, customer does not arrive
+  → Admin marks: payload.update({ status: 'no-show' })      [only from 'confirmed']
+  → Reservation is terminal — cannot be reopened
+```
+No-shows can only be marked on `confirmed` reservations. A `pending` reservation that nobody showed up for should be `cancelled` instead, since it was never confirmed.
+
 ### Cancellation Policy
 
 **Hook:** `validateCancellation`
@@ -401,6 +472,8 @@ hours_until_appointment >= cancellationNoticePeriod
 ```
 
 With the default `cancellationNoticePeriod: 24`, you cannot cancel a reservation that starts within the next 24 hours. The hook throws a `ValidationError` with details about how many hours remain.
+
+**Why this matters:** Protects the business from last-minute cancellations that leave empty time slots that can't be filled by other customers. The configurable notice period lets each business set their own policy — a busy salon might require 48 hours, while a consultant might only need 2. Automated cleanup tasks can use the escape hatch to bypass this check when cancelling stale pending reservations.
 
 ### Escape Hatch
 
@@ -423,6 +496,127 @@ await payload.create({
 ```
 
 > **Note:** Authenticated admin users can create reservations with `'confirmed'` status without the escape hatch. The escape hatch is only needed for statuses that are never allowed on create (e.g., `'completed'`, `'cancelled'`, `'no-show'`) or to bypass conflict detection and cancellation policy checks.
+
+### Integration Patterns
+
+#### Payment Integration (Stripe)
+
+The `pending → confirmed` transition is a natural fit for payment-gated bookings. The reservation holds the time slot while payment processes, and the conflict detection hook has already validated availability on create.
+
+**Flow:**
+1. Customer creates a reservation → status is `pending`, slot is held
+2. Your app creates a Stripe Checkout Session with the reservation ID in metadata
+3. Customer completes payment on Stripe's hosted page
+4. Stripe sends a `checkout.session.completed` webhook to your app
+5. Your webhook handler updates the reservation to `confirmed`
+6. If payment fails or expires, the reservation stays `pending` for cleanup
+
+**Webhook handler example:**
+
+```ts
+// app/api/stripe-webhook/route.ts
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import Stripe from 'stripe'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+
+export async function POST(req: Request) {
+  const body = await req.text()
+  const sig = req.headers.get('stripe-signature')!
+
+  const event = stripe.webhooks.constructEvent(
+    body,
+    sig,
+    process.env.STRIPE_WEBHOOK_SECRET!,
+  )
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session
+    const reservationId = session.metadata?.reservationId
+
+    if (reservationId) {
+      const payload = await getPayload({ config })
+      await payload.update({
+        collection: 'reservations',
+        id: reservationId,
+        data: { status: 'confirmed' },
+      })
+    }
+  }
+
+  return new Response('OK', { status: 200 })
+}
+```
+
+> **Slot protection:** The `validateConflicts` hook runs on create, so the time slot is already reserved while the customer pays. No other booking can claim the same slot, even if the payment takes several minutes.
+
+#### Notification Integration
+
+Use Payload's `afterChange` hook on the Reservations collection (in your app config, outside the plugin) to trigger notifications when status changes. The plugin does not send notifications itself, giving you full control over messaging.
+
+**Example scenarios:**
+- **Confirmed** — send a confirmation email with appointment details
+- **Upcoming reminder** — trigger a reminder 24 hours before the appointment (via a scheduled task)
+- **Cancelled** — notify the customer and optionally alert staff about the freed slot
+- **No-show** — notify staff for internal tracking
+
+```ts
+// In your payload.config.ts, add an afterChange hook to the reservations collection
+// using Payload's collections override or a separate plugin
+
+const notifyOnStatusChange: CollectionAfterChangeHook = async ({
+  doc,
+  previousDoc,
+  operation,
+}) => {
+  if (operation === 'update' && doc.status !== previousDoc.status) {
+    switch (doc.status) {
+      case 'confirmed':
+        await sendConfirmationEmail(doc)
+        break
+      case 'cancelled':
+        await sendCancellationEmail(doc)
+        break
+    }
+  }
+}
+```
+
+#### Scheduled Cleanup
+
+Reservations that stay `pending` indefinitely (e.g., abandoned payment flows) hold time slots that could be used by other customers. Set up a scheduled task to cancel stale pending reservations:
+
+- Query for `pending` reservations older than your threshold (e.g., 30 minutes)
+- Update them to `cancelled` using the escape hatch to bypass the cancellation notice period
+- Optionally notify the customer that their hold expired
+
+```ts
+// Example: cron job or scheduled task
+const payload = await getPayload({ config })
+
+const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+
+const { docs: staleReservations } = await payload.find({
+  collection: 'reservations',
+  where: {
+    status: { equals: 'pending' },
+    createdAt: { less_than: thirtyMinutesAgo.toISOString() },
+  },
+})
+
+for (const reservation of staleReservations) {
+  await payload.update({
+    collection: 'reservations',
+    id: reservation.id,
+    data: {
+      status: 'cancelled',
+      cancellationReason: 'Automatically cancelled — payment not completed',
+    },
+    context: { skipReservationHooks: true }, // bypass cancellation notice period
+  })
+}
+```
 
 ---
 
