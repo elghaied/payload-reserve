@@ -2,7 +2,7 @@
 import type { AdminViewServerProps } from 'payload'
 
 import { useConfig, useDocumentDrawer } from '@payloadcms/ui'
-import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import styles from './CalendarView.module.css'
 
@@ -59,6 +59,15 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     collectionSlug: reservationSlug,
   })
 
+  const pendingDrawerOpen = useRef(false)
+
+  useEffect(() => {
+    if (pendingDrawerOpen.current) {
+      pendingDrawerOpen.current = false
+      openDrawer()
+    }
+  })
+
   const { rangeEnd, rangeStart } = useMemo(() => {
     const start = new Date(currentDate)
     const end = new Date(currentDate)
@@ -103,43 +112,34 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     void fetchReservations()
   }, [fetchReservations])
 
-  const handleEventClick = useCallback(
-    (e: React.MouseEvent, id: string) => {
+  const handleEventClick = useCallback((e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    setDrawerDocId(id)
+    setInitialData(undefined)
+    pendingDrawerOpen.current = true
+  }, [])
+
+  const handleEventKeyDown = useCallback((e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
       e.stopPropagation()
       setDrawerDocId(id)
       setInitialData(undefined)
-      openDrawer()
-    },
-    [openDrawer],
-  )
-
-  const handleEventKeyDown = useCallback(
-    (e: React.KeyboardEvent, id: string) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        e.stopPropagation()
-        setDrawerDocId(id)
-        setInitialData(undefined)
-        openDrawer()
-      }
-    },
-    [openDrawer],
-  )
+      pendingDrawerOpen.current = true
+    }
+  }, [])
 
   const handleCreateNew = useCallback(() => {
     setDrawerDocId(null)
     setInitialData(undefined)
-    openDrawer()
-  }, [openDrawer])
+    pendingDrawerOpen.current = true
+  }, [])
 
-  const handleDateClick = useCallback(
-    (date: Date) => {
-      setDrawerDocId(null)
-      setInitialData({ startTime: date.toISOString() })
-      openDrawer()
-    },
-    [openDrawer],
-  )
+  const handleDateClick = useCallback((date: Date) => {
+    setDrawerDocId(null)
+    setInitialData({ startTime: date.toISOString() })
+    pendingDrawerOpen.current = true
+  }, [])
 
   const navigate = useCallback(
     (direction: -1 | 1) => {

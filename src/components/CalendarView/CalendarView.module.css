@@ -18,16 +18,25 @@
 }
 
 .navButton {
-  background: var(--theme-elevation-100);
-  border: 1px solid var(--theme-elevation-200);
-  border-radius: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--theme-elevation-250);
   padding: 6px 12px;
   cursor: pointer;
+  font-family: inherit;
   font-size: 0.875rem;
+  color: var(--theme-text);
+  transition: box-shadow 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
 .navButton:hover {
-  background: var(--theme-elevation-200);
+  box-shadow: inset 0 0 0 1px var(--theme-elevation-400);
+}
+
+.navButton:focus-visible {
+  outline: 2px solid var(--theme-text);
+  outline-offset: 2px;
 }
 
 .currentDate {
@@ -37,37 +46,72 @@
 
 .viewToggle {
   display: flex;
-  gap: 4px;
+  gap: 0;
 }
 
 .createButton {
-  background: var(--theme-elevation-500);
-  color: var(--theme-bg);
-  border: 1px solid var(--theme-elevation-500);
-  border-radius: 4px;
+  background: var(--theme-elevation-800);
+  color: var(--theme-elevation-0);
+  border: none;
+  border-radius: 3px;
   padding: 6px 12px;
   cursor: pointer;
+  font-family: inherit;
   font-size: 0.75rem;
   font-weight: 600;
   margin-right: 8px;
+  transition: background-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
 .createButton:hover {
-  opacity: 0.85;
+  background: var(--theme-elevation-600);
+}
+
+.createButton:focus-visible {
+  outline: 2px solid var(--theme-text);
+  outline-offset: 2px;
 }
 
 .viewToggleButton {
-  background: var(--theme-elevation-100);
-  border: 1px solid var(--theme-elevation-200);
-  border-radius: 4px;
+  background: var(--theme-elevation-150);
+  color: var(--theme-elevation-800);
+  border: none;
+  border-radius: 0;
   padding: 6px 12px;
   cursor: pointer;
+  font-family: inherit;
   font-size: 0.75rem;
+  transition: background-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
-.viewToggleButtonActive {
-  background: var(--theme-elevation-500);
-  color: var(--theme-bg);
+.createButton + .viewToggleButton {
+  border-radius: 3px 0 0 3px;
+}
+
+.viewToggleButton + .viewToggleButton {
+  box-shadow: inset 1px 0 0 var(--theme-elevation-200);
+}
+
+.viewToggleButton:last-child {
+  border-radius: 0 3px 3px 0;
+}
+
+.viewToggleButton:hover {
+  background: var(--theme-elevation-100);
+}
+
+.viewToggleButton.viewToggleButtonActive {
+  background: var(--theme-elevation-800);
+  color: var(--theme-elevation-0);
+}
+
+.viewToggleButton.viewToggleButtonActive:hover {
+  background: var(--theme-elevation-800);
+}
+
+.viewToggleButton:focus-visible {
+  outline: 2px solid var(--theme-text);
+  outline-offset: 2px;
 }
 
 .monthGrid {
