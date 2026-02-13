@@ -22,6 +22,7 @@ export function resolveConfig(
       pluginOptions.cancellationNoticePeriod ?? DEFAULT_CANCELLATION_NOTICE_PERIOD,
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,
+    localized: false,
     slugs: {
       reservations: pluginOptions.slugs?.reservations ?? DEFAULT_SLUGS.reservations,
       resources: pluginOptions.slugs?.resources ?? DEFAULT_SLUGS.resources,

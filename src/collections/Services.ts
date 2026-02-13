@@ -16,6 +16,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         name: 'name',
         type: 'text',
         label: ({ t }) => (t as PluginT)('reservation:fieldName'),
+        ...(config.localized ? { localized: true } : {}),
         maxLength: 200,
         required: true,
       },
@@ -23,6 +24,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         name: 'description',
         type: 'textarea',
         label: ({ t }) => (t as PluginT)('reservation:fieldDescription'),
+        ...(config.localized ? { localized: true } : {}),
       },
       {
         name: 'duration',

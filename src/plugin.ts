@@ -20,6 +20,11 @@ export const reservationPlugin =
   (config: Config): Config => {
     const resolved = resolveConfig(pluginOptions)
 
+    // Detect localization from the Payload config
+    if (config.localization) {
+      resolved.localized = true
+    }
+
     if (!config.collections) {
       config.collections = []
     }

@@ -18,6 +18,7 @@ export function createResourcesCollection(
         name: 'name',
         type: 'text',
         label: ({ t }) => (t as PluginT)('reservation:fieldName'),
+        ...(config.localized ? { localized: true } : {}),
         maxLength: 200,
         required: true,
       },
@@ -25,6 +26,7 @@ export function createResourcesCollection(
         name: 'description',
         type: 'textarea',
         label: ({ t }) => (t as PluginT)('reservation:fieldDescription'),
+        ...(config.localized ? { localized: true } : {}),
       },
       {
         name: 'services',

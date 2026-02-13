@@ -38,6 +38,7 @@ export type ResolvedReservationPluginConfig = {
   cancellationNoticePeriod: number
   defaultBufferTime: number
   disabled: boolean
+  localized: boolean
   slugs: {
     reservations: string
     resources: string
