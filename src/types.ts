@@ -3,7 +3,6 @@ import type { CollectionConfig } from 'payload'
 export type ReservationPluginConfig = {
   /** Override access control per collection */
   access?: {
-    customers?: CollectionConfig['access']
     reservations?: CollectionConfig['access']
     resources?: CollectionConfig['access']
     schedules?: CollectionConfig['access']
@@ -19,17 +18,17 @@ export type ReservationPluginConfig = {
   disabled?: boolean
   /** Override collection slugs */
   slugs?: {
-    customers?: string
     reservations?: string
     resources?: string
     schedules?: string
     services?: string
   }
+  /** Slug of the existing auth collection to extend with customer fields (default: 'users') */
+  userCollection?: string
 }
 
 export type ResolvedReservationPluginConfig = {
   access: {
-    customers?: CollectionConfig['access']
     reservations?: CollectionConfig['access']
     resources?: CollectionConfig['access']
     schedules?: CollectionConfig['access']
@@ -40,12 +39,12 @@ export type ResolvedReservationPluginConfig = {
   defaultBufferTime: number
   disabled: boolean
   slugs: {
-    customers: string
     reservations: string
     resources: string
     schedules: string
     services: string
   }
+  userCollection: string
 }
 
 export type ReservationStatus = 'cancelled' | 'completed' | 'confirmed' | 'no-show' | 'pending'

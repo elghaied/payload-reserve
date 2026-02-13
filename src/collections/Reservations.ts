@@ -42,7 +42,7 @@ export function createReservationsCollection(
       {
         name: 'customer',
         type: 'relationship',
-        relationTo: config.slugs.customers,
+        relationTo: config.userCollection,
         required: true,
       },
       {

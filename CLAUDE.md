@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Payload CMS 3.x plugin that adds a reservation/booking system (5 collections, 4 hooks, 3 admin components). Designed for businesses needing appointment scheduling with conflict detection, status workflows, and admin UI.
+A Payload CMS 3.x plugin that adds a reservation/booking system (4 collections + user collection extension, 4 hooks, 3 admin components). Designed for businesses needing appointment scheduling with conflict detection, status workflows, and admin UI.
 
 ## Commands
 
@@ -26,7 +26,7 @@ Running a single integration test: `pnpm vitest -t "test name pattern"`
 
 ### Plugin Pattern
 
-The plugin uses Payload's higher-order function pattern: `(pluginOptions) => (config) => modifiedConfig`. Entry point is `src/plugin.ts` which injects 5 collections and 3 admin components into the Payload config.
+The plugin uses Payload's higher-order function pattern: `(pluginOptions) => (config) => modifiedConfig`. Entry point is `src/plugin.ts` which injects 4 collections, extends the existing users collection with customer fields, and adds 3 admin components into the Payload config.
 
 ### Three Export Paths
 
@@ -36,9 +36,11 @@ The plugin uses Payload's higher-order function pattern: `(pluginOptions) => (co
 
 ### Collection Factory Pattern
 
-Each collection in `src/collections/` is a factory function: `createXxxCollection(resolvedConfig) → CollectionConfig`. The resolved config provides customized slugs, access control, and plugin settings. All 5 collections are grouped under a configurable admin group.
+Each collection in `src/collections/` is a factory function: `createXxxCollection(resolvedConfig) → CollectionConfig`. The resolved config provides customized slugs, access control, and plugin settings. All 4 collections are grouped under a configurable admin group.
 
-**Collections:** Services → Resources → Schedules → Customers → Reservations. Resources reference Services (many-to-many). Schedules belong to Resources. Reservations reference a Service, Resource, and Customer.
+**Collections:** Services → Resources → Schedules → Reservations. Resources reference Services (many-to-many). Schedules belong to Resources. Reservations reference a Service, Resource, and a User (customer).
+
+**User Collection Extension:** Instead of a standalone Customers collection, the plugin extends the existing users collection (configurable via `userCollection` option, default: `'users'`) with `name`, `phone`, `notes`, and `bookings` (join) fields. Fields are only added if they don't already exist.
 
 ### Business Logic Hooks (`src/hooks/reservations/`)
 
@@ -78,5 +80,6 @@ Components access collection slugs via `config.admin.custom.reservationSlugs`.
 - All peer dependencies (payload, react, next) are devDependencies — only `payload ^3.37.0` is a peerDependency.
 
 
-## Documentation 
-@documentation/docs.md 
+## Configuration
+
+The `userCollection` option (default: `'users'`) specifies which existing auth collection to extend with customer fields. The target collection must be defined in the Payload config before the plugin runs.

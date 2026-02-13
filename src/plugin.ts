@@ -1,16 +1,19 @@
-import type { Config } from 'payload'
+import type { Config, Field } from 'payload'
 
 import { deepMergeSimple } from 'payload/shared'
 
 import type { ReservationPluginConfig } from './types.js'
 
-import { createCustomersCollection } from './collections/Customers.js'
 import { createReservationsCollection } from './collections/Reservations.js'
 import { createResourcesCollection } from './collections/Resources.js'
 import { createSchedulesCollection } from './collections/Schedules.js'
 import { createServicesCollection } from './collections/Services.js'
 import { resolveConfig } from './defaults.js'
 import { translations } from './translations/index.js'
+
+/** Check whether a top-level field with the given name already exists */
+const hasField = (fields: Field[], name: string): boolean =>
+  fields.some((f) => 'name' in f && f.name === name)
 
 export const reservationPlugin =
   (pluginOptions: ReservationPluginConfig = {}) =>
@@ -25,14 +28,40 @@ export const reservationPlugin =
       return config
     }
 
-    // Add all 5 collections
+    // Add the 4 plugin collections
     config.collections.push(
       createServicesCollection(resolved),
       createResourcesCollection(resolved),
       createSchedulesCollection(resolved),
-      createCustomersCollection(resolved),
       createReservationsCollection(resolved),
     )
+
+    // Extend the existing user collection with customer fields
+    const userCol = config.collections.find((c) => c.slug === resolved.userCollection)
+    if (userCol) {
+      const fieldsToAdd: Field[] = [
+        { name: 'name', type: 'text', maxLength: 200 },
+        { name: 'phone', type: 'text', maxLength: 50 },
+        { name: 'notes', type: 'textarea' },
+        {
+          name: 'bookings',
+          type: 'join',
+          collection: resolved.slugs.reservations,
+          on: 'customer',
+        },
+      ]
+
+      for (const field of fieldsToAdd) {
+        if (!hasField(userCol.fields, (field as { name: string }).name)) {
+          userCol.fields.push(field)
+        }
+      }
+    } else {
+      console.warn(
+        `[reservation-plugin] Could not find collection "${resolved.userCollection}" to extend with customer fields. ` +
+          'Make sure your Payload config defines this collection before the reservation plugin runs.',
+      )
+    }
 
     // Set up admin configuration
     if (!config.admin) {config.admin = {}}
@@ -40,7 +69,10 @@ export const reservationPlugin =
 
     // Store slugs in admin custom for component access
     if (!config.admin.custom) {config.admin.custom = {}}
-    config.admin.custom.reservationSlugs = resolved.slugs
+    config.admin.custom.reservationSlugs = {
+      ...resolved.slugs,
+      userCollection: resolved.userCollection,
+    }
 
     // Add dashboard widget
     if (!config.admin.components.beforeDashboard) {
