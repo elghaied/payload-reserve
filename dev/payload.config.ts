@@ -3,7 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
 import path from 'path'
 import { buildConfig } from 'payload'
-import { reservationPlugin } from 'reservation-plugin'
+import { reservationPlugin } from 'payload-reserve'
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
