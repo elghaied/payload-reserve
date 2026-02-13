@@ -57,8 +57,9 @@ export const reservationPlugin =
         }
       }
     } else {
+      // eslint-disable-next-line no-console
       console.warn(
-        `[reservation-plugin] Could not find collection "${resolved.userCollection}" to extend with customer fields. ` +
+        `[payload-reserve] Could not find collection "${resolved.userCollection}" to extend with customer fields. ` +
           'Make sure your Payload config defines this collection before the reservation plugin runs.',
       )
     }
@@ -83,10 +84,10 @@ export const reservationPlugin =
     }
     config.admin.dashboard.widgets.push({
       slug: 'reservation-todays-reservations',
-      ComponentPath: 'reservation-plugin/rsc#DashboardWidgetServer',
+      ComponentPath: 'payload-reserve/rsc#DashboardWidgetServer',
       label: 'Today\'s Reservations',
-      minWidth: 'medium',
       maxWidth: 'large',
+      minWidth: 'medium',
     })
 
     // Add availability overview as custom admin view
@@ -94,7 +95,7 @@ export const reservationPlugin =
       config.admin.components.views = {}
     }
     ;(config.admin.components.views as Record<string, unknown>)['reservation-availability'] = {
-      Component: 'reservation-plugin/client#AvailabilityOverview',
+      Component: 'payload-reserve/client#AvailabilityOverview',
       path: '/reservation-availability',
     }
 

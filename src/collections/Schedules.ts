@@ -17,11 +17,13 @@ export function createSchedulesCollection(
       {
         name: 'name',
         type: 'text',
+        label: ({ t }) => (t as PluginT)('reservation:fieldName'),
         required: true,
       },
       {
         name: 'resource',
         type: 'relationship',
+        label: ({ t }) => (t as PluginT)('reservation:fieldResource'),
         relationTo: config.slugs.resources,
         required: true,
       },
@@ -29,6 +31,7 @@ export function createSchedulesCollection(
         name: 'scheduleType',
         type: 'select',
         defaultValue: 'recurring',
+        label: ({ t }) => (t as PluginT)('reservation:fieldScheduleType'),
         options: [
           {
             label: ({ t }) => (t as PluginT)('reservation:scheduleTypeRecurring'),
@@ -50,6 +53,7 @@ export function createSchedulesCollection(
           {
             name: 'day',
             type: 'select',
+            label: ({ t }) => (t as PluginT)('reservation:fieldDay'),
             options: [
               { label: ({ t }) => (t as PluginT)('reservation:dayMonday'), value: 'mon' },
               { label: ({ t }) => (t as PluginT)('reservation:dayTuesday'), value: 'tue' },
@@ -80,6 +84,7 @@ export function createSchedulesCollection(
             required: true,
           },
         ],
+        label: ({ t }) => (t as PluginT)('reservation:fieldRecurringSlots'),
       },
       {
         name: 'manualSlots',
@@ -96,6 +101,7 @@ export function createSchedulesCollection(
                 pickerAppearance: 'dayOnly',
               },
             },
+            label: ({ t }) => (t as PluginT)('reservation:fieldDate'),
             required: true,
           },
           {
@@ -117,6 +123,7 @@ export function createSchedulesCollection(
             required: true,
           },
         ],
+        label: ({ t }) => (t as PluginT)('reservation:fieldManualSlots'),
       },
       {
         name: 'exceptions',
@@ -130,13 +137,16 @@ export function createSchedulesCollection(
                 pickerAppearance: 'dayOnly',
               },
             },
+            label: ({ t }) => (t as PluginT)('reservation:fieldDate'),
             required: true,
           },
           {
             name: 'reason',
             type: 'text',
+            label: ({ t }) => (t as PluginT)('reservation:fieldReason'),
           },
         ],
+        label: ({ t }) => (t as PluginT)('reservation:fieldExceptions'),
       },
       {
         name: 'active',
@@ -145,7 +155,12 @@ export function createSchedulesCollection(
           position: 'sidebar',
         },
         defaultValue: true,
+        label: ({ t }) => (t as PluginT)('reservation:fieldActive'),
       },
     ],
+    labels: {
+      plural: ({ t }) => (t as PluginT)('reservation:collectionSchedules'),
+      singular: ({ t }) => (t as PluginT)('reservation:collectionSchedules'),
+    },
   }
 }

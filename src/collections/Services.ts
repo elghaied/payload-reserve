@@ -15,12 +15,14 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
       {
         name: 'name',
         type: 'text',
+        label: ({ t }) => (t as PluginT)('reservation:fieldName'),
         maxLength: 200,
         required: true,
       },
       {
         name: 'description',
         type: 'textarea',
+        label: ({ t }) => (t as PluginT)('reservation:fieldDescription'),
       },
       {
         name: 'duration',
@@ -35,6 +37,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         admin: {
           step: 0.01,
         },
+        label: ({ t }) => (t as PluginT)('reservation:fieldPrice'),
         min: 0,
       },
       {
@@ -58,7 +61,12 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
           position: 'sidebar',
         },
         defaultValue: true,
+        label: ({ t }) => (t as PluginT)('reservation:fieldActive'),
       },
     ],
+    labels: {
+      plural: ({ t }) => (t as PluginT)('reservation:collectionServices'),
+      singular: ({ t }) => (t as PluginT)('reservation:collectionServices'),
+    },
   }
 }

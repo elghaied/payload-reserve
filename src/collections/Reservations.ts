@@ -18,7 +18,7 @@ export function createReservationsCollection(
       components: {
         views: {
           list: {
-            Component: 'reservation-plugin/client#CalendarView',
+            Component: 'payload-reserve/client#CalendarView',
           },
         },
       },
@@ -30,18 +30,21 @@ export function createReservationsCollection(
       {
         name: 'service',
         type: 'relationship',
+        label: ({ t }) => (t as PluginT)('reservation:fieldService'),
         relationTo: config.slugs.services,
         required: true,
       },
       {
         name: 'resource',
         type: 'relationship',
+        label: ({ t }) => (t as PluginT)('reservation:fieldResource'),
         relationTo: config.slugs.resources,
         required: true,
       },
       {
         name: 'customer',
         type: 'relationship',
+        label: ({ t }) => (t as PluginT)('reservation:fieldCustomer'),
         relationTo: config.userCollection,
         required: true,
       },
@@ -53,6 +56,7 @@ export function createReservationsCollection(
             pickerAppearance: 'dayAndTime',
           },
         },
+        label: ({ t }) => (t as PluginT)('reservation:fieldStartTime'),
         required: true,
       },
       {
@@ -64,11 +68,13 @@ export function createReservationsCollection(
           },
           readOnly: true,
         },
+        label: ({ t }) => (t as PluginT)('reservation:fieldEndTime'),
       },
       {
         name: 'status',
         type: 'select',
         defaultValue: 'pending',
+        label: ({ t }) => (t as PluginT)('reservation:fieldStatus'),
         options: [
           { label: ({ t }) => (t as PluginT)('reservation:statusPending'), value: 'pending' },
           { label: ({ t }) => (t as PluginT)('reservation:statusConfirmed'), value: 'confirmed' },
@@ -83,10 +89,12 @@ export function createReservationsCollection(
         admin: {
           condition: (_, siblingData) => siblingData?.status === 'cancelled',
         },
+        label: ({ t }) => (t as PluginT)('reservation:fieldCancellationReason'),
       },
       {
         name: 'notes',
         type: 'textarea',
+        label: ({ t }) => (t as PluginT)('reservation:fieldNotes'),
       },
     ],
     hooks: {
@@ -96,6 +104,10 @@ export function createReservationsCollection(
         validateStatusTransition(),
         validateCancellation(config),
       ],
+    },
+    labels: {
+      plural: ({ t }) => (t as PluginT)('reservation:collectionReservations'),
+      singular: ({ t }) => (t as PluginT)('reservation:collectionReservations'),
     },
   }
 }

@@ -1,4 +1,4 @@
-# Reservation Plugin for Payload CMS 3.x
+# payload-reserve - Reservation Plugin for Payload CMS 3.x
 
 A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Designed for salons, clinics, consultants, and any business that needs appointment scheduling with conflict prevention, status workflows, and admin UI components.
 
@@ -60,10 +60,10 @@ A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Design
 
 ```bash
 # Install the plugin as a dependency
-pnpm add reservation-plugin
+pnpm add payload-reserve
 
 # Or if developing locally, link it
-pnpm link ./plugins/reservation-plugin
+pnpm link ./plugins/payload-reserve
 ```
 
 **Peer Dependency:** Requires `payload ^3.69.0` (modular dashboard widget API).
@@ -76,7 +76,7 @@ Add the plugin to your `payload.config.ts`:
 
 ```typescript
 import { buildConfig } from 'payload'
-import { reservationPlugin } from 'reservation-plugin'
+import { reservationPlugin } from 'payload-reserve'
 
 export default buildConfig({
   // ... your existing config
@@ -97,8 +97,8 @@ That's it. The plugin registers 4 collections, extends your existing Users colle
 All options are optional. The plugin works out of the box with sensible defaults.
 
 ```typescript
-import { reservationPlugin } from 'reservation-plugin'
-import type { ReservationPluginConfig } from 'reservation-plugin'
+import { reservationPlugin } from 'payload-reserve'
+import type { ReservationPluginConfig } from 'payload-reserve'
 
 const config: ReservationPluginConfig = {
   // Disable the plugin entirely (collections are still registered for schema consistency)
@@ -729,7 +729,7 @@ The plugin is backend-only — it adds collections, hooks, and admin UI to Paylo
 By default all collections use Payload's default access control (authenticated users only). To allow public booking, pass `access` overrides in your plugin config:
 
 ```ts
-import { reservationPlugin } from '@gshelllabs/reservation-plugin'
+import { reservationPlugin } from 'payload-reserve'
 
 reservationPlugin({
   access: {
@@ -813,7 +813,7 @@ import {
   addMinutes,
   doRangesOverlap,
   computeBlockedWindow,
-} from '@gshelllabs/reservation-plugin'
+} from 'payload-reserve'
 
 // 1. Get the resource's active schedule
 const { docs: schedules } = await payload.find({
@@ -1096,8 +1096,8 @@ src/
 ### Plugin Export
 
 ```typescript
-import { reservationPlugin } from 'reservation-plugin'
-import type { ReservationPluginConfig } from 'reservation-plugin'
+import { reservationPlugin } from 'payload-reserve'
+import type { ReservationPluginConfig } from 'payload-reserve'
 ```
 
 ### Client Exports
