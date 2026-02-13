@@ -49,5 +49,7 @@ yarn-error.log*
 /playwright/.cache/
 
 
-# claude 
+# claude
 .claude/
+CLAUDE.md
+claude-instructions/
