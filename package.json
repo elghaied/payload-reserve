@@ -13,6 +13,15 @@
     "calendar"
   ],
   "license": "MIT",
+  "author": "elghaied",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elghaied/payload-reserve.git"
+  },
+  "homepage": "https://github.com/elghaied/payload-reserve#readme",
+  "bugs": {
+    "url": "https://github.com/elghaied/payload-reserve/issues"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -52,7 +61,8 @@
     "lint:fix": "eslint ./src --fix",
     "test": "pnpm test:int && pnpm test:e2e",
     "test:e2e": "playwright test",
-    "test:int": "vitest"
+    "test:int": "vitest",
+    "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -123,7 +133,5 @@
       "esbuild",
       "unrs-resolver"
     ]
-  },
-  "registry": "https://registry.npmjs.org/",
-  "dependencies": {}
+  }
 }
