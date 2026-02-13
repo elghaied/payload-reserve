@@ -66,7 +66,7 @@ pnpm add reservation-plugin
 pnpm link ./plugins/reservation-plugin
 ```
 
-**Peer Dependency:** Requires `payload ^3.37.0`.
+**Peer Dependency:** Requires `payload ^3.69.0` (modular dashboard widget API).
 
 ---
 
@@ -630,9 +630,11 @@ for (const reservation of staleReservations) {
 ### Dashboard Widget
 
 **Type:** React Server Component (RSC)
-**Location:** Before Dashboard
+**Location:** Modular Dashboard Widget (`admin.dashboard.widgets`)
+**Widget slug:** `reservation-todays-reservations`
+**Default size:** medium–large
 
-Displays a summary of today's reservations:
+Uses Payload's modular dashboard widget system (v3.69.0+), which supports configurable sizing, drag-and-drop layout, and add/remove functionality. Displays a summary of today's reservations:
 
 - **Total** reservations today
 - **Upcoming** reservations (not yet completed/cancelled, start time in future)

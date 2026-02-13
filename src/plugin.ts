@@ -75,12 +75,19 @@ export const reservationPlugin =
     }
 
     // Add dashboard widget
-    if (!config.admin.components.beforeDashboard) {
-      config.admin.components.beforeDashboard = []
+    if (!config.admin.dashboard) {
+      config.admin.dashboard = { widgets: [] }
     }
-    config.admin.components.beforeDashboard.push(
-      'reservation-plugin/rsc#DashboardWidgetServer',
-    )
+    if (!config.admin.dashboard.widgets) {
+      config.admin.dashboard.widgets = []
+    }
+    config.admin.dashboard.widgets.push({
+      slug: 'reservation-todays-reservations',
+      ComponentPath: 'reservation-plugin/rsc#DashboardWidgetServer',
+      label: 'Today\'s Reservations',
+      minWidth: 'medium',
+      maxWidth: 'large',
+    })
 
     // Add availability overview as custom admin view
     if (!config.admin.components.views) {

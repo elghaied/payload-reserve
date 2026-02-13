@@ -1,11 +1,12 @@
-import type { ServerComponentProps } from 'payload'
+import type { WidgetServerProps } from 'payload'
 
 import type { PluginT } from '../../translations/index.js'
 
 import styles from './DashboardWidget.module.css'
 
-export const DashboardWidgetServer = async (props: ServerComponentProps) => {
-  const { i18n, payload } = props
+export const DashboardWidgetServer = async (props: WidgetServerProps) => {
+  const { req } = props
+  const { i18n, payload } = req
   const t = i18n.t as PluginT
 
   const slugs = payload.config.admin?.custom?.reservationSlugs
