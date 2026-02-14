@@ -5,6 +5,7 @@
   "collectionReservations": "Reservations",
   "fieldName": "Name",
   "fieldDescription": "Description",
+  "fieldImage": "Image",
   "fieldPrice": "Price",
   "fieldActive": "Active",
   "fieldServices": "Services",

@@ -20,6 +20,7 @@ export type ReservationPluginConfig = {
   disabled?: boolean
   /** Override collection slugs */
   slugs?: {
+    media?: string
     reservations?: string
     resources?: string
     schedules?: string
@@ -43,6 +44,7 @@ export type ResolvedReservationPluginConfig = {
   disabled: boolean
   localized: boolean
   slugs: {
+    media: string
     reservations: string
     resources: string
     schedules: string

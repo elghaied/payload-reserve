@@ -1,6 +1,7 @@
 import type { ReservationPluginConfig, ResolvedReservationPluginConfig } from './types.js'
 
 export const DEFAULT_SLUGS = {
+  media: 'media',
   reservations: 'reservations',
   resources: 'resources',
   schedules: 'schedules',
@@ -26,6 +27,7 @@ export function resolveConfig(
     disabled: pluginOptions.disabled ?? false,
     localized: false,
     slugs: {
+      media: pluginOptions.slugs?.media ?? DEFAULT_SLUGS.media,
       reservations: pluginOptions.slugs?.reservations ?? DEFAULT_SLUGS.reservations,
       resources: pluginOptions.slugs?.resources ?? DEFAULT_SLUGS.resources,
       schedules: pluginOptions.slugs?.schedules ?? DEFAULT_SLUGS.schedules,

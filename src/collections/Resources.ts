@@ -23,6 +23,12 @@ export function createResourcesCollection(
         required: true,
       },
       {
+        name: 'image',
+        type: 'upload',
+        relationTo: config.slugs.media,
+        label: ({ t }) => (t as PluginT)('reservation:fieldImage'),
+      },
+      {
         name: 'description',
         type: 'textarea',
         label: ({ t }) => (t as PluginT)('reservation:fieldDescription'),
