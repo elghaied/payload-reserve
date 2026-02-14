@@ -82,5 +82,9 @@
   "dashboardNextAppointment": "Next Appointment",
   "dashboardTime": "Time:",
   "dashboardStatus": "Status:",
-  "dashboardNoUpcoming": "No upcoming appointments today."
+  "dashboardNoUpcoming": "No upcoming appointments today.",
+  "fieldCustomerSearch": "Search customers...",
+  "fieldCustomerNoResults": "No customers found",
+  "fieldCustomerCreateNew": "Create new customer",
+  "fieldCustomerClear": "Clear selection"
 }

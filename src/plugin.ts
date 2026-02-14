@@ -9,6 +9,7 @@ import { createResourcesCollection } from './collections/Resources.js'
 import { createSchedulesCollection } from './collections/Schedules.js'
 import { createServicesCollection } from './collections/Services.js'
 import { resolveConfig } from './defaults.js'
+import { createCustomerSearchEndpoint } from './endpoints/customerSearch.js'
 import { translations } from './translations/index.js'
 
 /** Check whether a top-level field with the given name already exists */
@@ -61,6 +62,12 @@ export const payloadReserve =
           userCol.fields.push(field)
         }
       }
+
+      // Enable multi-field search on the user collection
+      if (!userCol.admin) {userCol.admin = {}}
+      if (!userCol.admin.listSearchableFields) {
+        userCol.admin.listSearchableFields = ['name', 'phone', 'email']
+      }
     } else {
       // eslint-disable-next-line no-console
       console.warn(
@@ -68,6 +75,10 @@ export const payloadReserve =
           'Make sure your Payload config defines this collection before the reservation plugin runs.',
       )
     }
+
+    // Register custom endpoints
+    if (!config.endpoints) {config.endpoints = []}
+    config.endpoints.push(createCustomerSearchEndpoint(resolved))
 
     // Set up admin configuration
     if (!config.admin) {config.admin = {}}
@@ -79,6 +90,7 @@ export const payloadReserve =
       ...resolved.slugs,
       userCollection: resolved.userCollection,
     }
+    config.admin.custom.reservationCustomerRole = resolved.customerRole
 
     // Add dashboard widget
     if (!config.admin.dashboard) {

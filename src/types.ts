@@ -12,6 +12,8 @@ export type ReservationPluginConfig = {
   adminGroup?: string
   /** Hours of notice required before cancellation */
   cancellationNoticePeriod?: number
+  /** Role to filter customers by in the reservation form. Set false to disable filtering. (default: 'customer') */
+  customerRole?: false | string
   /** Default buffer time in minutes between reservations */
   defaultBufferTime?: number
   /** Disable the plugin entirely */
@@ -36,6 +38,7 @@ export type ResolvedReservationPluginConfig = {
   }
   adminGroup: string
   cancellationNoticePeriod: number
+  customerRole: false | string
   defaultBufferTime: number
   disabled: boolean
   localized: boolean

@@ -27,6 +27,7 @@ A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Design
 - [Admin UI Components](#admin-ui-components)
   - [Dashboard Widget](#dashboard-widget)
   - [Calendar View](#calendar-view)
+  - [Customer Picker](#customer-picker)
   - [Availability Overview](#availability-overview)
 - [Utilities](#utilities)
 - [Development](#development)
@@ -49,6 +50,7 @@ A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Design
 - **Status Legend** - Color key displayed in the calendar explaining each status color
 - **Current Time Indicator** - Red line in week/day views marking the current time
 - **Dashboard Widget** - Server component showing today's booking stats at a glance
+- **Customer Picker** - Rich customer search field with multi-field search (name, phone, email), inline create/edit via document drawer, and optional role filtering
 - **Availability Grid** - Weekly overview of resource availability vs. booked slots
 - **Recurring & Manual Schedules** - Flexible schedule types with exception dates
 - **Fully Configurable** - Override slugs, access control, buffer times, and admin grouping
@@ -125,6 +127,10 @@ const config: ReservationPluginConfig = {
   // Minimum hours of notice required before cancellation
   cancellationNoticePeriod: 24,             // default (hours)
 
+  // Filter customers by role in the reservation form
+  // Set to a role string to filter, or false to show all users
+  customerRole: false,                      // default (no filtering)
+
   // Override access control per collection
   access: {
     services: {
@@ -155,6 +161,7 @@ payloadReserve(config)
 | `adminGroup` | `'Reservations'` | Admin panel group name |
 | `defaultBufferTime` | `0` | Default buffer (minutes) between bookings |
 | `cancellationNoticePeriod` | `24` | Minimum hours notice for cancellation |
+| `customerRole` | `false` | Filter customers by role in reservation form (`string` or `false` to disable) |
 
 ---
 
@@ -675,6 +682,32 @@ A CSS Grid-based calendar (no external dependencies) with three view modes:
 - **Current time indicator:** A red horizontal line in week/day views showing the current time position within the matching hour cell
 - Fetches data via REST API for the visible date range
 
+### Customer Picker
+
+**Type:** Client Component
+**Location:** Replaces the default Reservations `customer` relationship field
+
+A custom field component that replaces the standard relationship dropdown with a rich customer search experience:
+
+- **Multi-field search** — searches across customer name, phone, and email simultaneously using debounced `contains` queries (300ms debounce)
+- **Rich dropdown** — each result shows the customer's name (bold), phone number, and email address
+- **Selected display** — selected customer shows full details (name, phone, email) instead of just a name
+- **Inline create** — "Create new customer" button opens a Payload document drawer to create a customer without leaving the reservation form
+- **Role filtering** — when `customerRole` is set (e.g., `'customer'`), only users with that role appear in search results. Set to `false` (default) to show all users
+- **Custom search endpoint** — uses `/api/reservation-customer-search` for efficient multi-field search with pagination
+
+**Configuration:**
+
+```typescript
+// Show all users (default)
+payloadReserve()
+
+// Only show users with role 'customer'
+payloadReserve({ customerRole: 'customer' })
+```
+
+> **Note:** When `customerRole` is set, your user collection must have a `role` field. The plugin does not add this field — define it in your Users collection config.
+
 ### Availability Overview
 
 **Type:** Client Component
@@ -1073,10 +1106,16 @@ src/
     slotUtils.ts                        # Time math helpers
     scheduleUtils.ts                    # Schedule resolution helpers
 
+  endpoints/
+    customerSearch.ts                    # Custom search endpoint for customer picker
+
   components/
     CalendarView/
       index.tsx                         # Client: calendar for reservations
       CalendarView.module.css
+    CustomerField/
+      index.tsx                         # Client: rich customer picker field
+      CustomerField.module.css
     DashboardWidget/
       DashboardWidgetServer.tsx         # RSC: today's booking stats
       DashboardWidget.module.css
@@ -1085,7 +1124,7 @@ src/
       AvailabilityOverview.module.css
 
   exports/
-    client.ts                           # CalendarView, AvailabilityOverview
+    client.ts                           # CalendarView, AvailabilityOverview, CustomerField
     rsc.ts                              # DashboardWidgetServer
 ```
 
@@ -1103,7 +1142,7 @@ import type { ReservationPluginConfig } from 'payload-reserve'
 ### Client Exports
 
 ```typescript
-import { CalendarView, AvailabilityOverview } from 'reservation-plugin/client'
+import { CalendarView, AvailabilityOverview, CustomerField } from 'reservation-plugin/client'
 ```
 
 ### RSC Exports

@@ -47,6 +47,16 @@ export function createReservationsCollection(
         label: ({ t }) => (t as PluginT)('reservation:fieldCustomer'),
         relationTo: config.userCollection,
         required: true,
+        ...(config.customerRole
+          ? { filterOptions: () => ({ role: { equals: config.customerRole } }) }
+          : {}),
+        admin: {
+          allowCreate: true,
+          allowEdit: true,
+          components: {
+            Field: 'payload-reserve/client#CustomerField',
+          },
+        },
       },
       {
         name: 'startTime',
