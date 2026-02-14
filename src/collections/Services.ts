@@ -21,6 +21,12 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         required: true,
       },
       {
+        name: 'image',
+        type: 'upload',
+        label: ({ t }) => (t as PluginT)('reservation:fieldImage'),
+        relationTo: config.slugs.media,
+      },
+      {
         name: 'description',
         type: 'textarea',
         label: ({ t }) => (t as PluginT)('reservation:fieldDescription'),
