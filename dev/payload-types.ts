@@ -70,9 +70,9 @@ export interface Config {
     users: User;
     posts: Post;
     media: Media;
-    'reservation-services': ReservationService;
-    'reservation-resources': ReservationResource;
-    'reservation-schedules': ReservationSchedule;
+    services: Service;
+    resources: Resource;
+    schedules: Schedule;
     reservations: Reservation;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
@@ -88,9 +88,9 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
-    'reservation-services': ReservationServicesSelect<false> | ReservationServicesSelect<true>;
-    'reservation-resources': ReservationResourcesSelect<false> | ReservationResourcesSelect<true>;
-    'reservation-schedules': ReservationSchedulesSelect<false> | ReservationSchedulesSelect<true>;
+    services: ServicesSelect<false> | ServicesSelect<true>;
+    resources: ResourcesSelect<false> | ResourcesSelect<true>;
+    schedules: SchedulesSelect<false> | SchedulesSelect<true>;
     reservations: ReservationsSelect<false> | ReservationsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -167,8 +167,8 @@ export interface User {
  */
 export interface Reservation {
   id: string;
-  service: string | ReservationService;
-  resource: string | ReservationResource;
+  service: string | Service;
+  resource: string | Resource;
   customer: string | User;
   startTime: string;
   endTime?: string | null;
@@ -180,9 +180,9 @@ export interface Reservation {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "reservation-services".
+ * via the `definition` "services".
  */
-export interface ReservationService {
+export interface Service {
   id: string;
   name: string;
   description?: string | null;
@@ -196,13 +196,13 @@ export interface ReservationService {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "reservation-resources".
+ * via the `definition` "resources".
  */
-export interface ReservationResource {
+export interface Resource {
   id: string;
   name: string;
   description?: string | null;
-  services: (string | ReservationService)[];
+  services: (string | Service)[];
   active?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -236,12 +236,12 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "reservation-schedules".
+ * via the `definition` "schedules".
  */
-export interface ReservationSchedule {
+export interface Schedule {
   id: string;
   name: string;
-  resource: string | ReservationResource;
+  resource: string | Resource;
   scheduleType?: ('recurring' | 'manual') | null;
   recurringSlots?:
     | {
@@ -307,16 +307,16 @@ export interface PayloadLockedDocument {
         value: string | Media;
       } | null)
     | ({
-        relationTo: 'reservation-services';
-        value: string | ReservationService;
+        relationTo: 'services';
+        value: string | Service;
       } | null)
     | ({
-        relationTo: 'reservation-resources';
-        value: string | ReservationResource;
+        relationTo: 'resources';
+        value: string | Resource;
       } | null)
     | ({
-        relationTo: 'reservation-schedules';
-        value: string | ReservationSchedule;
+        relationTo: 'schedules';
+        value: string | Schedule;
       } | null)
     | ({
         relationTo: 'reservations';
@@ -417,9 +417,9 @@ export interface MediaSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "reservation-services_select".
+ * via the `definition` "services_select".
  */
-export interface ReservationServicesSelect<T extends boolean = true> {
+export interface ServicesSelect<T extends boolean = true> {
   name?: T;
   description?: T;
   duration?: T;
@@ -432,9 +432,9 @@ export interface ReservationServicesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "reservation-resources_select".
+ * via the `definition` "resources_select".
  */
-export interface ReservationResourcesSelect<T extends boolean = true> {
+export interface ResourcesSelect<T extends boolean = true> {
   name?: T;
   description?: T;
   services?: T;
@@ -444,9 +444,9 @@ export interface ReservationResourcesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "reservation-schedules_select".
+ * via the `definition` "schedules_select".
  */
-export interface ReservationSchedulesSelect<T extends boolean = true> {
+export interface SchedulesSelect<T extends boolean = true> {
   name?: T;
   resource?: T;
   scheduleType?: T;

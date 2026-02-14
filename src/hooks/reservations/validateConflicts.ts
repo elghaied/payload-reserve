@@ -23,7 +23,7 @@ export const validateConflicts =
       try {
         const service = await req.payload.findByID({
           id: serviceId,
-          collection: config.slugs.services as 'reservation-services',
+          collection: config.slugs.services as 'services',
           req,
         })
         if (service) {

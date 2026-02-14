@@ -3,7 +3,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
 import path from 'path'
 import { buildConfig } from 'payload'
-import { reservationPlugin } from 'payload-reserve'
+import { payloadReserve } from 'payload-reserve'
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
@@ -63,7 +63,7 @@ const buildConfigWithMemoryDB = async () => {
       await seed(payload)
     },
     plugins: [
-      reservationPlugin({
+      payloadReserve({
         cancellationNoticePeriod: 24,
         defaultBufferTime: 10,
       }),

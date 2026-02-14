@@ -76,12 +76,12 @@ Add the plugin to your `payload.config.ts`:
 
 ```typescript
 import { buildConfig } from 'payload'
-import { reservationPlugin } from 'payload-reserve'
+import { payloadReserve } from 'payload-reserve'
 
 export default buildConfig({
   // ... your existing config
   plugins: [
-    reservationPlugin(),
+    payloadReserve(),
   ],
 })
 ```
@@ -97,7 +97,7 @@ That's it. The plugin registers 4 collections, extends your existing Users colle
 All options are optional. The plugin works out of the box with sensible defaults.
 
 ```typescript
-import { reservationPlugin } from 'payload-reserve'
+import { payloadReserve } from 'payload-reserve'
 import type { ReservationPluginConfig } from 'payload-reserve'
 
 const config: ReservationPluginConfig = {
@@ -106,9 +106,9 @@ const config: ReservationPluginConfig = {
 
   // Override collection slugs
   slugs: {
-    services: 'reservation-services',       // default
-    resources: 'reservation-resources',      // default
-    schedules: 'reservation-schedules',      // default
+    services: 'services',       // default
+    resources: 'resources',      // default
+    schedules: 'schedules',      // default
     reservations: 'reservations',            // default
   },
 
@@ -139,7 +139,7 @@ const config: ReservationPluginConfig = {
   },
 }
 
-reservationPlugin(config)
+payloadReserve(config)
 ```
 
 ### Configuration Defaults
@@ -147,9 +147,9 @@ reservationPlugin(config)
 | Option | Default | Description |
 |--------|---------|-------------|
 | `disabled` | `false` | Disable plugin functionality |
-| `slugs.services` | `'reservation-services'` | Services collection slug |
-| `slugs.resources` | `'reservation-resources'` | Resources collection slug |
-| `slugs.schedules` | `'reservation-schedules'` | Schedules collection slug |
+| `slugs.services` | `'services'` | Services collection slug |
+| `slugs.resources` | `'resources'` | Resources collection slug |
+| `slugs.schedules` | `'schedules'` | Schedules collection slug |
 | `slugs.reservations` | `'reservations'` | Reservations collection slug |
 | `userCollection` | `'users'` | Existing auth collection to extend with customer fields |
 | `adminGroup` | `'Reservations'` | Admin panel group name |
@@ -162,7 +162,7 @@ reservationPlugin(config)
 
 ### Services
 
-**Slug:** `reservation-services`
+**Slug:** `services`
 
 Defines what can be booked (e.g., "Haircut", "Consultation", "Massage").
 
@@ -179,7 +179,7 @@ Defines what can be booked (e.g., "Haircut", "Consultation", "Massage").
 **Example:**
 ```typescript
 await payload.create({
-  collection: 'reservation-services',
+  collection: 'services',
   data: {
     name: 'Haircut',
     description: 'Standard haircut service',
@@ -194,7 +194,7 @@ await payload.create({
 
 ### Resources
 
-**Slug:** `reservation-resources`
+**Slug:** `resources`
 
 Who or what performs the service (e.g., a stylist, a room, a consultant).
 
@@ -208,7 +208,7 @@ Who or what performs the service (e.g., a stylist, a room, a consultant).
 **Example:**
 ```typescript
 await payload.create({
-  collection: 'reservation-resources',
+  collection: 'resources',
   data: {
     name: 'Alice Johnson',
     description: 'Senior Stylist',
@@ -220,7 +220,7 @@ await payload.create({
 
 ### Schedules
 
-**Slug:** `reservation-schedules`
+**Slug:** `schedules`
 
 Defines when a resource is available. Supports **recurring** (weekly pattern) and **manual** (specific dates) modes, plus exception dates.
 
@@ -245,7 +245,7 @@ Defines when a resource is available. Supports **recurring** (weekly pattern) an
 **Example - Recurring Schedule:**
 ```typescript
 await payload.create({
-  collection: 'reservation-schedules',
+  collection: 'schedules',
   data: {
     name: 'Alice - Weekdays',
     resource: aliceId,
@@ -729,9 +729,9 @@ The plugin is backend-only — it adds collections, hooks, and admin UI to Paylo
 By default all collections use Payload's default access control (authenticated users only). To allow public booking, pass `access` overrides in your plugin config:
 
 ```ts
-import { reservationPlugin } from 'payload-reserve'
+import { payloadReserve } from 'payload-reserve'
 
-reservationPlugin({
+payloadReserve({
   access: {
     services: {
       read: () => true,       // anyone can browse services
@@ -771,7 +771,7 @@ export default async function BookingPage() {
   const payload = await getPayload({ config })
 
   const { docs: services } = await payload.find({
-    collection: 'reservation-services',
+    collection: 'services',
     overrideAccess: false,
     where: { active: { equals: true } },
   })
@@ -794,7 +794,7 @@ Once a customer picks a service, load the resources that offer it:
 
 ```ts
 const { docs: resources } = await payload.find({
-  collection: 'reservation-resources',
+  collection: 'resources',
   overrideAccess: false,
   where: {
     services: { contains: selectedServiceId },
@@ -817,7 +817,7 @@ import {
 
 // 1. Get the resource's active schedule
 const { docs: schedules } = await payload.find({
-  collection: 'reservation-schedules',
+  collection: 'schedules',
   overrideAccess: false,
   where: {
     resource: { equals: resourceId },
@@ -946,7 +946,7 @@ If you prefer a client-side-only approach (e.g., a separate SPA), use Payload's 
 
 ```ts
 // Fetch services
-const res = await fetch('https://your-site.com/api/reservation-services?where[active][equals]=true')
+const res = await fetch('https://your-site.com/api/services?where[active][equals]=true')
 const { docs: services } = await res.json()
 
 // Create a reservation (customer is a user ID)
@@ -1096,7 +1096,7 @@ src/
 ### Plugin Export
 
 ```typescript
-import { reservationPlugin } from 'payload-reserve'
+import { payloadReserve } from 'payload-reserve'
 import type { ReservationPluginConfig } from 'payload-reserve'
 ```
 

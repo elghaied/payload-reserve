@@ -2,9 +2,9 @@ import type { ReservationPluginConfig, ResolvedReservationPluginConfig } from '.
 
 export const DEFAULT_SLUGS = {
   reservations: 'reservations',
-  resources: 'reservation-resources',
-  schedules: 'reservation-schedules',
-  services: 'reservation-services',
+  resources: 'resources',
+  schedules: 'schedules',
+  services: 'services',
 } as const
 
 export const DEFAULT_ADMIN_GROUP = 'Reservations'

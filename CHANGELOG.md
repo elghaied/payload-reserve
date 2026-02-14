@@ -71,6 +71,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 #### Exports
 
-- `.` (main): `reservationPlugin` function + types
+- `.` (main): `payloadReserve` function + types
 - `./client`: `CalendarView`, `AvailabilityOverview` client components
 - `./rsc`: `DashboardWidgetServer` React Server Component

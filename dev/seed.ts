@@ -22,13 +22,13 @@ export const seed = async (payload: Payload) => {
 
   // Check if reservation data already seeded
   const { totalDocs: existingServices } = await payload.count({
-    collection: 'reservation-services' as 'users',
+    collection: 'services' as 'users',
   })
   if (existingServices > 0) {return}
 
   // Seed services
   const haircut = await payload.create({
-    collection: 'reservation-services' as 'users',
+    collection: 'services' as 'users',
     data: {
       name: 'Haircut',
       active: true,
@@ -41,7 +41,7 @@ export const seed = async (payload: Payload) => {
   })
 
   const coloring = await payload.create({
-    collection: 'reservation-services' as 'users',
+    collection: 'services' as 'users',
     data: {
       name: 'Hair Coloring',
       active: true,
@@ -54,7 +54,7 @@ export const seed = async (payload: Payload) => {
   })
 
   const consultation = await payload.create({
-    collection: 'reservation-services' as 'users',
+    collection: 'services' as 'users',
     data: {
       name: 'Consultation',
       active: true,
@@ -68,7 +68,7 @@ export const seed = async (payload: Payload) => {
 
   // Seed resources
   const alice = await payload.create({
-    collection: 'reservation-resources' as 'users',
+    collection: 'resources' as 'users',
     data: {
       name: 'Alice Johnson',
       active: true,
@@ -78,7 +78,7 @@ export const seed = async (payload: Payload) => {
   })
 
   const bob = await payload.create({
-    collection: 'reservation-resources' as 'users',
+    collection: 'resources' as 'users',
     data: {
       name: 'Bob Smith',
       active: true,
@@ -89,7 +89,7 @@ export const seed = async (payload: Payload) => {
 
   // Seed schedules
   await payload.create({
-    collection: 'reservation-schedules' as 'users',
+    collection: 'schedules' as 'users',
     data: {
       name: 'Alice - Weekday Schedule',
       active: true,
@@ -107,7 +107,7 @@ export const seed = async (payload: Payload) => {
   })
 
   await payload.create({
-    collection: 'reservation-schedules' as 'users',
+    collection: 'schedules' as 'users',
     data: {
       name: 'Bob - Weekday Schedule',
       active: true,
@@ -153,7 +153,7 @@ export const seed = async (payload: Payload) => {
   }
 
   const reservation1 = await payload.create({
-    collection: 'reservations' as 'users',
+    collection: 'reservations',
     data: {
       customer: customer1.id,
       resource: alice.id,
@@ -165,12 +165,12 @@ export const seed = async (payload: Payload) => {
 
   await payload.update({
     id: reservation1.id,
-    collection: 'reservations' as 'users',
+    collection: 'reservations',
     data: { status: 'confirmed' },
   })
 
   await payload.create({
-    collection: 'reservations' as 'users',
+    collection: 'reservations',
     data: {
       customer: customer2.id,
       resource: bob.id,
@@ -181,7 +181,7 @@ export const seed = async (payload: Payload) => {
   })
 
   await payload.create({
-    collection: 'reservations' as 'users',
+    collection: 'reservations',
     data: {
       customer: customer2.id,
       resource: alice.id,

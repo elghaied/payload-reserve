@@ -19,9 +19,9 @@ const col = (slug: string) => slug as 'users'
 
 describe('Reservation plugin - Collections', () => {
   test('all 4 plugin collections are registered', () => {
-    expect(payload.collections['reservation-services']).toBeDefined()
-    expect(payload.collections['reservation-resources']).toBeDefined()
-    expect(payload.collections['reservation-schedules']).toBeDefined()
+    expect(payload.collections['services']).toBeDefined()
+    expect(payload.collections['resources']).toBeDefined()
+    expect(payload.collections['schedules']).toBeDefined()
     expect(payload.collections['reservations']).toBeDefined()
   })
 
@@ -38,7 +38,7 @@ describe('Reservation plugin - Collections', () => {
 
   test('can create a service', async () => {
     const service = await payload.create({
-      collection: col('reservation-services'),
+      collection: col('services'),
       data: {
         name: 'Test Service',
         active: true,
@@ -52,11 +52,11 @@ describe('Reservation plugin - Collections', () => {
 
   test('can create a resource with service relationship', async () => {
     const service = await payload.create({
-      collection: col('reservation-services'),
+      collection: col('services'),
       data: { name: 'Linked Service', active: true, duration: 30 },
     })
     const resource = await payload.create({
-      collection: col('reservation-resources'),
+      collection: col('resources'),
       data: {
         name: 'Test Resource',
         active: true,
@@ -68,15 +68,15 @@ describe('Reservation plugin - Collections', () => {
 
   test('can create a schedule', async () => {
     const service = await payload.create({
-      collection: col('reservation-services'),
+      collection: col('services'),
       data: { name: 'Schedule Test Service', active: true, duration: 30 },
     })
     const resource = await payload.create({
-      collection: col('reservation-resources'),
+      collection: col('resources'),
       data: { name: 'Schedule Test Resource', active: true, services: [service.id] },
     })
     const schedule = await payload.create({
-      collection: col('reservation-schedules'),
+      collection: col('schedules'),
       data: {
         name: 'Weekday Schedule',
         active: true,
@@ -108,11 +108,11 @@ describe('Reservation plugin - Collections', () => {
 describe('Reservation plugin - calculateEndTime hook', () => {
   test('auto-calculates endTime from startTime + service duration', async () => {
     const service = await payload.create({
-      collection: col('reservation-services'),
+      collection: col('services'),
       data: { name: 'EndTime Service', active: true, duration: 45 },
     })
     const resource = await payload.create({
-      collection: col('reservation-resources'),
+      collection: col('resources'),
       data: { name: 'EndTime Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({
@@ -141,7 +141,7 @@ describe('Reservation plugin - calculateEndTime hook', () => {
 describe('Reservation plugin - validateConflicts hook', () => {
   test('prevents double-booking on same resource', async () => {
     const service = await payload.create({
-      collection: col('reservation-services'),
+      collection: col('services'),
       data: {
         name: 'Conflict Service',
         active: true,
@@ -151,7 +151,7 @@ describe('Reservation plugin - validateConflicts hook', () => {
       },
     })
     const resource = await payload.create({
-      collection: col('reservation-resources'),
+      collection: col('resources'),
       data: { name: 'Conflict Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({
@@ -187,7 +187,7 @@ describe('Reservation plugin - validateConflicts hook', () => {
 
   test('allows booking on different resource at same time', async () => {
     const service = await payload.create({
-      collection: col('reservation-services'),
+      collection: col('services'),
       data: {
         name: 'No Conflict Service',
         active: true,
@@ -197,11 +197,11 @@ describe('Reservation plugin - validateConflicts hook', () => {
       },
     })
     const resource1 = await payload.create({
-      collection: col('reservation-resources'),
+      collection: col('resources'),
       data: { name: 'Resource A', active: true, services: [service.id] },
     })
     const resource2 = await payload.create({
-      collection: col('reservation-resources'),
+      collection: col('resources'),
       data: { name: 'Resource B', active: true, services: [service.id] },
     })
     const customer = await payload.create({
@@ -242,11 +242,11 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
 
   beforeAll(async () => {
     const service = await payload.create({
-      collection: col('reservation-services'),
+      collection: col('services'),
       data: { name: 'Status Service', active: true, duration: 30 },
     })
     const resource = await payload.create({
-      collection: col('reservation-resources'),
+      collection: col('resources'),
       data: { name: 'Status Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({
@@ -374,11 +374,11 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
 describe('Reservation plugin - validateCancellation hook', () => {
   test('rejects cancellation within notice period', async () => {
     const service = await payload.create({
-      collection: col('reservation-services'),
+      collection: col('services'),
       data: { name: 'Cancel Service', active: true, duration: 30 },
     })
     const resource = await payload.create({
-      collection: col('reservation-resources'),
+      collection: col('resources'),
       data: { name: 'Cancel Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({
@@ -411,11 +411,11 @@ describe('Reservation plugin - validateCancellation hook', () => {
 
   test('allows cancellation with sufficient notice', async () => {
     const service = await payload.create({
-      collection: col('reservation-services'),
+      collection: col('services'),
       data: { name: 'Cancel OK Service', active: true, duration: 30 },
     })
     const resource = await payload.create({
-      collection: col('reservation-resources'),
+      collection: col('resources'),
       data: { name: 'Cancel OK Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({

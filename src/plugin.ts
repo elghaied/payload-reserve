@@ -15,7 +15,7 @@ import { translations } from './translations/index.js'
 const hasField = (fields: Field[], name: string): boolean =>
   fields.some((f) => 'name' in f && f.name === name)
 
-export const reservationPlugin =
+export const payloadReserve =
   (pluginOptions: ReservationPluginConfig = {}) =>
   (config: Config): Config => {
     const resolved = resolveConfig(pluginOptions)
