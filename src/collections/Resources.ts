@@ -25,8 +25,8 @@ export function createResourcesCollection(
       {
         name: 'image',
         type: 'upload',
-        relationTo: config.slugs.media,
         label: ({ t }) => (t as PluginT)('reservation:fieldImage'),
+        relationTo: config.slugs.media,
       },
       {
         name: 'description',
