@@ -68,7 +68,7 @@ pnpm add payload-reserve
 pnpm link ./plugins/payload-reserve
 ```
 
-**Peer Dependency:** Requires `payload ^3.69.0` (modular dashboard widget API).
+**Peer Dependency:** Requires `payload ^3.76.1`.
 
 ---
 
@@ -112,6 +112,7 @@ const config: ReservationPluginConfig = {
     resources: 'resources',      // default
     schedules: 'schedules',      // default
     reservations: 'reservations',            // default
+    media: 'media',              // default (used by Resources image field)
   },
 
   // Slug of the existing auth collection to extend with customer fields
@@ -157,6 +158,7 @@ payloadReserve(config)
 | `slugs.resources` | `'resources'` | Resources collection slug |
 | `slugs.schedules` | `'schedules'` | Schedules collection slug |
 | `slugs.reservations` | `'reservations'` | Reservations collection slug |
+| `slugs.media` | `'media'` | Media collection slug (used by Resources image field) |
 | `userCollection` | `'users'` | Existing auth collection to extend with customer fields |
 | `adminGroup` | `'Reservations'` | Admin panel group name |
 | `defaultBufferTime` | `0` | Default buffer (minutes) between bookings |
@@ -208,6 +210,7 @@ Who or what performs the service (e.g., a stylist, a room, a consultant).
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | Text | Yes | Resource name (max 200 chars, used as title) |
+| `image` | Upload | No | Resource image (references media collection) |
 | `description` | Textarea | No | Resource description |
 | `services` | Relationship | Yes | Services this resource can perform (hasMany) |
 | `active` | Checkbox | No | Whether resource is active (default: true, sidebar) |
@@ -1142,13 +1145,13 @@ import type { ReservationPluginConfig } from 'payload-reserve'
 ### Client Exports
 
 ```typescript
-import { CalendarView, AvailabilityOverview, CustomerField } from 'reservation-plugin/client'
+import { CalendarView, AvailabilityOverview, CustomerField } from 'payload-reserve/client'
 ```
 
 ### RSC Exports
 
 ```typescript
-import { DashboardWidgetServer } from 'reservation-plugin/rsc'
+import { DashboardWidgetServer } from 'payload-reserve/rsc'
 ```
 
 ### Type Exports
@@ -1157,7 +1160,7 @@ import { DashboardWidgetServer } from 'reservation-plugin/rsc'
 import type {
   ReservationPluginConfig,
   ResolvedReservationPluginConfig,
-} from 'reservation-plugin'
+} from 'payload-reserve'
 ```
 
 ### Integration Test Coverage

@@ -46,7 +46,7 @@ export default buildConfig({
 
 **Gotcha**: The users collection (or whichever `userCollection` you specify) must be defined in `config.collections` before the plugin runs. The plugin finds it and appends fields.
 
-**Peer dependency**: `payload ^3.69.0`
+**Peer dependency**: `payload ^3.76.1`
 
 ## Configuration
 
@@ -60,6 +60,7 @@ payloadReserve({
     resources: 'resources',
     schedules: 'schedules',
     reservations: 'reservations',
+    media: 'media',                   // media collection for Resources image field
   },
   userCollection: 'users',           // existing auth collection to extend
   adminGroup: 'Reservations',        // admin panel group name
@@ -78,7 +79,7 @@ payloadReserve({
 | Option | Default | Description |
 |--------|---------|-------------|
 | `disabled` | `false` | Disable plugin functionality |
-| `slugs.*` | `services`, `resources`, `schedules`, `reservations` | Collection slugs |
+| `slugs.*` | `services`, `resources`, `schedules`, `reservations`, `media` | Collection slugs |
 | `userCollection` | `'users'` | Auth collection to extend with customer fields |
 | `adminGroup` | `'Reservations'` | Admin panel group |
 | `defaultBufferTime` | `0` | Default buffer minutes between bookings |

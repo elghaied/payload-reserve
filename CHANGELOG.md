@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-02-14
+
+### Changed
+
+- **Renamed plugin export** from `reservationPlugin` to `payloadReserve` for consistency with the package name
+- **Simplified default collection slugs** — `reservation-services`, `reservation-resources`, and `reservation-schedules` are now just `services`, `resources`, and `schedules` to reduce verbosity
+- **Customer role filtering is now optional** — `customerRole` defaults to `false` (show all users) instead of requiring a role. Set to a role string (e.g., `'customer'`) to filter
+
+### Added
+
+- **Customer Picker field** — new rich customer search component replacing the default relationship dropdown on Reservations. Features multi-field search (name, phone, email), inline create/edit via document drawer, and optional role filtering via the `customerRole` config option
+- **Image field on Resources** — resources can now have an image (upload field) for displaying photos of staff, rooms, or equipment. Configurable via `slugs.media` (default: `'media'`)
+- **`slugs.media` config option** — configurable slug for the media collection used by the Resources image field (default: `'media'`)
+- **Claude Code skills** — added skill definitions for AI-assisted development with the plugin
+
+### Fixed
+
+- Excluded E2E spec files from Vitest test runs
+- Synced package versions and lockfile
+- Specified pnpm version in CI workflow
+- Switched to OIDC for npm publishing in CI
+
 ## [1.0.0] - 2025-06-01
 
 ### Added

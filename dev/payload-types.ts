@@ -201,18 +201,10 @@ export interface Service {
 export interface Resource {
   id: string;
   name: string;
+  image?: (string | null) | Media;
   description?: string | null;
   services: (string | Service)[];
   active?: boolean | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "posts".
- */
-export interface Post {
-  id: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -233,6 +225,15 @@ export interface Media {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts".
+ */
+export interface Post {
+  id: string;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -436,6 +437,7 @@ export interface ServicesSelect<T extends boolean = true> {
  */
 export interface ResourcesSelect<T extends boolean = true> {
   name?: T;
+  image?: T;
   description?: T;
   services?: T;
   active?: T;

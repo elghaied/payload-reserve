@@ -52,6 +52,7 @@ Who or what performs the service (e.g., a stylist, a room, a consultant).
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `name` | Text | Yes | — | Resource name (max 200 chars, used as title) |
+| `image` | Upload | No | — | Resource image (references media collection, configurable via `slugs.media`) |
 | `description` | Textarea | No | — | Resource description |
 | `services` | Relationship | Yes | — | Services this resource can perform (hasMany, references Services) |
 | `active` | Checkbox | No | true | Whether resource is active (sidebar field) |
