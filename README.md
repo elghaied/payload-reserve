@@ -14,7 +14,7 @@ A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Design
   - [Services](#services)
   - [Resources](#resources)
   - [Schedules](#schedules)
-  - [User Collection Extension (Customers)](#user-collection-extension-customers)
+  - [Customers](#customers)
   - [Reservations](#reservations)
 - [Business Logic Hooks](#business-logic-hooks)
   - [Auto End Time Calculation](#auto-end-time-calculation)
@@ -38,7 +38,7 @@ A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Design
 
 ## Features
 
-- **4 Collections + User Extension** - Services, Resources, Schedules, and Reservations, plus customer fields added to your existing Users collection
+- **5 Collections** - Services, Resources, Schedules, Reservations, and Customers (dedicated auth collection)
 - **Double-Booking Prevention** - Automatic conflict detection with configurable buffer times
 - **Status State Machine** - Enforced workflow: pending -> confirmed -> completed/cancelled/no-show
 - **Auto End Time** - Automatically calculates reservation end time from service duration
@@ -50,7 +50,7 @@ A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Design
 - **Status Legend** - Color key displayed in the calendar explaining each status color
 - **Current Time Indicator** - Red line in week/day views marking the current time
 - **Dashboard Widget** - Server component showing today's booking stats at a glance
-- **Customer Picker** - Rich customer search field with multi-field search (name, phone, email), inline create/edit via document drawer, and optional role filtering
+- **Customer Picker** - Rich customer search field with multi-field search (firstName, lastName, phone, email), inline create/edit via document drawer
 - **Availability Grid** - Weekly overview of resource availability vs. booked slots
 - **Recurring & Manual Schedules** - Flexible schedule types with exception dates
 - **Fully Configurable** - Override slugs, access control, buffer times, and admin grouping
@@ -88,9 +88,7 @@ export default buildConfig({
 })
 ```
 
-That's it. The plugin registers 4 collections, extends your existing Users collection with customer fields (`name`, `phone`, `notes`, `bookings`), and adds a dashboard widget, a calendar list view, and an availability admin view automatically. All plugin collections appear under the **"Reservations"** group in the admin panel.
-
-> **Important:** Your Payload config must explicitly define a `users` collection (or whichever collection you specify via `userCollection`). The plugin finds it in `config.collections` and appends customer fields to it.
+That's it. The plugin registers 5 collections (Services, Resources, Schedules, Reservations, Customers), and adds a dashboard widget, a calendar list view, and an availability admin view automatically. All plugin collections appear under the **"Reservations"** group in the admin panel. The plugin does **not** modify your existing users collection.
 
 ---
 
@@ -112,11 +110,9 @@ const config: ReservationPluginConfig = {
     resources: 'resources',      // default
     schedules: 'schedules',      // default
     reservations: 'reservations',            // default
+    customers: 'customers',      // default
     media: 'media',              // default (used by Resources image field)
   },
-
-  // Slug of the existing auth collection to extend with customer fields
-  userCollection: 'users',                   // default
 
   // Admin panel group name
   adminGroup: 'Reservations',               // default
@@ -127,10 +123,6 @@ const config: ReservationPluginConfig = {
 
   // Minimum hours of notice required before cancellation
   cancellationNoticePeriod: 24,             // default (hours)
-
-  // Filter customers by role in the reservation form
-  // Set to a role string to filter, or false to show all users
-  customerRole: false,                      // default (no filtering)
 
   // Override access control per collection
   access: {
@@ -143,6 +135,7 @@ const config: ReservationPluginConfig = {
     resources: { /* ... */ },
     schedules: { /* ... */ },
     reservations: { /* ... */ },
+    customers: { /* ... */ },
   },
 }
 
@@ -158,12 +151,11 @@ payloadReserve(config)
 | `slugs.resources` | `'resources'` | Resources collection slug |
 | `slugs.schedules` | `'schedules'` | Schedules collection slug |
 | `slugs.reservations` | `'reservations'` | Reservations collection slug |
+| `slugs.customers` | `'customers'` | Customers collection slug |
 | `slugs.media` | `'media'` | Media collection slug (used by Resources image field) |
-| `userCollection` | `'users'` | Existing auth collection to extend with customer fields |
 | `adminGroup` | `'Reservations'` | Admin panel group name |
 | `defaultBufferTime` | `0` | Default buffer (minutes) between bookings |
 | `cancellationNoticePeriod` | `24` | Minimum hours notice for cancellation |
-| `customerRole` | `false` | Filter customers by role in reservation form (`string` or `false` to disable) |
 
 ---
 
@@ -275,27 +267,35 @@ await payload.create({
 })
 ```
 
-### User Collection Extension (Customers)
+### Customers
 
-Instead of a standalone Customers collection, the plugin extends your **existing auth-enabled Users collection** with customer fields. This means customers are real users who can log in to your site.
+**Slug:** `customers`
 
-The plugin finds the collection specified by `userCollection` (default: `'users'`) and appends these fields if they don't already exist:
+A dedicated auth collection for customers. Has `auth: true` for JWT login/register/forgot-password REST endpoints, but `access.admin: () => false` to block admin panel login. Customers are managed by admins through the admin panel.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | Text | Customer name (max 200 chars) |
-| `phone` | Text | Phone number (max 50 chars) |
-| `notes` | Textarea | Internal notes |
-| `bookings` | Join | Virtual field: all reservations for this customer |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | Email | Yes | Customer email (auto-provided by Payload's `auth: true`) |
+| `firstName` | Text | Yes | First name (max 200 chars, used as title) |
+| `lastName` | Text | Yes | Last name (max 200 chars) |
+| `phone` | Text | No | Phone number (max 50 chars) |
+| `notes` | Textarea | No | Internal notes |
+| `bookings` | Join | No | Virtual field: all reservations for this customer |
 
-The `bookings` field is a **join** field — it shows all reservations linked to this user without storing anything on the user document itself. Fields that already exist on the collection (e.g., if your Users collection already has a `name` field) are skipped to avoid duplicates.
+The `bookings` field is a **join** — it shows all reservations linked to this customer without storing anything on the customer document itself.
+
+**Auth endpoints** (auto-provided by Payload):
+- `POST /api/customers/login` — customer login
+- `POST /api/customers/forgot-password` — password reset
+- `GET /api/customers/me` — current customer
 
 **Example:**
 ```typescript
 await payload.create({
-  collection: 'users',
+  collection: 'customers',
   data: {
-    name: 'Jane Doe',
+    firstName: 'Jane',
+    lastName: 'Doe',
     email: 'jane@example.com',
     password: 'securepassword',
     phone: '555-0101',
@@ -304,7 +304,7 @@ await payload.create({
 })
 ```
 
-> **Note:** Since users is an auth collection, you must provide `email` and `password` when creating customers. The `email` field comes from Payload's built-in auth — the plugin does not add it.
+> **Note:** Since customers is an auth collection, you must provide `email` and `password` when creating customers. The `email` field comes from Payload's built-in auth — the plugin does not add it.
 
 ### Reservations
 
@@ -316,7 +316,7 @@ The core booking records. Each reservation links a customer to a service perform
 |-------|------|----------|-------------|
 | `service` | Relationship | Yes | Which service is being booked |
 | `resource` | Relationship | Yes | Which resource performs the service |
-| `customer` | Relationship | Yes | Who is booking (references the user collection) |
+| `customer` | Relationship | Yes | Who is booking (references Customers collection) |
 | `startTime` | Date | Yes | Appointment start (date + time picker) |
 | `endTime` | Date | No | Auto-calculated, read-only (date + time picker) |
 | `status` | Select | No | Workflow status (default: `'pending'`) |
@@ -345,7 +345,7 @@ const reservation = await payload.create({
   data: {
     service: haircutId,
     resource: aliceId,
-    customer: janeUserId,
+    customer: janeCustomerId,
     startTime: '2025-06-15T10:00:00.000Z',
     status: 'pending',
   },
@@ -692,24 +692,11 @@ A CSS Grid-based calendar (no external dependencies) with three view modes:
 
 A custom field component that replaces the standard relationship dropdown with a rich customer search experience:
 
-- **Multi-field search** — searches across customer name, phone, and email simultaneously using debounced `contains` queries (300ms debounce)
-- **Rich dropdown** — each result shows the customer's name (bold), phone number, and email address
+- **Multi-field search** — searches across firstName, lastName, phone, and email simultaneously using debounced `contains` queries (300ms debounce)
+- **Rich dropdown** — each result shows the customer's full name (bold), phone number, and email address
 - **Selected display** — selected customer shows full details (name, phone, email) instead of just a name
 - **Inline create** — "Create new customer" button opens a Payload document drawer to create a customer without leaving the reservation form
-- **Role filtering** — when `customerRole` is set (e.g., `'customer'`), only users with that role appear in search results. Set to `false` (default) to show all users
 - **Custom search endpoint** — uses `/api/reservation-customer-search` for efficient multi-field search with pagination
-
-**Configuration:**
-
-```typescript
-// Show all users (default)
-payloadReserve()
-
-// Only show users with role 'customer'
-payloadReserve({ customerRole: 'customer' })
-```
-
-> **Note:** When `customerRole` is set, your user collection must have a `role` field. The plugin does not add this field — define it in your Users collection config.
 
 ### Availability Overview
 
@@ -786,11 +773,12 @@ payloadReserve({
         return false
       },
     },
+    customers: {
+      create: () => true,     // allow public customer registration
+    },
   },
 })
 ```
-
-> **Note:** Access control for the Users collection itself is defined on your Users collection config, not via the plugin's `access` option. The plugin only extends the Users collection with fields — it doesn't control its access.
 
 > **Important:** Always use `overrideAccess: false` in your frontend queries so these rules are enforced. Without it, Payload bypasses access control entirely.
 
@@ -919,16 +907,17 @@ import config from '@payload-config'
 export async function createReservation(data: {
   service: string
   resource: string
-  customerName: string
+  firstName: string
+  lastName: string
   customerEmail: string
   startTime: string
   notes?: string
 }) {
   const payload = await getPayload({ config })
 
-  // Find or create the customer (customers are users)
+  // Find or create the customer
   const existing = await payload.find({
-    collection: 'users',
+    collection: 'customers',
     overrideAccess: false,
     where: { email: { equals: data.customerEmail } },
   })
@@ -938,10 +927,11 @@ export async function createReservation(data: {
     customerId = String(existing.docs[0].id)
   } else {
     const customer = await payload.create({
-      collection: 'users',
+      collection: 'customers',
       overrideAccess: false,
       data: {
-        name: data.customerName,
+        firstName: data.firstName,
+        lastName: data.lastName,
         email: data.customerEmail,
         password: generateSecurePassword(), // auth collection requires a password
       },
@@ -985,14 +975,14 @@ If you prefer a client-side-only approach (e.g., a separate SPA), use Payload's 
 const res = await fetch('https://your-site.com/api/services?where[active][equals]=true')
 const { docs: services } = await res.json()
 
-// Create a reservation (customer is a user ID)
+// Create a reservation (customer is a customer ID)
 const res = await fetch('https://your-site.com/api/reservations', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     service: serviceId,
     resource: resourceId,
-    customer: userId,
+    customer: customerId,
     startTime: '2025-03-15T10:00:00.000Z',
   }),
 })
@@ -1049,8 +1039,8 @@ pnpm clean
 The `dev/` directory contains a complete Payload CMS app for testing:
 
 - **`dev/payload.config.ts`** - Payload config with the plugin installed
-- **`dev/seed.ts`** - Seeds sample data: 3 services, 2 resources, 2 schedules, 2 customer users, 3 reservations
-- **`dev/int.spec.ts`** - Integration tests covering all hooks and CRUD operations
+- **`dev/seed.ts`** - Seeds sample data: 3 services, 2 resources, 2 schedules, 2 customers, 3 reservations
+- **`dev/int.spec.ts`** - Integration tests covering all hooks, CRUD operations, and customers auth collection
 
 The dev environment uses `mongodb-memory-server` for testing, so no external MongoDB instance is required.
 
@@ -1071,7 +1061,7 @@ When you run `pnpm dev`, the seed script creates:
 - Alice: Mon-Thu 9am-5pm, Fri 9am-3pm
 - Bob: Mon/Wed/Fri 10am-6pm, Sat 9am-2pm
 
-**Customers (created as users):**
+**Customers (dedicated auth collection):**
 - Jane Doe (jane@example.com)
 - John Public (john@example.com)
 
@@ -1096,6 +1086,7 @@ src/
     Resources.ts                        # Providers/resources
     Schedules.ts                        # Availability schedules
     Reservations.ts                     # Bookings with hooks
+    Customers.ts                        # Customer auth collection
 
   hooks/
     reservations/
@@ -1165,16 +1156,18 @@ import type {
 
 ### Integration Test Coverage
 
-The plugin ships with 16 integration tests covering:
+The plugin ships with 18 integration tests covering:
 
 | Test | What It Verifies |
 |------|-----------------|
-| Collections registered | All 4 plugin collections exist after plugin init |
-| User collection extended | Users collection has phone, notes, bookings fields |
+| Collections registered | All 5 plugin collections exist after plugin init |
+| Customers auth enabled | Customers collection has `auth: true` |
+| Customers blocks admin | `access.admin` returns `false` for customers |
+| Users not modified | Plugin does not inject fields into users collection |
 | Create service | Service CRUD with all fields |
 | Create resource | Resource with service relationship |
 | Create schedule | Recurring schedule with slots |
-| Create user with customer fields | User with name, phone, email |
+| Create customer | Customer with firstName, lastName, email, auth |
 | Auto endTime | endTime = startTime + duration |
 | Conflict: same resource | Double-booking is rejected |
 | Conflict: different resource | Same time on different resource is allowed |

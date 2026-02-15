@@ -6,7 +6,7 @@
 - [Resources](#resources)
 - [Schedules](#schedules)
 - [Reservations](#reservations)
-- [User Collection Extension (Customers)](#user-collection-extension-customers)
+- [Customers](#customers)
 
 ---
 
@@ -128,7 +128,7 @@ The core booking records. Each reservation links a customer to a service perform
 |-------|------|----------|-------------|
 | `service` | Relationship | Yes | Which service is being booked (references Services) |
 | `resource` | Relationship | Yes | Which resource performs the service (references Resources) |
-| `customer` | Relationship | Yes | Who is booking (references the user collection) |
+| `customer` | Relationship | Yes | Who is booking (references Customers collection) |
 | `startTime` | Date | Yes | Appointment start (date + time picker) |
 | `endTime` | Date | No | Auto-calculated by hook, read-only |
 | `status` | Select | No | Workflow status (default: `'pending'`) |
@@ -144,7 +144,7 @@ const reservation = await payload.create({
   data: {
     service: haircutId,
     resource: aliceId,
-    customer: janeUserId,
+    customer: janeCustomerId,
     startTime: '2025-06-15T10:00:00.000Z',
     status: 'pending',
   },
@@ -154,28 +154,36 @@ const reservation = await payload.create({
 
 ---
 
-## User Collection Extension (Customers)
+## Customers
 
-Instead of a standalone Customers collection, the plugin extends the existing auth-enabled Users collection (configurable via `userCollection` option, default: `'users'`).
+**Default slug:** `customers`
 
-Fields appended (skipped if already present):
+A dedicated auth collection for customers. Has `auth: true` for JWT login/register/forgot-password REST endpoints, but `access.admin: () => false` to block admin panel login. Customers are managed by admins through the admin panel.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | Text | Customer name (max 200 chars) |
-| `phone` | Text | Phone number (max 50 chars) |
-| `notes` | Textarea | Internal notes |
-| `bookings` | Join | Virtual field: all reservations for this customer (join on `customer`) |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | Email | Yes | Customer email (auto-provided by Payload's `auth: true`) |
+| `firstName` | Text | Yes | First name (max 200 chars, used as title) |
+| `lastName` | Text | Yes | Last name (max 200 chars) |
+| `phone` | Text | No | Phone number (max 50 chars) |
+| `notes` | Textarea | No | Internal notes |
+| `bookings` | Join | No | Virtual field: all reservations for this customer (join on `customer`) |
 
-The `bookings` field is a **join** — it shows all reservations linked to this user without storing anything on the user document.
+The `bookings` field is a **join** — it shows all reservations linked to this customer without storing anything on the customer document.
 
-Since users is an auth collection, `email` and `password` are required when creating customers. The `email` field comes from Payload's built-in auth — the plugin does not add it.
+Since customers is an auth collection, `email` and `password` are required when creating customers. The `email` field comes from Payload's built-in auth — the plugin does not add it.
+
+**Auth endpoints** (auto-provided by Payload):
+- `POST /api/customers/login` — customer login
+- `POST /api/customers/forgot-password` — password reset
+- `GET /api/customers/me` — current customer
 
 ```ts
 await payload.create({
-  collection: 'users',
+  collection: 'customers',
   data: {
-    name: 'Jane Doe',
+    firstName: 'Jane',
+    lastName: 'Doe',
     email: 'jane@example.com',
     password: 'securepassword',
     phone: '555-0101',

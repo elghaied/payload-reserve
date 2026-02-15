@@ -3,6 +3,7 @@ import type { CollectionConfig } from 'payload'
 export type ReservationPluginConfig = {
   /** Override access control per collection */
   access?: {
+    customers?: CollectionConfig['access']
     reservations?: CollectionConfig['access']
     resources?: CollectionConfig['access']
     schedules?: CollectionConfig['access']
@@ -12,26 +13,24 @@ export type ReservationPluginConfig = {
   adminGroup?: string
   /** Hours of notice required before cancellation */
   cancellationNoticePeriod?: number
-  /** Role to filter customers by in the reservation form. Set false to disable filtering. (default: 'customer') */
-  customerRole?: false | string
   /** Default buffer time in minutes between reservations */
   defaultBufferTime?: number
   /** Disable the plugin entirely */
   disabled?: boolean
   /** Override collection slugs */
   slugs?: {
+    customers?: string
     media?: string
     reservations?: string
     resources?: string
     schedules?: string
     services?: string
   }
-  /** Slug of the existing auth collection to extend with customer fields (default: 'users') */
-  userCollection?: string
 }
 
 export type ResolvedReservationPluginConfig = {
   access: {
+    customers?: CollectionConfig['access']
     reservations?: CollectionConfig['access']
     resources?: CollectionConfig['access']
     schedules?: CollectionConfig['access']
@@ -39,18 +38,17 @@ export type ResolvedReservationPluginConfig = {
   }
   adminGroup: string
   cancellationNoticePeriod: number
-  customerRole: false | string
   defaultBufferTime: number
   disabled: boolean
   localized: boolean
   slugs: {
+    customers: string
     media: string
     reservations: string
     resources: string
     schedules: string
     services: string
   }
-  userCollection: string
 }
 
 export type ReservationStatus = 'cancelled' | 'completed' | 'confirmed' | 'no-show' | 'pending'

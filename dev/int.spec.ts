@@ -18,22 +18,39 @@ beforeAll(async () => {
 const col = (slug: string) => slug as 'users'
 
 describe('Reservation plugin - Collections', () => {
-  test('all 4 plugin collections are registered', () => {
+  test('all 5 plugin collections are registered', () => {
     expect(payload.collections['services']).toBeDefined()
     expect(payload.collections['resources']).toBeDefined()
     expect(payload.collections['schedules']).toBeDefined()
     expect(payload.collections['reservations']).toBeDefined()
+    expect(payload.collections['customers']).toBeDefined()
   })
 
-  test('plugin extends users collection with customer fields', () => {
+  test('customers collection has auth enabled', () => {
+    const customersConfig = payload.config.collections.find((c) => c.slug === 'customers')
+    expect(customersConfig).toBeDefined()
+    expect(customersConfig!.auth).toBeTruthy()
+  })
+
+  test('customers collection blocks admin panel access', async () => {
+    const customersConfig = payload.config.collections.find((c) => c.slug === 'customers')
+    expect(customersConfig).toBeDefined()
+    expect(customersConfig!.access?.admin).toBeDefined()
+    // The access.admin function should return false
+    const result = customersConfig!.access!.admin!({} as Parameters<NonNullable<NonNullable<typeof customersConfig>['access']>['admin']>[0])
+    expect(result).toBe(false)
+  })
+
+  test('users collection is NOT modified by the plugin', () => {
     const usersConfig = payload.config.collections.find((c) => c.slug === 'users')
     expect(usersConfig).toBeDefined()
     const fieldNames = usersConfig!.fields
       .filter((f): f is { name: string } => 'name' in f)
       .map((f) => f.name)
-    expect(fieldNames).toContain('phone')
-    expect(fieldNames).toContain('notes')
-    expect(fieldNames).toContain('bookings')
+    // Plugin should NOT inject phone, notes, or bookings into users
+    expect(fieldNames).not.toContain('phone')
+    expect(fieldNames).not.toContain('notes')
+    expect(fieldNames).not.toContain('bookings')
   })
 
   test('can create a service', async () => {
@@ -90,17 +107,19 @@ describe('Reservation plugin - Collections', () => {
     expect(schedule.name).toBe('Weekday Schedule')
   })
 
-  test('can create a user with customer fields', async () => {
+  test('can create a customer with firstName, lastName, and auth', async () => {
     const customer = await payload.create({
-      collection: 'users',
+      collection: col('customers'),
       data: {
-        name: 'Test Customer',
+        firstName: 'Test',
+        lastName: 'Customer',
         email: 'test-unique@example.com',
         password: 'testpass123',
         phone: '555-1234',
       },
     })
-    expect(customer.name).toBe('Test Customer')
+    expect(customer.firstName).toBe('Test')
+    expect(customer.lastName).toBe('Customer')
     expect(customer.email).toBe('test-unique@example.com')
   })
 })
@@ -116,8 +135,8 @@ describe('Reservation plugin - calculateEndTime hook', () => {
       data: { name: 'EndTime Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({
-      collection: 'users',
-      data: { name: 'EndTime Customer', email: 'endtime@example.com', password: 'testpass123' },
+      collection: col('customers'),
+      data: { firstName: 'EndTime', lastName: 'Customer', email: 'endtime@example.com', password: 'testpass123' },
     })
 
     const startTime = new Date('2025-06-15T10:00:00.000Z')
@@ -155,8 +174,8 @@ describe('Reservation plugin - validateConflicts hook', () => {
       data: { name: 'Conflict Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({
-      collection: 'users',
-      data: { name: 'Conflict Customer', email: 'conflict@example.com', password: 'testpass123' },
+      collection: col('customers'),
+      data: { firstName: 'Conflict', lastName: 'Customer', email: 'conflict@example.com', password: 'testpass123' },
     })
 
     await payload.create({
@@ -205,8 +224,8 @@ describe('Reservation plugin - validateConflicts hook', () => {
       data: { name: 'Resource B', active: true, services: [service.id] },
     })
     const customer = await payload.create({
-      collection: 'users',
-      data: { name: 'No Conflict Customer', email: 'noconflict@example.com', password: 'testpass123' },
+      collection: col('customers'),
+      data: { firstName: 'No Conflict', lastName: 'Customer', email: 'noconflict@example.com', password: 'testpass123' },
     })
 
     await payload.create({
@@ -250,8 +269,8 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
       data: { name: 'Status Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({
-      collection: 'users',
-      data: { name: 'Status Customer', email: 'status@example.com', password: 'testpass123' },
+      collection: col('customers'),
+      data: { firstName: 'Status', lastName: 'Customer', email: 'status@example.com', password: 'testpass123' },
     })
     serviceId = service.id
     resourceId = resource.id
@@ -382,8 +401,8 @@ describe('Reservation plugin - validateCancellation hook', () => {
       data: { name: 'Cancel Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({
-      collection: 'users',
-      data: { name: 'Cancel Customer', email: 'cancel@example.com', password: 'testpass123' },
+      collection: col('customers'),
+      data: { firstName: 'Cancel', lastName: 'Customer', email: 'cancel@example.com', password: 'testpass123' },
     })
 
     // Create a reservation starting in 1 hour (less than 24h notice)
@@ -419,8 +438,8 @@ describe('Reservation plugin - validateCancellation hook', () => {
       data: { name: 'Cancel OK Resource', active: true, services: [service.id] },
     })
     const customer = await payload.create({
-      collection: 'users',
-      data: { name: 'Cancel OK Customer', email: 'cancelok@example.com', password: 'testpass123' },
+      collection: col('customers'),
+      data: { firstName: 'Cancel OK', lastName: 'Customer', email: 'cancelok@example.com', password: 'testpass123' },
     })
 
     // Create a reservation 48 hours from now (more than 24h notice)

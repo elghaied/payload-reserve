@@ -11,7 +11,7 @@ import styles from './CalendarView.module.css'
 type ViewMode = 'day' | 'month' | 'week'
 
 type Reservation = {
-  customer?: { name?: string } | string
+  customer?: { firstName?: string; lastName?: string; name?: string } | string
   endTime?: string
   id: string
   resource?: { name?: string } | string
@@ -173,6 +173,13 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     return field.name ?? ''
   }
 
+  const getCustomerName = (field: Reservation['customer']): string => {
+    if (!field) {return ''}
+    if (typeof field === 'string') {return ''}
+    const parts = [field.firstName, field.lastName].filter(Boolean)
+    return parts.length > 0 ? parts.join(' ') : (field.name ?? '')
+  }
+
   const getEventLabel = (r: Reservation, compact: boolean) => {
     const time = new Date(r.startTime).toLocaleTimeString([], {
       hour: '2-digit',
@@ -182,7 +189,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     if (compact) {
       return `${time} ${serviceName}`.trim()
     }
-    const customerName = getResName(r.customer)
+    const customerName = getCustomerName(r.customer)
     const parts = [time, serviceName, customerName].filter(Boolean)
     return parts.join(' - ')
   }
@@ -196,7 +203,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     const endStr = r.endTime
       ? new Date(r.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '?'
-    const customerName = getResName(r.customer) || t('reservation:calendarUnknownCustomer')
+    const customerName = getCustomerName(r.customer) || t('reservation:calendarUnknownCustomer')
     const resourceName = getResName(r.resource) || t('reservation:calendarUnknownResource')
     const status = STATUS_LABELS[r.status] ?? r.status
     return `${serviceName}\n${startStr} - ${endStr}\n${t('reservation:tooltipCustomer')} ${customerName}\n${t('reservation:tooltipResource')} ${resourceName}\n${t('reservation:tooltipStatus')} ${status}`

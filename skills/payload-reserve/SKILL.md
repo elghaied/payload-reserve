@@ -19,8 +19,8 @@ description: >
 
 `payload-reserve` is a Payload CMS 3.x plugin that injects a complete reservation/booking system:
 
-- **4 collections**: Services, Resources, Schedules, Reservations
-- **User extension**: Appends customer fields (`name`, `phone`, `notes`, `bookings` join) to an existing auth collection
+- **5 collections**: Services, Resources, Schedules, Reservations, Customers
+- **Customers auth collection**: Dedicated auth collection (`auth: true`) with `access.admin: () => false` — customers get JWT auth endpoints but cannot access the admin panel
 - **4 beforeChange hooks**: Auto endTime calculation, conflict detection, status state machine, cancellation policy
 - **Admin components**: Dashboard widget (RSC), Calendar view (client), Customer picker (client), Availability grid (client)
 - **Custom endpoint**: `/api/reservation-customer-search` for multi-field customer search
@@ -39,12 +39,12 @@ import { buildConfig } from 'payload'
 import { payloadReserve } from 'payload-reserve'
 
 export default buildConfig({
-  collections: [/* must include a 'users' auth collection */],
+  collections: [/* your existing collections */],
   plugins: [payloadReserve()],
 })
 ```
 
-**Gotcha**: The users collection (or whichever `userCollection` you specify) must be defined in `config.collections` before the plugin runs. The plugin finds it and appends fields.
+The plugin creates 5 collections (Services, Resources, Schedules, Reservations, Customers) and adds a dashboard widget, calendar list view, and availability admin view. All collections appear under the **"Reservations"** group in the admin panel. The plugin does **not** modify your existing users collection.
 
 **Peer dependency**: `payload ^3.76.1`
 
@@ -60,18 +60,18 @@ payloadReserve({
     resources: 'resources',
     schedules: 'schedules',
     reservations: 'reservations',
+    customers: 'customers',
     media: 'media',                   // media collection for Resources image field
   },
-  userCollection: 'users',           // existing auth collection to extend
   adminGroup: 'Reservations',        // admin panel group name
   defaultBufferTime: 0,              // minutes between reservations (fallback)
   cancellationNoticePeriod: 24,      // minimum hours notice for cancellation
-  customerRole: false,               // filter customers by role (string or false)
   access: {                          // per-collection access control overrides
     services: { read: () => true },
     resources: { /* ... */ },
     schedules: { /* ... */ },
     reservations: { /* ... */ },
+    customers: { /* ... */ },
   },
 })
 ```
@@ -79,12 +79,10 @@ payloadReserve({
 | Option | Default | Description |
 |--------|---------|-------------|
 | `disabled` | `false` | Disable plugin functionality |
-| `slugs.*` | `services`, `resources`, `schedules`, `reservations`, `media` | Collection slugs |
-| `userCollection` | `'users'` | Auth collection to extend with customer fields |
+| `slugs.*` | `services`, `resources`, `schedules`, `reservations`, `customers`, `media` | Collection slugs |
 | `adminGroup` | `'Reservations'` | Admin panel group |
 | `defaultBufferTime` | `0` | Default buffer minutes between bookings |
 | `cancellationNoticePeriod` | `24` | Minimum hours notice for cancellation |
-| `customerRole` | `false` | Filter customers by role in reservation form |
 | `access` | `{}` | Per-collection access control overrides |
 
 ## Collection Relationships
@@ -98,12 +96,13 @@ Services <--many-to-many-- Resources
 
 Reservations --> Service
              --> Resource
-             --> Customer (User)
+             --> Customer
 ```
 
 - **Resources** reference **Services** (hasMany) — which services a resource can perform
 - **Schedules** belong to a **Resource** — when the resource is available
-- **Reservations** reference a Service, Resource, and User (customer)
+- **Reservations** reference a Service, Resource, and Customer
+- **Customers** is a dedicated auth collection — has JWT auth endpoints but no admin panel access
 
 For full field schemas, see [references/collections.md](references/collections.md).
 
@@ -172,6 +171,7 @@ payloadReserve({
     resources: 'stylists',
     schedules: 'stylist-schedules',
     reservations: 'appointments',
+    customers: 'clients',
   },
 })
 ```
@@ -182,7 +182,7 @@ Components access slugs via `config.admin.custom.reservationSlugs`.
 
 - **DashboardWidget** (RSC): Today's stats (total, upcoming, completed, cancelled, next appointment). Registered as modular dashboard widget with slug `reservation-todays-reservations`.
 - **CalendarView** (Client): Month/week/day CSS Grid calendar replacing Reservations list view. Color-coded by status. Click-to-create, event tooltips, current time indicator.
-- **CustomerField** (Client): Rich customer picker with multi-field search (name, phone, email), inline create/edit via document drawer, optional role filtering.
+- **CustomerField** (Client): Rich customer picker with multi-field search (firstName, lastName, phone, email), inline create/edit via document drawer.
 - **AvailabilityOverview** (Client): Weekly resource availability grid at `/admin/reservation-availability`. Green=available, blue=booked, gray=exception.
 
 ## Utility Exports
@@ -201,15 +201,13 @@ Available from `payload-reserve` (server-side):
 
 ## Troubleshooting
 
-**"Could not find collection 'users' to extend"**: The users collection must be defined in `config.collections` before the plugin runs. Ensure your Users collection is listed before calling `payloadReserve()`.
-
 **Conflict detection not catching overlaps**: Check that `bufferTimeBefore`/`bufferTimeAfter` are set on the Service. The plugin falls back to `defaultBufferTime` (default: 0) if not set.
 
 **Status transition errors**: Only valid transitions are allowed. Check the state machine diagram above. Use `context: { skipReservationHooks: true }` for migrations/seeding.
 
 **Cancellation rejected**: The `cancellationNoticePeriod` (default: 24h) blocks late cancellations. Use the escape hatch for automated cleanup.
 
-**Customer picker not filtering by role**: Set `customerRole: 'your-role'` in plugin config. Your user collection must have a `role` field — the plugin doesn't add it.
+**Customer cannot log into admin panel**: This is by design. The Customers collection has `access.admin: () => false`. Customers authenticate via REST API endpoints (`/api/customers/login`) for customer-facing pages.
 
 **endTime not updating**: endTime is auto-calculated from `startTime + service.duration`. Ensure the service has a `duration` value. The field is read-only.
 

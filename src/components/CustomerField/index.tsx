@@ -10,9 +10,15 @@ import styles from './CustomerField.module.css'
 
 type CustomerDoc = {
   email: string
+  firstName: string
   id: string
-  name: string
+  lastName: string
   phone: string
+}
+
+const getDisplayName = (customer: CustomerDoc): string => {
+  const fullName = [customer.firstName, customer.lastName].filter(Boolean).join(' ')
+  return fullName || customer.email
 }
 
 export const CustomerField: RelationshipFieldClientComponent = ({ field, path: pathProp }) => {
@@ -24,7 +30,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
   const { setValue, value } = useField<string>({ path: fieldPath })
 
   const slugs = config.admin?.custom?.reservationSlugs
-  const userCollection: string = slugs?.userCollection ?? 'users'
+  const customersCollection: string = slugs?.customers ?? 'customers'
 
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<CustomerDoc[]>([])
@@ -36,7 +42,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
   const debounceRef = useRef<null | ReturnType<typeof setTimeout>>(null)
 
   const [DocumentDrawer, , { openDrawer }] = useDocumentDrawer({
-    collectionSlug: userCollection,
+    collectionSlug: customersCollection,
   })
 
   // Fetch selected customer details when value changes
@@ -51,13 +57,14 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
 
     const fetchCustomer = async () => {
       try {
-        const res = await fetch(`/api/${userCollection}/${value}`)
+        const res = await fetch(`/api/${customersCollection}/${value}`)
         if (res.ok) {
           const doc = await res.json()
           setSelectedCustomer({
             id: doc.id,
-            name: doc.name ?? '',
             email: doc.email ?? '',
+            firstName: doc.firstName ?? '',
+            lastName: doc.lastName ?? '',
             phone: doc.phone ?? '',
           })
         }
@@ -66,7 +73,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
       }
     }
     void fetchCustomer()
-  }, [value, userCollection, selectedCustomer?.id])
+  }, [value, customersCollection, selectedCustomer?.id])
 
   // Debounced search
   const doSearch = useCallback(
@@ -147,8 +154,9 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
     ({ doc }: { doc: Record<string, unknown> }) => {
       const customer: CustomerDoc = {
         id: doc.id as string,
-        name: (doc.name as string) ?? '',
         email: (doc.email as string) ?? '',
+        firstName: (doc.firstName as string) ?? '',
+        lastName: (doc.lastName as string) ?? '',
         phone: (doc.phone as string) ?? '',
       }
       setValue(customer.id)
@@ -164,7 +172,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
       {selectedCustomer ? (
         <div className={styles.selected}>
           <div className={styles.selectedInfo}>
-            <span className={styles.selectedName}>{selectedCustomer.name || selectedCustomer.email}</span>
+            <span className={styles.selectedName}>{getDisplayName(selectedCustomer)}</span>
             <span className={styles.selectedMeta}>
               {[selectedCustomer.phone, selectedCustomer.email].filter(Boolean).join(' · ')}
             </span>
@@ -211,7 +219,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
                 role="option"
                 tabIndex={0}
               >
-                <span className={styles.optionName}>{customer.name || customer.email}</span>
+                <span className={styles.optionName}>{getDisplayName(customer)}</span>
                 <span className={styles.optionMeta}>
                   {[customer.phone, customer.email].filter(Boolean).join(' · ')}
                 </span>

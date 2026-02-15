@@ -15,7 +15,8 @@ Expert guide for the `payload-reserve` Payload CMS 3.x reservation/booking plugi
 **Covers:**
 
 - Plugin configuration and setup
-- Collection schemas (Services, Resources, Schedules, Reservations, User extension)
+- Collection schemas (Services, Resources, Schedules, Reservations, Customers)
+- Customers auth collection (dedicated auth, no admin panel access)
 - Status state machine and hook behavior
 - Conflict detection and buffer times
 - Frontend booking integration (Local API and REST)

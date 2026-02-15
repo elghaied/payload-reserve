@@ -18,33 +18,19 @@ export function createCustomerSearchEndpoint(
 
       let where: Where = {}
 
-      if (search && config.customerRole) {
-        where = {
-          and: [
-            {
-              or: [
-                { name: { contains: search } },
-                { phone: { contains: search } },
-                { email: { contains: search } },
-              ],
-            },
-            { role: { equals: config.customerRole } },
-          ],
-        }
-      } else if (search) {
+      if (search) {
         where = {
           or: [
-            { name: { contains: search } },
+            { firstName: { contains: search } },
+            { lastName: { contains: search } },
             { phone: { contains: search } },
             { email: { contains: search } },
           ],
         }
-      } else if (config.customerRole) {
-        where = { role: { equals: config.customerRole } }
       }
 
       const result = await req.payload.find({
-        collection: config.userCollection,
+        collection: config.slugs.customers,
         limit,
         page,
         where,
@@ -53,8 +39,9 @@ export function createCustomerSearchEndpoint(
       return Response.json({
         docs: result.docs.map((doc: Record<string, unknown>) => ({
           id: doc.id,
-          name: doc.name ?? '',
           email: doc.email ?? '',
+          firstName: doc.firstName ?? '',
+          lastName: doc.lastName ?? '',
           phone: doc.phone ?? '',
         })),
         hasNextPage: result.hasNextPage,

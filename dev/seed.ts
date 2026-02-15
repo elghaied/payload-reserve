@@ -123,11 +123,12 @@ export const seed = async (payload: Payload) => {
     },
   })
 
-  // Seed customers (as users in the auth collection)
+  // Seed customers (dedicated auth collection)
   const customer1 = await payload.create({
-    collection: 'users',
+    collection: 'customers' as 'users',
     data: {
-      name: 'Jane Doe',
+      firstName: 'Jane',
+      lastName: 'Doe',
       email: 'jane@example.com',
       notes: 'Prefers morning appointments',
       password: 'customer123',
@@ -136,9 +137,10 @@ export const seed = async (payload: Payload) => {
   })
 
   const customer2 = await payload.create({
-    collection: 'users',
+    collection: 'customers' as 'users',
     data: {
-      name: 'John Public',
+      firstName: 'John',
+      lastName: 'Public',
       email: 'john@example.com',
       password: 'customer123',
       phone: '555-0202',

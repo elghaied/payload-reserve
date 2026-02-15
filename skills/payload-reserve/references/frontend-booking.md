@@ -42,11 +42,12 @@ payloadReserve({
         return false
       },
     },
+    customers: {
+      create: () => true,     // allow public customer registration
+    },
   },
 })
 ```
-
-**Important:** Access control for the Users collection itself is defined on the Users collection config, not via the plugin's `access` option.
 
 **Critical:** Always use `overrideAccess: false` in frontend queries so access rules are enforced.
 
@@ -177,7 +178,8 @@ import config from '@payload-config'
 export async function createReservation(data: {
   service: string
   resource: string
-  customerName: string
+  firstName: string
+  lastName: string
   customerEmail: string
   startTime: string
   notes?: string
@@ -186,7 +188,7 @@ export async function createReservation(data: {
 
   // Find or create the customer
   const existing = await payload.find({
-    collection: 'users',
+    collection: 'customers',
     overrideAccess: false,
     where: { email: { equals: data.customerEmail } },
   })
@@ -196,12 +198,13 @@ export async function createReservation(data: {
     customerId = String(existing.docs[0].id)
   } else {
     const customer = await payload.create({
-      collection: 'users',
+      collection: 'customers',
       overrideAccess: false,
       data: {
-        name: data.customerName,
+        firstName: data.firstName,
+        lastName: data.lastName,
         email: data.customerEmail,
-        password: generateSecurePassword(),
+        password: generateSecurePassword(), // auth collection requires a password
       },
     })
     customerId = String(customer.id)
@@ -235,6 +238,7 @@ If the slot is already booked, `validateConflicts` throws a `ValidationError` â€
 - Validate and sanitize all user input before passing to `payload.create`
 - Consider rate limiting on Server Actions or API routes
 - Hooks enforce conflict detection server-side, preventing double-bookings even with stale frontend data
+- Customers cannot access the admin panel (`access.admin: () => false`), so admin-only operations remain secure
 
 ---
 
@@ -247,6 +251,18 @@ For client-side-only approaches (e.g., separate SPA), use Payload's auto-generat
 const res = await fetch('/api/services?where[active][equals]=true')
 const { docs: services } = await res.json()
 
+// Create a customer (auth collection â€” returns JWT token)
+const res = await fetch('/api/customers', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    firstName: 'Jane',
+    lastName: 'Doe',
+    email: 'jane@example.com',
+    password: 'securepassword',
+  }),
+})
+
 // Create a reservation
 const res = await fetch('/api/reservations', {
   method: 'POST',
@@ -254,7 +270,7 @@ const res = await fetch('/api/reservations', {
   body: JSON.stringify({
     service: serviceId,
     resource: resourceId,
-    customer: userId,
+    customer: customerId,
     startTime: '2025-03-15T10:00:00.000Z',
   }),
 })
