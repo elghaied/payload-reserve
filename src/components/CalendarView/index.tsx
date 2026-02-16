@@ -8,7 +8,7 @@ import type { PluginT } from '../../translations/index.js'
 
 import styles from './CalendarView.module.css'
 
-type ViewMode = 'day' | 'month' | 'week'
+type ViewMode = 'day' | 'month' | 'pending' | 'week'
 
 type Reservation = {
   customer?: { firstName?: string; lastName?: string; name?: string } | string
@@ -53,6 +53,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   )
   const slugs = config.admin?.custom?.reservationSlugs
   const reservationSlug = slugs?.reservations ?? 'reservations'
+  const apiUrl = `${config.serverURL ?? ''}${config.routes.api}/${reservationSlug}`
 
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('month')
@@ -60,6 +61,16 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const [loading, setLoading] = useState(true)
   const [drawerDocId, setDrawerDocId] = useState<null | string>(null)
   const [initialData, setInitialData] = useState<Record<string, unknown> | undefined>(undefined)
+
+  // Pending tab state
+  const [pendingReservations, setPendingReservations] = useState<Reservation[]>([])
+  const [pendingCount, setPendingCount] = useState(0)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [confirmingIds, setConfirmingIds] = useState<Set<string>>(() => new Set())
+  const [actionFeedback, setActionFeedback] = useState<{
+    message: string
+    type: 'error' | 'success'
+  } | null>(null)
 
   const [DocumentDrawer, , { openDrawer }] = useDocumentDrawer({
     id: drawerDocId ?? undefined,
@@ -98,7 +109,6 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const fetchReservations = useCallback(async () => {
     setLoading(true)
     try {
-      const apiUrl = `${config.serverURL ?? ''}${config.routes.api}/${reservationSlug}`
       const params = new URLSearchParams({
         depth: '1',
         limit: '500',
@@ -113,11 +123,184 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       setReservations([])
     }
     setLoading(false)
-  }, [rangeStart, rangeEnd, config.routes.api, config.serverURL, reservationSlug])
+  }, [rangeStart, rangeEnd, apiUrl])
 
   useEffect(() => {
     void fetchReservations()
   }, [fetchReservations])
+
+  // Fetch pending count (always, for badge)
+  const fetchPendingCount = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        limit: '0',
+        'where[status][equals]': 'pending',
+      })
+      const response = await fetch(`${apiUrl}?${params}`)
+      const result = await response.json()
+      setPendingCount(result.totalDocs ?? 0)
+    } catch {
+      // silently ignore
+    }
+  }, [apiUrl])
+
+  useEffect(() => {
+    void fetchPendingCount()
+  }, [fetchPendingCount])
+
+  // Fetch pending reservations when tab is active
+  const fetchPendingReservations = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        depth: '1',
+        limit: '500',
+        sort: 'startTime',
+        'where[status][equals]': 'pending',
+      })
+      const response = await fetch(`${apiUrl}?${params}`)
+      const result = await response.json()
+      setPendingReservations(result.docs ?? [])
+    } catch {
+      setPendingReservations([])
+    }
+  }, [apiUrl])
+
+  useEffect(() => {
+    if (viewMode === 'pending') {
+      void fetchPendingReservations()
+    }
+  }, [viewMode, fetchPendingReservations])
+
+  // Clear selection when leaving pending view
+  useEffect(() => {
+    if (viewMode !== 'pending') {
+      setSelectedIds(new Set())
+      setActionFeedback(null)
+    }
+  }, [viewMode])
+
+  // Auto-clear feedback toast
+  useEffect(() => {
+    if (!actionFeedback) {return}
+    const timer = setTimeout(() => setActionFeedback(null), 4000)
+    return () => clearTimeout(timer)
+  }, [actionFeedback])
+
+  const patchReservation = useCallback(
+    async (id: string, data: Record<string, unknown>): Promise<boolean> => {
+      try {
+        const response = await fetch(`${apiUrl}/${id}`, {
+          body: JSON.stringify(data),
+          headers: { 'Content-Type': 'application/json' },
+          method: 'PATCH',
+        })
+        return response.ok
+      } catch {
+        return false
+      }
+    },
+    [apiUrl],
+  )
+
+  const handleQuickConfirm = useCallback(
+    async (id: string) => {
+      setConfirmingIds((prev) => new Set(prev).add(id))
+      const ok = await patchReservation(id, { status: 'confirmed' })
+      setConfirmingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      setActionFeedback({
+        type: ok ? 'success' : 'error',
+        message: ok
+          ? t('reservation:pendingConfirmSuccess')
+          : t('reservation:pendingConfirmError'),
+      })
+      if (ok) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+        void fetchPendingReservations()
+        void fetchPendingCount()
+      }
+    },
+    [patchReservation, fetchPendingReservations, fetchPendingCount, t],
+  )
+
+  const handleQuickCancel = useCallback(
+    async (id: string) => {
+      setConfirmingIds((prev) => new Set(prev).add(id))
+      const ok = await patchReservation(id, { status: 'cancelled' })
+      setConfirmingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      setActionFeedback({
+        type: ok ? 'success' : 'error',
+        message: ok
+          ? t('reservation:pendingCancelSuccess')
+          : t('reservation:pendingCancelError'),
+      })
+      if (ok) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+        void fetchPendingReservations()
+        void fetchPendingCount()
+      }
+    },
+    [patchReservation, fetchPendingReservations, fetchPendingCount, t],
+  )
+
+  const confirmSelected = useCallback(async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) {return}
+
+    setConfirmingIds((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) {next.add(id)}
+      return next
+    })
+
+    const results = await Promise.allSettled(
+      ids.map((id) => patchReservation(id, { status: 'confirmed' })),
+    )
+
+    setConfirmingIds((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) {next.delete(id)}
+      return next
+    })
+
+    const succeeded = results.filter(
+      (r) => r.status === 'fulfilled' && r.value,
+    ).length
+    const failed = ids.length - succeeded
+
+    if (failed === 0) {
+      setActionFeedback({
+        type: 'success',
+        message: `${succeeded} ${t('reservation:pendingConfirmSuccess').toLowerCase()}`,
+      })
+    } else {
+      setActionFeedback({
+        type: failed === ids.length ? 'error' : 'success',
+        message: t('reservation:pendingBulkConfirmSuccess')
+          .replace('{{succeeded}}', String(succeeded))
+          .replace('{{failed}}', String(failed)),
+      })
+    }
+
+    setSelectedIds(new Set())
+    void fetchPendingReservations()
+    void fetchPendingCount()
+  }, [selectedIds, patchReservation, fetchPendingReservations, fetchPendingCount, t])
 
   const handleEventClick = useCallback((e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -145,6 +328,12 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const handleDateClick = useCallback((date: Date) => {
     setDrawerDocId(null)
     setInitialData({ startTime: date.toISOString() })
+    pendingDrawerOpen.current = true
+  }, [])
+
+  const openDocDrawer = useCallback((id: string) => {
+    setDrawerDocId(id)
+    setInitialData(undefined)
     pendingDrawerOpen.current = true
   }, [])
 
@@ -425,6 +614,157 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     )
   }
 
+  const renderPendingView = () => {
+    if (pendingReservations.length === 0) {
+      return <div className={styles.pendingEmpty}>{t('reservation:pendingEmpty')}</div>
+    }
+
+    const allSelected =
+      pendingReservations.length > 0 &&
+      pendingReservations.every((r) => selectedIds.has(r.id))
+
+    const toggleSelectAll = () => {
+      if (allSelected) {
+        setSelectedIds(new Set())
+      } else {
+        setSelectedIds(new Set(pendingReservations.map((r) => r.id)))
+      }
+    }
+
+    const toggleSelect = (id: string) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        if (next.has(id)) {
+          next.delete(id)
+        } else {
+          next.add(id)
+        }
+        return next
+      })
+    }
+
+    const formatDateTime = (iso: string) => {
+      const d = new Date(iso)
+      return d.toLocaleString([], {
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      })
+    }
+
+    return (
+      <div className={styles.pendingView}>
+        <div className={styles.pendingToolbar}>
+          <label className={styles.selectAllLabel}>
+            <input
+              aria-label={t('reservation:pendingSelectAll')}
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              type="checkbox"
+            />
+            {t('reservation:pendingSelectAll')}
+          </label>
+          {selectedIds.size > 0 && (
+            <button
+              className={styles.bulkConfirmButton}
+              disabled={confirmingIds.size > 0}
+              onClick={() => void confirmSelected()}
+              type="button"
+            >
+              {confirmingIds.size > 0
+                ? t('reservation:pendingConfirming')
+                : t('reservation:pendingConfirmSelected').replace(
+                    '{{count}}',
+                    String(selectedIds.size),
+                  )}
+            </button>
+          )}
+        </div>
+        {actionFeedback && (
+          <div
+            className={`${styles.feedbackToast} ${actionFeedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError}`}
+          >
+            {actionFeedback.message}
+          </div>
+        )}
+        <table className={styles.pendingTable}>
+          <thead>
+            <tr>
+              <th aria-label={t('reservation:pendingSelectAll')} className={styles.pendingTh} />
+              <th className={styles.pendingTh}>{t('reservation:fieldCustomer')}</th>
+              <th className={styles.pendingTh}>{t('reservation:fieldService')}</th>
+              <th className={styles.pendingTh}>{t('reservation:fieldResource')}</th>
+              <th className={styles.pendingTh}>{t('reservation:pendingDateTime')}</th>
+              <th className={styles.pendingTh}>{t('reservation:pendingActions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pendingReservations.map((r) => {
+              const isConfirming = confirmingIds.has(r.id)
+              return (
+                <tr className={styles.pendingRow} key={r.id}>
+                  <td className={styles.pendingTd}>
+                    <input
+                      aria-label={getCustomerName(r.customer) || r.id}
+                      checked={selectedIds.has(r.id)}
+                      onChange={() => toggleSelect(r.id)}
+                      type="checkbox"
+                    />
+                  </td>
+                  <td className={styles.pendingTd}>
+                    <span
+                      className={styles.pendingCustomerLink}
+                      onClick={() => openDocDrawer(r.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          openDocDrawer(r.id)
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      {getCustomerName(r.customer) || t('reservation:calendarUnknownCustomer')}
+                    </span>
+                  </td>
+                  <td className={styles.pendingTd}>
+                    {getResName(r.service) || t('reservation:calendarUnknownService')}
+                  </td>
+                  <td className={styles.pendingTd}>
+                    {getResName(r.resource) || t('reservation:calendarUnknownResource')}
+                  </td>
+                  <td className={styles.pendingTd}>{formatDateTime(r.startTime)}</td>
+                  <td className={styles.pendingTd}>
+                    <button
+                      className={styles.confirmButton}
+                      disabled={isConfirming}
+                      onClick={() => void handleQuickConfirm(r.id)}
+                      title={t('reservation:pendingConfirm')}
+                      type="button"
+                    >
+                      &#x2713;
+                    </button>
+                    <button
+                      className={styles.cancelButton}
+                      disabled={isConfirming}
+                      onClick={() => void handleQuickCancel(r.id)}
+                      title={t('reservation:pendingCancel')}
+                      type="button"
+                    >
+                      &#x2717;
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   const dateLabel = useMemo(() => {
     if (viewMode === 'month') {
       return currentDate.toLocaleDateString([], { month: 'long', year: 'numeric' })
@@ -444,25 +784,32 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     })
   }, [currentDate, viewMode])
 
-  if (loading) {
-    return <div className={styles.loading}>{t('reservation:calendarLoading')}</div>
-  }
+  const handleDrawerSave = useCallback(() => {
+    void fetchReservations()
+    void fetchPendingCount()
+    if (viewMode === 'pending') {
+      void fetchPendingReservations()
+    }
+  }, [fetchReservations, fetchPendingCount, fetchPendingReservations, viewMode])
 
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
-        <div className={styles.navButtons}>
-          <button className={styles.navButton} onClick={() => navigate(-1)} type="button">
-            &larr;
-          </button>
-          <button className={styles.navButton} onClick={goToToday} type="button">
-            {t('reservation:calendarToday')}
-          </button>
-          <button className={styles.navButton} onClick={() => navigate(1)} type="button">
-            &rarr;
-          </button>
-          <span className={styles.currentDate}>{dateLabel}</span>
-        </div>
+        {viewMode !== 'pending' && (
+          <div className={styles.navButtons}>
+            <button className={styles.navButton} onClick={() => navigate(-1)} type="button">
+              &larr;
+            </button>
+            <button className={styles.navButton} onClick={goToToday} type="button">
+              {t('reservation:calendarToday')}
+            </button>
+            <button className={styles.navButton} onClick={() => navigate(1)} type="button">
+              &rarr;
+            </button>
+            <span className={styles.currentDate}>{dateLabel}</span>
+          </div>
+        )}
+        {viewMode === 'pending' && <div />}
         <div className={styles.viewToggle}>
           <button className={styles.createButton} onClick={handleCreateNew} type="button">
             {t('reservation:calendarCreateNew')}
@@ -471,6 +818,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             { key: 'month' as ViewMode, label: t('reservation:calendarMonth') },
             { key: 'week' as ViewMode, label: t('reservation:calendarWeek') },
             { key: 'day' as ViewMode, label: t('reservation:calendarDay') },
+            { key: 'pending' as ViewMode, label: t('reservation:calendarPending') },
           ]).map(({ key, label }) => (
             <button
               className={`${styles.viewToggleButton} ${viewMode === key ? styles.viewToggleButtonActive : ''}`}
@@ -479,15 +827,25 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               type="button"
             >
               {label}
+              {key === 'pending' && pendingCount > 0 && (
+                <span className={styles.pendingBadge}>{pendingCount}</span>
+              )}
             </button>
           ))}
         </div>
       </div>
-      {renderStatusLegend()}
-      {viewMode === 'month' && renderMonthView()}
-      {viewMode === 'week' && renderWeekView()}
-      {viewMode === 'day' && renderDayView()}
-      <DocumentDrawer initialData={initialData} onSave={fetchReservations} />
+      {viewMode !== 'pending' && renderStatusLegend()}
+      {loading && viewMode !== 'pending' ? (
+        <div className={styles.loading}>{t('reservation:calendarLoading')}</div>
+      ) : (
+        <>
+          {viewMode === 'month' && renderMonthView()}
+          {viewMode === 'week' && renderWeekView()}
+          {viewMode === 'day' && renderDayView()}
+        </>
+      )}
+      {viewMode === 'pending' && renderPendingView()}
+      <DocumentDrawer initialData={initialData} onSave={handleDrawerSave} />
     </div>
   )
 }

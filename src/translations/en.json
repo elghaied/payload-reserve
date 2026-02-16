@@ -91,5 +91,19 @@
   "fieldCustomerSearch": "Search customers...",
   "fieldCustomerNoResults": "No customers found",
   "fieldCustomerCreateNew": "Create new customer",
-  "fieldCustomerClear": "Clear selection"
+  "fieldCustomerClear": "Clear selection",
+  "calendarPending": "Pending",
+  "pendingDateTime": "Date / Time",
+  "pendingActions": "Actions",
+  "pendingSelectAll": "Select all",
+  "pendingConfirmSelected": "Confirm Selected ({{count}})",
+  "pendingConfirming": "Confirming...",
+  "pendingConfirm": "Confirm",
+  "pendingCancel": "Cancel",
+  "pendingConfirmSuccess": "Reservation confirmed",
+  "pendingConfirmError": "Failed to confirm reservation",
+  "pendingCancelSuccess": "Reservation cancelled",
+  "pendingCancelError": "Failed to cancel reservation",
+  "pendingBulkConfirmSuccess": "{{succeeded}} confirmed, {{failed}} failed",
+  "pendingEmpty": "No pending reservations"
 }
