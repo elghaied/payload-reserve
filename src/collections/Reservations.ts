@@ -8,14 +8,16 @@ import type { PluginT } from '../translations/index.js'
 import type { ReservationPluginHooks, ResolvedReservationPluginConfig } from '../types.js'
 
 import { calculateEndTime } from '../hooks/reservations/calculateEndTime.js'
+import { checkIdempotency } from '../hooks/reservations/checkIdempotency.js'
+import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
 import { validateStatusTransition } from '../hooks/reservations/validateStatusTransition.js'
 
-function createPluginHooksBeforeChange(
+function createPluginHooksBeforeCreate(
   hooks: ReservationPluginHooks,
 ): CollectionBeforeChangeHook {
-  return async ({ context, data, operation, originalDoc, req }) => {
+  return async ({ context, data, operation, req }) => {
     if (context?.skipReservationHooks) {return data}
 
     if (operation === 'create' && hooks.beforeBookingCreate) {
@@ -27,77 +29,20 @@ function createPluginHooksBeforeChange(
       return mutatedData
     }
 
-    if (operation === 'update') {
-      const previousStatus = (originalDoc as Record<string, unknown>)?.status as
-        | string
-        | undefined
-      const newStatus = data?.status as string | undefined
-
-      if (previousStatus && newStatus && previousStatus !== newStatus) {
-        if (newStatus === 'confirmed' && hooks.beforeBookingConfirm) {
-          for (const hook of hooks.beforeBookingConfirm) {
-            await hook({
-              doc: originalDoc as Record<string, unknown>,
-              newStatus,
-              req,
-            })
-          }
-        }
-        if (newStatus === 'cancelled' && hooks.beforeBookingCancel) {
-          for (const hook of hooks.beforeBookingCancel) {
-            await hook({
-              doc: originalDoc as Record<string, unknown>,
-              reason: data?.cancellationReason as string | undefined,
-              req,
-            })
-          }
-        }
-      }
-    }
-
     return data
   }
 }
 
-function createPluginHooksAfterChange(
+function createPluginHooksAfterCreate(
   hooks: ReservationPluginHooks,
 ): CollectionAfterChangeHook {
-  return async ({ doc, operation, previousDoc, req }) => {
-    const docRecord = doc as Record<string, unknown>
-
-    if (operation === 'create') {
-      if (hooks.afterBookingCreate) {
-        for (const hook of hooks.afterBookingCreate) {
-          await hook({ doc: docRecord, req })
-        }
+  return async ({ doc, operation, req }) => {
+    if (operation === 'create' && hooks.afterBookingCreate) {
+      const docRecord = doc as Record<string, unknown>
+      for (const hook of hooks.afterBookingCreate) {
+        await hook({ doc: docRecord, req })
       }
     }
-
-    if (operation === 'update') {
-      const previousStatus = (previousDoc as Record<string, unknown>)?.status as
-        | string
-        | undefined
-      const newStatus = docRecord.status as string | undefined
-
-      if (previousStatus && newStatus && previousStatus !== newStatus) {
-        if (hooks.afterStatusChange) {
-          for (const hook of hooks.afterStatusChange) {
-            await hook({ doc: docRecord, newStatus, previousStatus, req })
-          }
-        }
-        if (newStatus === 'confirmed' && hooks.afterBookingConfirm) {
-          for (const hook of hooks.afterBookingConfirm) {
-            await hook({ doc: docRecord, req })
-          }
-        }
-        if (newStatus === 'cancelled' && hooks.afterBookingCancel) {
-          for (const hook of hooks.afterBookingCancel) {
-            await hook({ doc: docRecord, req })
-          }
-        }
-      }
-    }
-
     return doc
   }
 }
@@ -105,6 +50,8 @@ function createPluginHooksAfterChange(
 export function createReservationsCollection(
   config: ResolvedReservationPluginConfig,
 ): CollectionConfig {
+  const { statusMachine } = config
+
   return {
     slug: config.slugs.reservations,
     access: config.access.reservations ?? {},
@@ -174,15 +121,16 @@ export function createReservationsCollection(
       {
         name: 'status',
         type: 'select',
-        defaultValue: 'pending',
+        defaultValue: statusMachine.defaultStatus,
         label: ({ t }) => (t as PluginT)('reservation:fieldStatus'),
-        options: [
-          { label: ({ t }) => (t as PluginT)('reservation:statusPending'), value: 'pending' },
-          { label: ({ t }) => (t as PluginT)('reservation:statusConfirmed'), value: 'confirmed' },
-          { label: ({ t }) => (t as PluginT)('reservation:statusCompleted'), value: 'completed' },
-          { label: ({ t }) => (t as PluginT)('reservation:statusCancelled'), value: 'cancelled' },
-          { label: ({ t }) => (t as PluginT)('reservation:statusNoShow'), value: 'no-show' },
-        ],
+        options: statusMachine.statuses.map((s) => ({
+          label: ({ t }) => {
+            const key = `reservation:status${s.charAt(0).toUpperCase() + s.slice(1)}`
+            const translated = (t as PluginT)(key as Parameters<PluginT>[0])
+            return translated !== key ? translated : s.charAt(0).toUpperCase() + s.slice(1)
+          },
+          value: s,
+        })),
       },
       {
         name: 'cancellationReason',
@@ -195,6 +143,7 @@ export function createReservationsCollection(
       {
         name: 'guestCount',
         type: 'number',
+        defaultValue: 1,
         label: ({ t }) => (t as PluginT)('reservation:fieldGuestCount'),
         min: 1,
       },
@@ -244,14 +193,25 @@ export function createReservationsCollection(
         ],
         label: ({ t }) => (t as PluginT)('reservation:fieldItems'),
       },
+      {
+        name: 'idempotencyKey',
+        type: 'text',
+        admin: { position: 'sidebar', readOnly: true },
+        index: true,
+        unique: true,
+      },
     ],
     hooks: {
-      afterChange: [createPluginHooksAfterChange(config.hooks)],
+      afterChange: [
+        createPluginHooksAfterCreate(config.hooks),
+        onStatusChange(config),
+      ],
       beforeChange: [
-        createPluginHooksBeforeChange(config.hooks),
+        createPluginHooksBeforeCreate(config.hooks),
+        checkIdempotency(config),
         calculateEndTime(config),
         validateConflicts(config),
-        validateStatusTransition(),
+        validateStatusTransition(config),
         validateCancellation(config),
       ],
     },

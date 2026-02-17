@@ -1,4 +1,6 @@
 export { calculateEndTime } from './reservations/calculateEndTime.js'
+export { checkIdempotency } from './reservations/checkIdempotency.js'
+export { onStatusChange } from './reservations/onStatusChange.js'
 export { validateCancellation } from './reservations/validateCancellation.js'
 export { validateConflicts } from './reservations/validateConflicts.js'
 export { validateStatusTransition } from './reservations/validateStatusTransition.js'

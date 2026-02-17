@@ -3,21 +3,24 @@ import type { CollectionBeforeChangeHook } from 'payload'
 import { ValidationError } from 'payload'
 
 import type { PluginT } from '../../translations/index.js'
-import type { ReservationStatus } from '../../types.js'
+import type { ResolvedReservationPluginConfig } from '../../types.js'
 
-import { VALID_STATUS_TRANSITIONS } from '../../types.js'
+import { validateTransition } from '../../services/AvailabilityService.js'
 
-export const validateStatusTransition = (): CollectionBeforeChangeHook =>
-  ({ context, data, operation, originalDoc, req }) => {
+export const validateStatusTransition =
+  (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
+  async ({ context, data, operation, originalDoc, req }) => {
     if (context?.skipReservationHooks) {return data}
 
-    const newStatus = data?.status as ReservationStatus | undefined
+    const newStatus = data?.status as string | undefined
+    const { statusMachine } = config
 
     if (operation === 'create') {
       const isAdmin = Boolean(req.user)
-      const allowedOnCreate: ReservationStatus[] = isAdmin
-        ? ['pending', 'confirmed']
-        : ['pending']
+      const defaultStatus = statusMachine.defaultStatus
+      const allowedOnCreate: string[] = isAdmin
+        ? [defaultStatus, 'confirmed']
+        : [defaultStatus]
 
       if (newStatus && !allowedOnCreate.includes(newStatus)) {
         const allowed = allowedOnCreate.map((s) => `"${s}"`).join(' or ')
@@ -30,16 +33,19 @@ export const validateStatusTransition = (): CollectionBeforeChangeHook =>
           ],
         })
       }
+
+      // Call beforeBookingCreate hooks (handled by plugin hooks wrapper)
       return data
     }
 
     // On update
     if (operation === 'update' && newStatus) {
-      const previousStatus = originalDoc?.status as ReservationStatus | undefined
+      const previousStatus = originalDoc?.status as string | undefined
 
       if (previousStatus && previousStatus !== newStatus) {
-        const allowed = VALID_STATUS_TRANSITIONS[previousStatus]
-        if (!allowed || !allowed.includes(newStatus)) {
+        const result = validateTransition(previousStatus, newStatus, statusMachine)
+
+        if (!result.valid) {
           throw new ValidationError({
             errors: [
               {
@@ -51,6 +57,28 @@ export const validateStatusTransition = (): CollectionBeforeChangeHook =>
               },
             ],
           })
+        }
+
+        // Call beforeBookingConfirm plugin hooks
+        if (newStatus === 'confirmed' && config.hooks?.beforeBookingConfirm) {
+          for (const hook of config.hooks.beforeBookingConfirm) {
+            await hook({
+              doc: originalDoc as Record<string, unknown>,
+              newStatus,
+              req,
+            })
+          }
+        }
+
+        // Call beforeBookingCancel plugin hooks
+        if (newStatus === 'cancelled' && config.hooks?.beforeBookingCancel) {
+          for (const hook of config.hooks.beforeBookingCancel) {
+            await hook({
+              doc: originalDoc as Record<string, unknown>,
+              reason: data?.cancellationReason as string | undefined,
+              req,
+            })
+          }
         }
       }
     }

@@ -1,21 +1,24 @@
-import type { CollectionBeforeChangeHook, Where } from 'payload'
+import type { CollectionBeforeChangeHook } from 'payload'
 
 import { ValidationError } from 'payload'
 
 import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
-import { computeBlockedWindow } from '../../utilities/slotUtils.js'
+import { checkAvailability } from '../../services/AvailabilityService.js'
+import { resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 
 export const validateConflicts =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
   async ({ context, data, operation, originalDoc, req }) => {
     if (context?.skipReservationHooks) {return data}
 
-    if (!data?.startTime || !data?.endTime || !data?.resource) {return data}
+    const items = resolveReservationItems(data as Record<string, unknown>)
 
-    const serviceId = typeof data.service === 'object' ? data.service.id : data.service
+    if (items.length === 0) {return data}
 
+    // Fetch buffer times from the primary service
+    const serviceId = typeof data?.service === 'object' ? data.service.id : data?.service
     let bufferBefore = config.defaultBufferTime
     let bufferAfter = config.defaultBufferTime
 
@@ -35,50 +38,34 @@ export const validateConflicts =
       }
     }
 
-    const startTime = new Date(data.startTime)
-    const endTime = new Date(data.endTime)
-    const { effectiveEnd, effectiveStart } = computeBlockedWindow(
-      startTime,
-      endTime,
-      bufferBefore,
-      bufferAfter,
-    )
+    for (const item of items) {
+      if (!item.endTime) {continue}
 
-    const resourceId = typeof data.resource === 'object' ? data.resource.id : data.resource
-
-    const where: Where = {
-      and: [
-        { resource: { equals: resourceId } },
-        {
-          status: {
-            not_in: ['cancelled', 'no-show'],
-          },
-        },
-        { startTime: { less_than: effectiveEnd.toISOString() } },
-        { endTime: { greater_than: effectiveStart.toISOString() } },
-      ],
-    }
-
-    // Exclude self on update
-    if (operation === 'update' && originalDoc?.id) {
-      ;(where.and as Where[]).push({ id: { not_equals: originalDoc.id } })
-    }
-
-    const { totalDocs } = await req.payload.count({
-      collection: config.slugs.reservations as 'reservations',
-      req,
-      where,
-    })
-
-    if (totalDocs > 0) {
-      throw new ValidationError({
-        errors: [
-          {
-            message: (req.t as PluginT)('reservation:errorConflict'),
-            path: 'startTime',
-          },
-        ],
+      const result = await checkAvailability({
+        blockingStatuses: config.statusMachine.blockingStatuses,
+        bufferAfter,
+        bufferBefore,
+        endTime: new Date(item.endTime),
+        excludeReservationId: operation === 'update' ? originalDoc?.id : undefined,
+        guestCount: item.guestCount,
+        payload: req.payload,
+        req,
+        reservationSlug: config.slugs.reservations,
+        resourceId: item.resource,
+        resourceSlug: config.slugs.resources,
+        startTime: new Date(item.startTime),
       })
+
+      if (!result.available) {
+        throw new ValidationError({
+          errors: [
+            {
+              message: result.reason ?? (req.t as PluginT)('reservation:errorConflict'),
+              path: 'startTime',
+            },
+          ],
+        })
+      }
     }
 
     return data

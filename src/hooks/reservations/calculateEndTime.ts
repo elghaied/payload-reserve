@@ -1,8 +1,11 @@
 import type { CollectionBeforeChangeHook } from 'payload'
 
-import type { ResolvedReservationPluginConfig } from '../../types.js'
+import { ValidationError } from 'payload'
 
-import { addMinutes } from '../../utilities/slotUtils.js'
+import type { DurationType, ResolvedReservationPluginConfig } from '../../types.js'
+
+import { computeEndTime } from '../../services/AvailabilityService.js'
+import { resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 
 export const calculateEndTime =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
@@ -11,17 +14,76 @@ export const calculateEndTime =
 
     if (!data?.startTime || !data?.service) {return data}
 
-    const serviceId = typeof data.service === 'object' ? data.service.id : data.service
+    const items = resolveReservationItems(data)
 
-    const service = await req.payload.findByID({
-      id: serviceId,
-      collection: config.slugs.services as 'services',
-      req,
-    })
+    if (items.length <= 1) {
+      // Single-resource: compute top-level endTime
+      const serviceId = typeof data.service === 'object' ? data.service.id : data.service
 
-    if (service?.duration) {
+      const service = await req.payload.findByID({
+        id: serviceId,
+        collection: config.slugs.services as 'services',
+        req,
+      })
+
+      if (!service?.duration && service?.durationType !== 'full-day') {return data}
+
+      const durationType = ((service.durationType as string) ?? 'fixed') as DurationType
       const startDate = new Date(data.startTime)
-      data.endTime = addMinutes(startDate, service.duration).toISOString()
+
+      if (durationType === 'flexible') {
+        if (!data.endTime) {
+          throw new ValidationError({
+            errors: [{ message: 'endTime is required for flexible duration services', path: 'endTime' }],
+          })
+        }
+        // Validate customer-provided endTime (computeEndTime returns it back)
+        computeEndTime({
+          durationType: 'flexible',
+          endTime: new Date(data.endTime),
+          serviceDuration: service.duration as number,
+          startTime: startDate,
+        })
+      } else {
+        const result = computeEndTime({
+          durationType,
+          serviceDuration: (service.duration as number) ?? 0,
+          startTime: startDate,
+        })
+        data.endTime = result.endTime.toISOString()
+      }
+    } else {
+      // Multi-resource: compute endTime per item
+      for (const item of data.items as Array<Record<string, unknown>>) {
+        if (!item.startTime) {continue}
+
+        const itemServiceId = typeof item.service === 'object'
+          ? (item.service as { id: string }).id
+          : (item.service as string) ?? (typeof data.service === 'object' ? data.service.id : data.service)
+
+        if (!itemServiceId) {continue}
+
+        const service = await req.payload.findByID({
+          id: itemServiceId,
+          collection: config.slugs.services as 'services',
+          req,
+        })
+
+        if (!service?.duration && service?.durationType !== 'full-day') {continue}
+
+        const durationType = ((service.durationType as string) ?? 'fixed') as DurationType
+
+        if (durationType === 'flexible' && !item.endTime) {continue}
+
+        if (durationType !== 'flexible') {
+          const result = computeEndTime({
+            durationType,
+            serviceDuration: (service.duration as number) ?? 0,
+            startTime: new Date(item.startTime as string),
+          })
+          item.endTime = result.endTime.toISOString()
+        }
+      }
     }
 
     return data
