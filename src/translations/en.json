@@ -114,5 +114,7 @@
   "capacityPerGuest": "Per Guest",
   "durationFixed": "Fixed",
   "durationFlexible": "Flexible",
-  "durationFullDay": "Full Day"
+  "durationFullDay": "Full Day",
+  "fieldItems": "Items",
+  "fieldGuestCount": "Guest Count"
 }

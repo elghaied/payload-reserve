@@ -193,9 +193,56 @@ export function createReservationsCollection(
         label: ({ t }) => (t as PluginT)('reservation:fieldCancellationReason'),
       },
       {
+        name: 'guestCount',
+        type: 'number',
+        label: ({ t }) => (t as PluginT)('reservation:fieldGuestCount'),
+        min: 1,
+      },
+      {
         name: 'notes',
         type: 'textarea',
         label: ({ t }) => (t as PluginT)('reservation:fieldNotes'),
+      },
+      {
+        name: 'items',
+        type: 'array',
+        admin: {
+          description: 'Resources included in this booking. Leave empty for single-resource bookings.',
+        },
+        fields: [
+          {
+            name: 'resource',
+            type: 'relationship',
+            label: ({ t }) => (t as PluginT)('reservation:fieldResource'),
+            relationTo: config.slugs.resources,
+            required: true,
+          },
+          {
+            name: 'service',
+            type: 'relationship',
+            label: ({ t }) => (t as PluginT)('reservation:fieldService'),
+            relationTo: config.slugs.services,
+          },
+          {
+            name: 'startTime',
+            type: 'date',
+            admin: { date: { pickerAppearance: 'dayAndTime' } },
+            label: ({ t }) => (t as PluginT)('reservation:fieldStartTime'),
+          },
+          {
+            name: 'endTime',
+            type: 'date',
+            admin: { date: { pickerAppearance: 'dayAndTime' }, readOnly: false },
+            label: ({ t }) => (t as PluginT)('reservation:fieldEndTime'),
+          },
+          {
+            name: 'guestCount',
+            type: 'number',
+            label: ({ t }) => (t as PluginT)('reservation:fieldGuestCount'),
+            min: 1,
+          },
+        ],
+        label: ({ t }) => (t as PluginT)('reservation:fieldItems'),
       },
     ],
     hooks: {
