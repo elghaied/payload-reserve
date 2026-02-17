@@ -141,7 +141,7 @@ export type ResolvedReservationPluginConfig = {
     services: string
   }
   statusMachine: StatusMachineConfig
-  userCollection: string
+  userCollection: string | undefined
 }
 
 export type ReservationStatus = 'cancelled' | 'completed' | 'confirmed' | 'no-show' | 'pending'

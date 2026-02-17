@@ -1,6 +1,21 @@
-import type { Endpoint, Where } from 'payload'
+import type { Endpoint, Field, Where } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
+
+/**
+ * Inspect a collection's field list and return the set of top-level named
+ * fields as a plain Set<string>. Unnamed fields (rows, groups without a name,
+ * etc.) are skipped.
+ */
+function getNamedFields(fields: Field[]): Set<string> {
+  const names = new Set<string>()
+  for (const field of fields) {
+    if ('name' in field) {
+      names.add(field.name)
+    }
+  }
+  return names
+}
 
 export function createCustomerSearchEndpoint(
   config: ResolvedReservationPluginConfig,
@@ -16,34 +31,69 @@ export function createCustomerSearchEndpoint(
       const limit = Math.min(Number(url.searchParams.get('limit') ?? '10'), 50)
       const page = Math.max(Number(url.searchParams.get('page') ?? '1'), 1)
 
+      // Detect which fields exist on the target collection at runtime
+      const collectionConfig = req.payload.collections[config.slugs.customers]?.config
+      const availableFields: Set<string> = collectionConfig
+        ? getNamedFields(collectionConfig.fields)
+        : new Set()
+
+      const hasName = availableFields.has('name')
+      const hasFirstName = availableFields.has('firstName')
+      const hasLastName = availableFields.has('lastName')
+      const hasPhone = availableFields.has('phone')
+
       let where: Where = {}
 
       if (search) {
-        where = {
-          or: [
-            { firstName: { contains: search } },
-            { lastName: { contains: search } },
-            { phone: { contains: search } },
-            { email: { contains: search } },
-          ],
+        const orClauses: Where[] = []
+
+        if (hasName) {
+          orClauses.push({ name: { contains: search } })
         }
+        if (hasFirstName) {
+          orClauses.push({ firstName: { contains: search } })
+        }
+        if (hasLastName) {
+          orClauses.push({ lastName: { contains: search } })
+        }
+        // email is always present on auth collections
+        orClauses.push({ email: { contains: search } })
+        if (hasPhone) {
+          orClauses.push({ phone: { contains: search } })
+        }
+
+        where = { or: orClauses }
       }
 
       const result = await req.payload.find({
-        collection: config.slugs.customers,
+        collection: config.slugs.customers as 'customers',
         limit,
         page,
         where,
       })
 
       return Response.json({
-        docs: result.docs.map((doc: Record<string, unknown>) => ({
-          id: doc.id,
-          email: doc.email ?? '',
-          firstName: doc.firstName ?? '',
-          lastName: doc.lastName ?? '',
-          phone: doc.phone ?? '',
-        })),
+        docs: result.docs.map((doc: Record<string, unknown>) => {
+          const entry: Record<string, unknown> = {
+            id: doc['id'],
+            email: doc['email'] ?? '',
+          }
+
+          if (hasName) {
+            entry['name'] = doc['name'] ?? ''
+          }
+          if (hasFirstName) {
+            entry['firstName'] = doc['firstName'] ?? ''
+          }
+          if (hasLastName) {
+            entry['lastName'] = doc['lastName'] ?? ''
+          }
+          if (hasPhone) {
+            entry['phone'] = doc['phone'] ?? ''
+          }
+
+          return entry
+        }),
         hasNextPage: result.hasNextPage,
         totalDocs: result.totalDocs,
       })

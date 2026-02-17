@@ -1,4 +1,4 @@
-import type { Config } from 'payload'
+import type { Config, Field } from 'payload'
 
 import { deepMergeSimple } from 'payload/shared'
 
@@ -35,14 +35,68 @@ export const payloadReserve =
       return config
     }
 
-    // Add the 5 plugin collections
-    config.collections.push(
-      createServicesCollection(resolved),
-      createResourcesCollection(resolved),
-      createSchedulesCollection(resolved),
-      createReservationsCollection(resolved),
-      createCustomersCollection(resolved),
-    )
+    if (resolved.userCollection) {
+      // Extend the existing auth collection with customer fields
+      const targetCollection = config.collections.find(
+        (col) => col.slug === resolved.userCollection,
+      )
+
+      if (targetCollection) {
+        // Collect existing field names for deduplication check
+        const existingFieldNames = new Set(
+          targetCollection.fields
+            .map((field) => ('name' in field ? field.name : undefined))
+            .filter(Boolean),
+        )
+
+        // Fields to inject if not already present
+        const fieldsToAdd: Field[] = [
+          {
+            name: 'phone',
+            type: 'text',
+            maxLength: 50,
+          },
+          {
+            name: 'notes',
+            type: 'textarea',
+          },
+          {
+            name: 'bookings',
+            type: 'join',
+            collection: resolved.slugs.reservations as 'reservations',
+            on: 'customer',
+          },
+        ]
+
+        for (const field of fieldsToAdd) {
+          const fieldName = 'name' in field ? field.name : undefined
+          if (fieldName && !existingFieldNames.has(fieldName)) {
+            targetCollection.fields.push(field)
+          }
+        }
+      }
+
+      // Point the customers slug at the user collection so other parts of the
+      // plugin (endpoints, hooks) reference the correct collection
+      resolved.slugs.customers = resolved.userCollection
+
+      // Push only the 4 domain collections (no standalone Customers)
+      config.collections.push(
+        createServicesCollection(resolved),
+        createResourcesCollection(resolved),
+        createSchedulesCollection(resolved),
+        createReservationsCollection(resolved),
+      )
+    } else {
+      // Default behaviour: push all 5 collections including standalone Customers
+      config.collections.push(
+        createServicesCollection(resolved),
+        createResourcesCollection(resolved),
+        createSchedulesCollection(resolved),
+        createReservationsCollection(resolved),
+        createCustomersCollection(resolved),
+      )
+    }
 
     // Register custom endpoints
     if (!config.endpoints) {config.endpoints = []}

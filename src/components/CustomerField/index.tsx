@@ -9,14 +9,16 @@ import type { PluginT } from '../../translations/index.js'
 import styles from './CustomerField.module.css'
 
 type CustomerDoc = {
-  email: string
-  firstName: string
   id: string
-  lastName: string
-  phone: string
+  email: string
+  phone?: string
+  name?: string
+  firstName?: string
+  lastName?: string
 }
 
 const getDisplayName = (customer: CustomerDoc): string => {
+  if (customer.name) {return customer.name}
   const fullName = [customer.firstName, customer.lastName].filter(Boolean).join(' ')
   return fullName || customer.email
 }
@@ -63,9 +65,10 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
           setSelectedCustomer({
             id: doc.id,
             email: doc.email ?? '',
-            firstName: doc.firstName ?? '',
-            lastName: doc.lastName ?? '',
-            phone: doc.phone ?? '',
+            phone: doc.phone ?? undefined,
+            name: doc.name ?? undefined,
+            firstName: doc.firstName ?? undefined,
+            lastName: doc.lastName ?? undefined,
           })
         }
       } catch {
@@ -155,9 +158,10 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
       const customer: CustomerDoc = {
         id: doc.id as string,
         email: (doc.email as string) ?? '',
-        firstName: (doc.firstName as string) ?? '',
-        lastName: (doc.lastName as string) ?? '',
-        phone: (doc.phone as string) ?? '',
+        phone: (doc.phone as string) ?? undefined,
+        name: (doc.name as string) ?? undefined,
+        firstName: (doc.firstName as string) ?? undefined,
+        lastName: (doc.lastName as string) ?? undefined,
       }
       setValue(customer.id)
       setSelectedCustomer(customer)

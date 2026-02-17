@@ -14,7 +14,6 @@ export const DEFAULT_SLUGS = {
 export const DEFAULT_ADMIN_GROUP = 'Reservations'
 export const DEFAULT_BUFFER_TIME = 0
 export const DEFAULT_CANCELLATION_NOTICE_PERIOD = 24
-export const DEFAULT_USER_COLLECTION = 'users'
 
 export function resolveConfig(
   pluginOptions: ReservationPluginConfig,
@@ -48,6 +47,6 @@ export function resolveConfig(
           transitions: userStatusMachine.transitions ?? DEFAULT_STATUS_MACHINE.transitions,
         }
       : { ...DEFAULT_STATUS_MACHINE },
-    userCollection: pluginOptions.userCollection ?? DEFAULT_USER_COLLECTION,
+    userCollection: pluginOptions.userCollection ?? undefined,
   }
 }
