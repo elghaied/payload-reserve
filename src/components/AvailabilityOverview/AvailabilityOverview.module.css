@@ -79,6 +79,37 @@
   color: #1e40af;
 }
 
+/* Graduated capacity colors for multi-unit resources */
+/* Green: utilization < 50% */
+.slotCapacityLow {
+  font-size: 0.625rem;
+  padding: 2px 4px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* Yellow: utilization 50–99% */
+.slotCapacityMid {
+  font-size: 0.625rem;
+  padding: 2px 4px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Red: utilization 100% (fully booked) */
+.slotCapacityFull {
+  font-size: 0.625rem;
+  padding: 2px 4px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .slotException {
   font-size: 0.625rem;
   padding: 2px 4px;

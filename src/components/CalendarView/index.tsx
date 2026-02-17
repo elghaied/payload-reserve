@@ -10,16 +10,26 @@ import styles from './CalendarView.module.css'
 
 type ViewMode = 'day' | 'month' | 'pending' | 'week'
 
+type ReservationItem = {
+  endTime?: string
+  guestCount?: number
+  resource?: { name?: string } | string
+  service?: { name?: string } | string
+  startTime?: string
+}
+
 type Reservation = {
   customer?: { firstName?: string; lastName?: string; name?: string } | string
   endTime?: string
   id: string
+  items?: ReservationItem[]
   resource?: { name?: string } | string
   service?: { name?: string } | string
   startTime: string
   status: string
 }
 
+// Built-in status → CSS class map (for known statuses; custom statuses use inline style)
 const STATUS_CLASS_MAP: Record<string, string> = {
   cancelled: styles.statusCancelled,
   completed: styles.statusCompleted,
@@ -28,7 +38,8 @@ const STATUS_CLASS_MAP: Record<string, string> = {
   pending: styles.statusPending,
 }
 
-const STATUS_COLORS: Record<string, string> = {
+// Built-in default colors for known statuses
+const BUILTIN_STATUS_COLORS: Record<string, string> = {
   cancelled: '#e5e7eb',
   completed: '#d1fae5',
   confirmed: '#dbeafe',
@@ -36,24 +47,78 @@ const STATUS_COLORS: Record<string, string> = {
   pending: '#fef3c7',
 }
 
+// Palette for auto-assigning colors to custom statuses
+const CUSTOM_STATUS_PALETTE = ['#fde68a', '#c7d2fe', '#a7f3d0', '#fca5a5', '#fdba74']
+
 export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const { config } = useConfig()
   const { t: _t } = useTranslation()
   const t = _t as PluginT
 
-  const STATUS_LABELS = useMemo<Record<string, string>>(
-    () => ({
-      cancelled: t('reservation:statusCancelled'),
-      completed: t('reservation:statusCompleted'),
-      confirmed: t('reservation:statusConfirmed'),
-      'no-show': t('reservation:statusNoShowLabel'),
-      pending: t('reservation:statusPending'),
-    }),
-    [t],
-  )
   const slugs = config.admin?.custom?.reservationSlugs
   const reservationSlug = slugs?.reservations ?? 'reservations'
   const apiUrl = `${config.serverURL ?? ''}${config.routes.api}/${reservationSlug}`
+
+  const statusMachine = config.admin?.custom?.reservationStatusMachine as
+    | {
+        blockingStatuses?: string[]
+        defaultStatus?: string
+        statuses?: string[]
+        terminalStatuses?: string[]
+        transitions?: Record<string, string[]>
+      }
+    | undefined
+
+  // The initial/pending status (what "pending" view shows)
+  const defaultStatus = statusMachine?.defaultStatus ?? 'pending'
+
+  // Build STATUS_COLORS dynamically: built-ins first, then auto-assign palette for custom statuses
+  const STATUS_COLORS = useMemo<Record<string, string>>(() => {
+    const colors = { ...BUILTIN_STATUS_COLORS }
+    const statuses = statusMachine?.statuses ?? []
+    statuses.forEach((s, i) => {
+      if (!colors[s]) {
+        colors[s] = CUSTOM_STATUS_PALETTE[i % CUSTOM_STATUS_PALETTE.length]
+      }
+    })
+    return colors
+  }, [statusMachine])
+
+  // Derive confirm/cancel target statuses from config transitions
+  // "confirm" = first non-terminal transition from defaultStatus
+  // "cancel"  = first terminal transition from defaultStatus (or fallback: 'cancelled')
+  const { cancelStatus, confirmStatus } = useMemo(() => {
+    const terminalStatuses = statusMachine?.terminalStatuses ?? ['completed', 'cancelled', 'no-show']
+    const transitions = statusMachine?.transitions ?? {}
+    const defaultTransitions: string[] = transitions[defaultStatus] ?? []
+
+    const nonTerminal = defaultTransitions.find((s) => !terminalStatuses.includes(s))
+    const terminal = defaultTransitions.find((s) => terminalStatuses.includes(s))
+
+    return {
+      cancelStatus: terminal ?? 'cancelled',
+      confirmStatus: nonTerminal ?? 'confirmed',
+    }
+  }, [statusMachine, defaultStatus])
+
+  const STATUS_LABELS = useMemo<Record<string, string>>(() => {
+    const statuses = statusMachine?.statuses ?? [
+      'pending',
+      'confirmed',
+      'completed',
+      'cancelled',
+      'no-show',
+    ]
+    const labels: Record<string, string> = {}
+    for (const s of statuses) {
+      // Attempt to look up a translation key, e.g. reservation:statusPending
+      const key = `reservation:status${s.charAt(0).toUpperCase() + s.slice(1).replace(/-./g, (m) => m[1].toUpperCase())}`
+      const translated = t(key)
+      // If translation returns the key itself, it's missing — fall back to capitalized status name
+      labels[s] = translated !== key ? translated : s.charAt(0).toUpperCase() + s.slice(1)
+    }
+    return labels
+  }, [statusMachine, t])
 
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('month')
@@ -129,12 +194,12 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     void fetchReservations()
   }, [fetchReservations])
 
-  // Fetch pending count (always, for badge)
+  // Fetch pending count (always, for badge) — uses defaultStatus from config
   const fetchPendingCount = useCallback(async () => {
     try {
       const params = new URLSearchParams({
         limit: '0',
-        'where[status][equals]': 'pending',
+        'where[status][equals]': defaultStatus,
       })
       const response = await fetch(`${apiUrl}?${params}`)
       const result = await response.json()
@@ -142,20 +207,20 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     } catch {
       // silently ignore
     }
-  }, [apiUrl])
+  }, [apiUrl, defaultStatus])
 
   useEffect(() => {
     void fetchPendingCount()
   }, [fetchPendingCount])
 
-  // Fetch pending reservations when tab is active
+  // Fetch pending reservations when tab is active — uses defaultStatus from config
   const fetchPendingReservations = useCallback(async () => {
     try {
       const params = new URLSearchParams({
         depth: '1',
         limit: '500',
         sort: 'startTime',
-        'where[status][equals]': 'pending',
+        'where[status][equals]': defaultStatus,
       })
       const response = await fetch(`${apiUrl}?${params}`)
       const result = await response.json()
@@ -163,7 +228,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     } catch {
       setPendingReservations([])
     }
-  }, [apiUrl])
+  }, [apiUrl, defaultStatus])
 
   useEffect(() => {
     if (viewMode === 'pending') {
@@ -202,10 +267,11 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     [apiUrl],
   )
 
+  // Uses confirmStatus derived from config transitions
   const handleQuickConfirm = useCallback(
     async (id: string) => {
       setConfirmingIds((prev) => new Set(prev).add(id))
-      const ok = await patchReservation(id, { status: 'confirmed' })
+      const ok = await patchReservation(id, { status: confirmStatus })
       setConfirmingIds((prev) => {
         const next = new Set(prev)
         next.delete(id)
@@ -227,13 +293,14 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         void fetchPendingCount()
       }
     },
-    [patchReservation, fetchPendingReservations, fetchPendingCount, t],
+    [patchReservation, fetchPendingReservations, fetchPendingCount, t, confirmStatus],
   )
 
+  // Uses cancelStatus derived from config transitions
   const handleQuickCancel = useCallback(
     async (id: string) => {
       setConfirmingIds((prev) => new Set(prev).add(id))
-      const ok = await patchReservation(id, { status: 'cancelled' })
+      const ok = await patchReservation(id, { status: cancelStatus })
       setConfirmingIds((prev) => {
         const next = new Set(prev)
         next.delete(id)
@@ -255,7 +322,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         void fetchPendingCount()
       }
     },
-    [patchReservation, fetchPendingReservations, fetchPendingCount, t],
+    [patchReservation, fetchPendingReservations, fetchPendingCount, t, cancelStatus],
   )
 
   const confirmSelected = useCallback(async () => {
@@ -269,7 +336,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     })
 
     const results = await Promise.allSettled(
-      ids.map((id) => patchReservation(id, { status: 'confirmed' })),
+      ids.map((id) => patchReservation(id, { status: confirmStatus })),
     )
 
     setConfirmingIds((prev) => {
@@ -300,7 +367,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     setSelectedIds(new Set())
     void fetchPendingReservations()
     void fetchPendingCount()
-  }, [selectedIds, patchReservation, fetchPendingReservations, fetchPendingCount, t])
+  }, [selectedIds, patchReservation, fetchPendingReservations, fetchPendingCount, t, confirmStatus])
 
   const handleEventClick = useCallback((e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -383,6 +450,18 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     return parts.join(' - ')
   }
 
+  // Returns all resource names for a reservation — from items array if present, otherwise top-level resource
+  const getResourceNames = (r: Reservation): string[] => {
+    if (r.items && r.items.length > 0) {
+      const names = r.items
+        .map((item) => getResName(item.resource))
+        .filter((name) => name.length > 0)
+      if (names.length > 0) {return names}
+    }
+    const single = getResName(r.resource)
+    return single ? [single] : []
+  }
+
   const getEventTooltip = (r: Reservation): string => {
     const serviceName = getResName(r.service) || t('reservation:calendarUnknownService')
     const startStr = new Date(r.startTime).toLocaleTimeString([], {
@@ -393,35 +472,57 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       ? new Date(r.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '?'
     const customerName = getCustomerName(r.customer) || t('reservation:calendarUnknownCustomer')
-    const resourceName = getResName(r.resource) || t('reservation:calendarUnknownResource')
+    const resourceNames = getResourceNames(r)
+    const resourceStr =
+      resourceNames.length > 0
+        ? resourceNames.join(', ')
+        : t('reservation:calendarUnknownResource')
     const status = STATUS_LABELS[r.status] ?? r.status
-    return `${serviceName}\n${startStr} - ${endStr}\n${t('reservation:tooltipCustomer')} ${customerName}\n${t('reservation:tooltipResource')} ${resourceName}\n${t('reservation:tooltipStatus')} ${status}`
+    return [
+      serviceName,
+      `${startStr} - ${endStr}`,
+      `${t('reservation:tooltipCustomer')} ${customerName}`,
+      `${t('reservation:tooltipResource')} ${resourceStr}`,
+      `${t('reservation:tooltipStatus')} ${status}`,
+    ].join('\n')
   }
 
-  const renderEventItem = (r: Reservation, compact: boolean) => (
-    <div
-      className={`${styles.eventItem} ${STATUS_CLASS_MAP[r.status] ?? ''}`}
-      key={r.id}
-      onClick={(e) => handleEventClick(e, r.id)}
-      onKeyDown={(e) => handleEventKeyDown(e, r.id)}
-      role="button"
-      tabIndex={0}
-      title={getEventTooltip(r)}
-    >
-      {getEventLabel(r, compact)}
-    </div>
-  )
+  const renderEventItem = (r: Reservation, compact: boolean) => {
+    // Use CSS class for built-in statuses; also apply inline background for custom statuses
+    const cssClass = STATUS_CLASS_MAP[r.status] ?? ''
+    const color = STATUS_COLORS[r.status]
+    // Only apply inline style when there's no CSS class (custom statuses) or as a supplement
+    const inlineStyle = cssClass ? undefined : { background: color }
+    return (
+      <div
+        className={`${styles.eventItem} ${cssClass}`}
+        key={r.id}
+        onClick={(e) => handleEventClick(e, r.id)}
+        onKeyDown={(e) => handleEventKeyDown(e, r.id)}
+        role="button"
+        style={inlineStyle}
+        tabIndex={0}
+        title={getEventTooltip(r)}
+      >
+        {getEventLabel(r, compact)}
+      </div>
+    )
+  }
 
-  const renderStatusLegend = () => (
-    <div className={styles.statusLegend}>
-      {Object.entries(STATUS_LABELS).map(([key, label]) => (
-        <div className={styles.legendItem} key={key}>
-          <span className={styles.legendDot} style={{ background: STATUS_COLORS[key] }} />
-          {label}
-        </div>
-      ))}
-    </div>
-  )
+  // Dynamic legend: iterates all statuses from the status machine config
+  const renderStatusLegend = () => {
+    const statuses = statusMachine?.statuses ?? Object.keys(BUILTIN_STATUS_COLORS)
+    return (
+      <div className={styles.statusLegend}>
+        {statuses.map((key) => (
+          <div className={styles.legendItem} key={key}>
+            <span className={styles.legendDot} style={{ background: STATUS_COLORS[key] }} />
+            {STATUS_LABELS[key] ?? key}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   const renderCurrentTimeLine = (cellDate: Date, cellHour: number) => {
     const now = new Date()
@@ -703,6 +804,9 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           <tbody>
             {pendingReservations.map((r) => {
               const isConfirming = confirmingIds.has(r.id)
+              // Show all resources from items array if present, else top-level resource
+              const resourceDisplay =
+                getResourceNames(r).join(', ') || t('reservation:calendarUnknownResource')
               return (
                 <tr className={styles.pendingRow} key={r.id}>
                   <td className={styles.pendingTd}>
@@ -732,9 +836,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   <td className={styles.pendingTd}>
                     {getResName(r.service) || t('reservation:calendarUnknownService')}
                   </td>
-                  <td className={styles.pendingTd}>
-                    {getResName(r.resource) || t('reservation:calendarUnknownResource')}
-                  </td>
+                  <td className={styles.pendingTd}>{resourceDisplay}</td>
                   <td className={styles.pendingTd}>{formatDateTime(r.startTime)}</td>
                   <td className={styles.pendingTd}>
                     <button

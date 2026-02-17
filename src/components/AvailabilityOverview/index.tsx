@@ -10,8 +10,10 @@ import styles from './AvailabilityOverview.module.css'
 
 type Resource = {
   active?: boolean
+  capacityMode?: 'per-guest' | 'per-reservation'
   id: string
   name: string
+  quantity?: number
 }
 
 type Schedule = {
@@ -42,11 +44,20 @@ const DAY_MAP: Record<string, number> = {
   wed: 3,
 }
 
+/** Return the CSS class for a capacity badge based on utilization ratio. */
+function capacityClass(booked: number, total: number): string {
+  if (booked >= total) {return styles.slotCapacityFull}
+  if (booked / total >= 0.5) {return styles.slotCapacityMid}
+  return styles.slotCapacityLow
+}
+
 export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const { config } = useConfig()
   const { t: _t } = useTranslation()
   const t = _t as PluginT
   const slugs = config.admin?.custom?.reservationSlugs
+  const statusMachine = config.admin?.custom?.reservationStatusMachine
+  const blockingStatuses: string[] = statusMachine?.blockingStatuses ?? ['pending', 'confirmed']
 
   const DAY_NAMES = useMemo(
     () => [
@@ -95,6 +106,11 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
       setLoading(true)
       const apiBase = `${config.serverURL ?? ''}${config.routes.api}`
 
+      // Build a query that fetches only blocking-status reservations so the
+      // component doesn't need to filter client-side. The `in` operator on
+      // Payload's REST API accepts a comma-separated list.
+      const blockingIn = blockingStatuses.join(',')
+
       try {
         const [resourcesRes, schedulesRes, reservationsRes] = await Promise.all([
           fetch(`${apiBase}/${slugs.resources}?where[active][equals]=true&limit=100`),
@@ -105,7 +121,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
               limit: '500',
               'where[startTime][greater_than_equal]': weekStart.toISOString(),
               'where[startTime][less_than_equal]': weekEnd.toISOString(),
-              'where[status][not_in]': 'cancelled,no-show',
+              'where[status][in]': blockingIn,
             })}`,
           ),
         ])
@@ -128,7 +144,10 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     }
 
     void fetchData()
-  }, [weekStart, weekEnd, config.routes.api, config.serverURL, slugs])
+    // blockingStatuses is derived from config which is stable; stringify to
+    // avoid object-reference churn causing infinite loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStart, weekEnd, config.routes.api, config.serverURL, slugs, blockingStatuses.join(',')])
 
   const navigateWeek = useCallback((direction: -1 | 1) => {
     setWeekStart((prev) => {
@@ -197,6 +216,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     return slots
   }
 
+  /** Returns all blocking-status reservations for a resource on a given day. */
   const getBookingsForResourceDay = (resourceId: string, day: Date) => {
     return reservations.filter((r) => {
       const rDate = new Date(r.startTime)
@@ -250,43 +270,71 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
           ))}
 
           {/* Resource rows */}
-          {resources.map((resource) => (
-            <Fragment key={resource.id}>
-              <div className={styles.resourceName}>
-                {resource.name}
-              </div>
-              {weekDays.map((day, di) => {
-                const slots = getSlotsForResourceDay(resource.id, day)
-                const bookings = getBookingsForResourceDay(resource.id, day)
+          {resources.map((resource) => {
+            const quantity = resource.quantity ?? 1
+            return (
+              <Fragment key={resource.id}>
+                <div className={styles.resourceName}>
+                  {resource.name}
+                  {quantity > 1 && (
+                    <span style={{ fontWeight: 400, marginLeft: 4, opacity: 0.6 }}>
+                      {' '}(&times;{quantity})
+                    </span>
+                  )}
+                </div>
+                {weekDays.map((day, di) => {
+                  const slots = getSlotsForResourceDay(resource.id, day)
+                  const bookings = getBookingsForResourceDay(resource.id, day)
+                  const bookedCount = bookings.length
 
-                return (
-                  <div className={styles.cell} key={`cell-${resource.id}-${di}`}>
-                    {slots.map((slot, si) => (
-                      <div
-                        className={
-                          slot.type === 'exception'
-                            ? styles.slotException
-                            : styles.slotAvailable
-                        }
-                        key={`slot-${si}`}
-                      >
-                        {slot.label}
-                      </div>
-                    ))}
-                    {bookings.map((b) => (
-                      <div className={styles.slotBooked} key={b.id}>
-                        {new Date(b.startTime).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}{' '}
-                        {t('reservation:availabilityBooked')}
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
-            </Fragment>
-          ))}
+                  return (
+                    <div className={styles.cell} key={`cell-${resource.id}-${di}`}>
+                      {slots.map((slot, si) => (
+                        <div
+                          className={
+                            slot.type === 'exception'
+                              ? styles.slotException
+                              : styles.slotAvailable
+                          }
+                          key={`slot-${si}`}
+                        >
+                          {slot.label}
+                        </div>
+                      ))}
+                      {quantity > 1 ? (
+                        /* Multi-unit resource: show X/Y booked with graduated color */
+                        bookedCount > 0 && (
+                          <div
+                            className={capacityClass(bookedCount, quantity)}
+                            title={t('reservation:availabilityXofYBooked', {
+                              booked: bookedCount,
+                              total: quantity,
+                            })}
+                          >
+                            {t('reservation:availabilityXofYBooked', {
+                              booked: bookedCount,
+                              total: quantity,
+                            })}
+                          </div>
+                        )
+                      ) : (
+                        /* Single-unit resource: show individual booking times */
+                        bookings.map((b) => (
+                          <div className={styles.slotBooked} key={b.id}>
+                            {new Date(b.startTime).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}{' '}
+                            {t('reservation:availabilityBooked')}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )
+                })}
+              </Fragment>
+            )
+          })}
         </div>
       )}
     </div>

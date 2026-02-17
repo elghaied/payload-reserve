@@ -9,12 +9,12 @@ import type { PluginT } from '../../translations/index.js'
 import styles from './CustomerField.module.css'
 
 type CustomerDoc = {
-  id: string
   email: string
-  phone?: string
-  name?: string
   firstName?: string
+  id: string
   lastName?: string
+  name?: string
+  phone?: string
 }
 
 const getDisplayName = (customer: CustomerDoc): string => {
@@ -64,11 +64,11 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
           const doc = await res.json()
           setSelectedCustomer({
             id: doc.id,
-            email: doc.email ?? '',
-            phone: doc.phone ?? undefined,
             name: doc.name ?? undefined,
+            email: doc.email ?? '',
             firstName: doc.firstName ?? undefined,
             lastName: doc.lastName ?? undefined,
+            phone: doc.phone ?? undefined,
           })
         }
       } catch {
@@ -157,11 +157,11 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
     ({ doc }: { doc: Record<string, unknown> }) => {
       const customer: CustomerDoc = {
         id: doc.id as string,
-        email: (doc.email as string) ?? '',
-        phone: (doc.phone as string) ?? undefined,
         name: (doc.name as string) ?? undefined,
+        email: (doc.email as string) ?? '',
         firstName: (doc.firstName as string) ?? undefined,
         lastName: (doc.lastName as string) ?? undefined,
+        phone: (doc.phone as string) ?? undefined,
       }
       setValue(customer.id)
       setSelectedCustomer(customer)
