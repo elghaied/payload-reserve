@@ -105,5 +105,14 @@
   "pendingCancelSuccess": "Reservation cancelled",
   "pendingCancelError": "Failed to cancel reservation",
   "pendingBulkConfirmSuccess": "{{succeeded}} confirmed, {{failed}} failed",
-  "pendingEmpty": "No pending reservations"
+  "pendingEmpty": "No pending reservations",
+  "fieldQuantity": "Quantity",
+  "fieldCapacityMode": "Capacity Mode",
+  "fieldTimezone": "Timezone",
+  "fieldDurationType": "Duration Type",
+  "capacityPerReservation": "Per Reservation",
+  "capacityPerGuest": "Per Guest",
+  "durationFixed": "Fixed",
+  "durationFlexible": "Flexible",
+  "durationFullDay": "Full Day"
 }

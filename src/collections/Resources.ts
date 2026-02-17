@@ -51,6 +51,45 @@ export function createResourcesCollection(
         defaultValue: true,
         label: ({ t }) => (t as PluginT)('reservation:fieldActive'),
       },
+      {
+        name: 'quantity',
+        type: 'number',
+        admin: {
+          position: 'sidebar',
+        },
+        defaultValue: 1,
+        label: ({ t }) => (t as PluginT)('reservation:fieldQuantity'),
+        min: 1,
+        required: true,
+      },
+      {
+        name: 'capacityMode',
+        type: 'select',
+        admin: {
+          condition: (data) => (data?.quantity ?? 1) > 1,
+          position: 'sidebar',
+        },
+        defaultValue: 'per-reservation',
+        label: ({ t }) => (t as PluginT)('reservation:fieldCapacityMode'),
+        options: [
+          {
+            label: ({ t }) => (t as PluginT)('reservation:capacityPerReservation'),
+            value: 'per-reservation',
+          },
+          {
+            label: ({ t }) => (t as PluginT)('reservation:capacityPerGuest'),
+            value: 'per-guest',
+          },
+        ],
+      },
+      {
+        name: 'timezone',
+        type: 'text',
+        admin: {
+          position: 'sidebar',
+        },
+        label: ({ t }) => (t as PluginT)('reservation:fieldTimezone'),
+      },
     ],
     labels: {
       plural: ({ t }) => (t as PluginT)('reservation:collectionResources'),

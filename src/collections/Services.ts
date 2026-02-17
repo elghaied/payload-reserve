@@ -40,6 +40,27 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         required: true,
       },
       {
+        name: 'durationType',
+        type: 'select',
+        defaultValue: 'fixed',
+        label: ({ t }) => (t as PluginT)('reservation:fieldDurationType'),
+        options: [
+          {
+            label: ({ t }) => (t as PluginT)('reservation:durationFixed'),
+            value: 'fixed',
+          },
+          {
+            label: ({ t }) => (t as PluginT)('reservation:durationFlexible'),
+            value: 'flexible',
+          },
+          {
+            label: ({ t }) => (t as PluginT)('reservation:durationFullDay'),
+            value: 'full-day',
+          },
+        ],
+        required: true,
+      },
+      {
         name: 'price',
         type: 'number',
         admin: {
