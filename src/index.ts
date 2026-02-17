@@ -15,6 +15,6 @@ export type {
   ResolvedReservationPluginConfig,
   StatusMachineConfig,
 } from './types.js'
+export { DEFAULT_STATUS_MACHINE, VALID_STATUS_TRANSITIONS } from './types.js'
 export type { ResolvedItem } from './utilities/resolveReservationItems.js'
 export { resolveReservationItems } from './utilities/resolveReservationItems.js'
-export { DEFAULT_STATUS_MACHINE, VALID_STATUS_TRANSITIONS } from './types.js'

@@ -126,7 +126,7 @@ export function createReservationsCollection(
         options: statusMachine.statuses.map((s) => ({
           label: ({ t }) => {
             const key = `reservation:status${s.charAt(0).toUpperCase() + s.slice(1)}`
-            const translated = (t as PluginT)(key as Parameters<PluginT>[0])
+            const translated = (t as PluginT)(key)
             return translated !== key ? translated : s.charAt(0).toUpperCase() + s.slice(1)
           },
           value: s,

@@ -10,7 +10,11 @@ import { createResourcesCollection } from './collections/Resources.js'
 import { createSchedulesCollection } from './collections/Schedules.js'
 import { createServicesCollection } from './collections/Services.js'
 import { resolveConfig } from './defaults.js'
+import { createCancelBookingEndpoint } from './endpoints/cancelBooking.js'
+import { createCheckAvailabilityEndpoint } from './endpoints/checkAvailability.js'
+import { createBookingEndpoint } from './endpoints/createBooking.js'
 import { createCustomerSearchEndpoint } from './endpoints/customerSearch.js'
+import { createGetSlotsEndpoint } from './endpoints/getSlots.js'
 import { translations } from './translations/index.js'
 
 export const payloadReserve =
@@ -42,7 +46,13 @@ export const payloadReserve =
 
     // Register custom endpoints
     if (!config.endpoints) {config.endpoints = []}
-    config.endpoints.push(createCustomerSearchEndpoint(resolved))
+    config.endpoints.push(
+      createCancelBookingEndpoint(resolved),
+      createCheckAvailabilityEndpoint(resolved),
+      createBookingEndpoint(resolved),
+      createCustomerSearchEndpoint(resolved),
+      createGetSlotsEndpoint(resolved),
+    )
 
     // Set up admin configuration
     if (!config.admin) {config.admin = {}}

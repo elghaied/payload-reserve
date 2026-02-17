@@ -12,8 +12,8 @@ export const checkIdempotency =
 
     const { totalDocs } = await req.payload.count({
       collection: config.slugs.reservations as 'reservations',
-      where: { idempotencyKey: { equals: data.idempotencyKey } },
       req,
+      where: { idempotencyKey: { equals: data.idempotencyKey } },
     })
 
     if (totalDocs > 0) {
