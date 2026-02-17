@@ -36,6 +36,7 @@ export const seed = async (payload: Payload) => {
       bufferTimeBefore: 5,
       description: 'Standard haircut service',
       duration: 30,
+      durationType: 'fixed',
       price: 35,
     },
   })
@@ -49,6 +50,7 @@ export const seed = async (payload: Payload) => {
       bufferTimeBefore: 10,
       description: 'Full hair coloring service',
       duration: 90,
+      durationType: 'fixed',
       price: 120,
     },
   })
@@ -62,6 +64,7 @@ export const seed = async (payload: Payload) => {
       bufferTimeBefore: 0,
       description: 'Initial consultation',
       duration: 15,
+      durationType: 'fixed',
       price: 0,
     },
   })
@@ -87,13 +90,56 @@ export const seed = async (payload: Payload) => {
     },
   })
 
+  // Date helpers (used for schedules, reservations, and exception dates)
+  const today = new Date()
+  const makeTime = (hour: number, minute: number = 0) => {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute)
+    return d.toISOString()
+  }
+
+  // Seed additional services (flexible + full-day duration types)
+  const eventSpace = await payload.create({
+    collection: 'services' as 'users',
+    data: {
+      name: 'Event Space Rental',
+      active: true,
+      bufferTimeAfter: 30,
+      bufferTimeBefore: 15,
+      description: 'Flexible-duration event space rental (minimum 2 hours)',
+      duration: 120,
+      durationType: 'flexible',
+      price: 200,
+    },
+  })
+
+  const fullDayRetreat = await payload.create({
+    collection: 'services' as 'users',
+    data: {
+      name: 'Full Day Wellness Retreat',
+      active: true,
+      bufferTimeAfter: 0,
+      bufferTimeBefore: 0,
+      description: 'Full-day wellness retreat package',
+      duration: 1,
+      durationType: 'full-day',
+      price: 350,
+    },
+  })
+
   // Seed schedules
+  // Helper dates for exception dates and manual schedules
+  const exceptionDate1 = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 10)
+  const exceptionDate2 = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 20)
+
   await payload.create({
     collection: 'schedules' as 'users',
     data: {
       name: 'Alice - Weekday Schedule',
       active: true,
-      exceptions: [],
+      exceptions: [
+        { date: exceptionDate1.toISOString(), reason: 'Vacation day' },
+        { date: exceptionDate2.toISOString(), reason: 'Training seminar' },
+      ],
       recurringSlots: [
         { day: 'mon', endTime: '17:00', startTime: '09:00' },
         { day: 'tue', endTime: '17:00', startTime: '09:00' },
@@ -148,16 +194,11 @@ export const seed = async (payload: Payload) => {
   })
 
   // Seed some reservations for today
-  const today = new Date()
-  const makeTime = (hour: number, minute: number = 0) => {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute)
-    return d.toISOString()
-  }
-
   const reservation1 = await payload.create({
     collection: 'reservations',
     data: {
       customer: customer1.id,
+      idempotencyKey: 'seed-booking-001',
       resource: alice.id,
       service: haircut.id,
       startTime: makeTime(9, 0),
@@ -226,7 +267,7 @@ export const seed = async (payload: Payload) => {
   })
 
   // Multi-unit resource: 5 massage tables (per-reservation capacity)
-  await payload.create({
+  const massageTable = await payload.create({
     collection: 'resources' as 'users',
     data: {
       name: 'Massage Table',
@@ -251,6 +292,17 @@ export const seed = async (payload: Payload) => {
     },
   })
 
+  // Event room resource (for flexible + full-day services)
+  const eventRoom = await payload.create({
+    collection: 'resources' as 'users',
+    data: {
+      name: 'Event Room',
+      active: true,
+      description: 'Multi-purpose event room for rentals and retreats',
+      services: [eventSpace.id, fullDayRetreat.id],
+    },
+  })
+
   // Schedule for the yoga room (daily classes)
   await payload.create({
     collection: 'schedules' as 'users',
@@ -269,6 +321,44 @@ export const seed = async (payload: Payload) => {
       ],
       resource: yogaRoom.id,
       scheduleType: 'recurring',
+    },
+  })
+
+  // Schedule for massage tables (weekdays)
+  await payload.create({
+    collection: 'schedules' as 'users',
+    data: {
+      name: 'Massage Table - Weekday Schedule',
+      active: true,
+      exceptions: [],
+      recurringSlots: [
+        { day: 'mon', endTime: '19:00', startTime: '09:00' },
+        { day: 'tue', endTime: '19:00', startTime: '09:00' },
+        { day: 'wed', endTime: '19:00', startTime: '09:00' },
+        { day: 'thu', endTime: '19:00', startTime: '09:00' },
+        { day: 'fri', endTime: '17:00', startTime: '09:00' },
+      ],
+      resource: massageTable.id,
+      scheduleType: 'recurring',
+    },
+  })
+
+  // Schedule for event room (manual slots — specific dates)
+  const nextWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7)
+  const weekAfter = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 14)
+
+  await payload.create({
+    collection: 'schedules' as 'users',
+    data: {
+      name: 'Event Room - Available Dates',
+      active: true,
+      exceptions: [],
+      manualSlots: [
+        { date: nextWeek.toISOString(), endTime: '22:00', startTime: '08:00' },
+        { date: weekAfter.toISOString(), endTime: '22:00', startTime: '08:00' },
+      ],
+      resource: eventRoom.id,
+      scheduleType: 'manual',
     },
   })
 
@@ -313,6 +403,33 @@ export const seed = async (payload: Payload) => {
       resource: yogaRoom.id,
       service: groupYoga.id,
       startTime: makeTime(8, 0),
+      status: 'confirmed',
+    },
+  })
+
+  // Flexible-duration reservation: event space rental with explicit endTime
+  await payload.create({
+    collection: 'reservations',
+    context: { skipReservationHooks: true },
+    data: {
+      customer: customer1.id,
+      endTime: new Date(
+        nextWeek.getFullYear(),
+        nextWeek.getMonth(),
+        nextWeek.getDate(),
+        14,
+        0,
+      ).toISOString(),
+      notes: 'Corporate team-building event (3 hours)',
+      resource: eventRoom.id,
+      service: eventSpace.id,
+      startTime: new Date(
+        nextWeek.getFullYear(),
+        nextWeek.getMonth(),
+        nextWeek.getDate(),
+        11,
+        0,
+      ).toISOString(),
       status: 'confirmed',
     },
   })

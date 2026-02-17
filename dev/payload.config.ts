@@ -66,6 +66,31 @@ const buildConfigWithMemoryDB = async () => {
       payloadReserve({
         cancellationNoticePeriod: 24,
         defaultBufferTime: 10,
+        hooks: {
+          afterBookingCreate: [
+            ({ doc }) => {
+              // eslint-disable-next-line no-console
+              console.log(`[reservation-plugin] Booking created: ${String(doc.id)}`)
+            },
+          ],
+          afterStatusChange: [
+            ({ doc, newStatus, previousStatus }) => {
+              // eslint-disable-next-line no-console
+              console.log(
+                `[reservation-plugin] Status changed: ${String(doc.id)} ${String(previousStatus)} -> ${String(newStatus)}`,
+              )
+            },
+          ],
+        },
+        // statusMachine: {
+        //   statuses: ['pending', 'waitlisted', 'confirmed', 'completed', 'cancelled', 'no-show'],
+        //   transitions: {
+        //     pending: ['waitlisted', 'confirmed', 'cancelled'],
+        //     waitlisted: ['confirmed', 'cancelled'],
+        //     confirmed: ['completed', 'cancelled', 'no-show'],
+        //   },
+        // },
+        // userCollection: 'users',
       }),
     ],
     secret: process.env.PAYLOAD_SECRET || 'test-secret_key',

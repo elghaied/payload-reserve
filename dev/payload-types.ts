@@ -211,6 +211,7 @@ export interface Service {
   image?: (string | null) | Media;
   description?: string | null;
   duration: number;
+  durationType: 'fixed' | 'flexible' | 'full-day';
   price?: number | null;
   bufferTimeBefore?: number | null;
   bufferTimeAfter?: number | null;
@@ -229,6 +230,9 @@ export interface Resource {
   description?: string | null;
   services: (string | Service)[];
   active?: boolean | null;
+  quantity: number;
+  capacityMode?: ('per-reservation' | 'per-guest') | null;
+  timezone?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -281,7 +285,22 @@ export interface Reservation {
   endTime?: string | null;
   status?: ('pending' | 'confirmed' | 'completed' | 'cancelled' | 'no-show') | null;
   cancellationReason?: string | null;
+  guestCount?: number | null;
   notes?: string | null;
+  /**
+   * Resources included in this booking. Leave empty for single-resource bookings.
+   */
+  items?:
+    | {
+        resource: string | Resource;
+        service?: (string | null) | Service;
+        startTime?: string | null;
+        endTime?: string | null;
+        guestCount?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  idempotencyKey?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -483,6 +502,7 @@ export interface ServicesSelect<T extends boolean = true> {
   image?: T;
   description?: T;
   duration?: T;
+  durationType?: T;
   price?: T;
   bufferTimeBefore?: T;
   bufferTimeAfter?: T;
@@ -500,6 +520,9 @@ export interface ResourcesSelect<T extends boolean = true> {
   description?: T;
   services?: T;
   active?: T;
+  quantity?: T;
+  capacityMode?: T;
+  timezone?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -550,7 +573,19 @@ export interface ReservationsSelect<T extends boolean = true> {
   endTime?: T;
   status?: T;
   cancellationReason?: T;
+  guestCount?: T;
   notes?: T;
+  items?:
+    | T
+    | {
+        resource?: T;
+        service?: T;
+        startTime?: T;
+        endTime?: T;
+        guestCount?: T;
+        id?: T;
+      };
+  idempotencyKey?: T;
   updatedAt?: T;
   createdAt?: T;
 }
