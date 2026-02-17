@@ -1,6 +1,8 @@
-# payload-reserve - Reservation Plugin for Payload CMS 3.x
+# payload-reserve
 
-A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Designed for salons, clinics, consultants, and any business that needs appointment scheduling with conflict prevention, status workflows, and admin UI components.
+A full-featured reservation and booking plugin for Payload CMS 3.x. Adds a scheduling system with conflict detection, a configurable status machine, multi-resource bookings, capacity and inventory tracking, a public REST API, and admin UI components.
+
+Designed for salons, clinics, hotels, restaurants, event venues, and any business that needs appointment scheduling managed through Payload's admin panel.
 
 ---
 
@@ -9,66 +11,62 @@ A full-featured, reusable reservation/booking plugin for Payload CMS 3.x. Design
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Configuration](#configuration)
+- [Configuration Reference](#configuration-reference)
 - [Collections](#collections)
   - [Services](#services)
   - [Resources](#resources)
   - [Schedules](#schedules)
   - [Customers](#customers)
   - [Reservations](#reservations)
+- [Status Machine](#status-machine)
+- [Duration Types](#duration-types)
+- [Multi-Resource Bookings](#multi-resource-bookings)
+- [Capacity and Inventory](#capacity-and-inventory)
+- [Plugin Hooks API](#plugin-hooks-api)
+- [Public API Endpoints](#public-api-endpoints)
+- [Admin Components](#admin-components)
+- [Use Case Examples](#use-case-examples)
+- [Performance: Recommended Indexes](#performance-recommended-indexes)
+- [Reconciliation Job](#reconciliation-job)
+- [Integration Examples](#integration-examples)
 - [Business Logic Hooks](#business-logic-hooks)
-  - [Auto End Time Calculation](#auto-end-time-calculation)
-  - [Conflict Detection](#conflict-detection)
-  - [Status Transition Enforcement](#status-transition-enforcement)
-  - [Common Workflows](#common-workflows)
-  - [Cancellation Policy](#cancellation-policy)
-  - [Escape Hatch](#escape-hatch)
-  - [Integration Patterns](#integration-patterns)
-- [Admin UI Components](#admin-ui-components)
-  - [Dashboard Widget](#dashboard-widget)
-  - [Calendar View](#calendar-view)
-  - [Customer Picker](#customer-picker)
-  - [Availability Overview](#availability-overview)
-- [Utilities](#utilities)
 - [Development](#development)
 - [Project Structure](#project-structure)
-- [API Reference](#api-reference)
 
 ---
 
 ## Features
 
-- **5 Collections** - Services, Resources, Schedules, Reservations, and Customers (dedicated auth collection)
-- **Double-Booking Prevention** - Automatic conflict detection with configurable buffer times
-- **Status State Machine** - Enforced workflow: pending -> confirmed -> completed/cancelled/no-show
-- **Auto End Time** - Automatically calculates reservation end time from service duration
-- **Cancellation Policy** - Configurable notice period enforcement
-- **Admin Quick-Confirm** - Authenticated admin users can create reservations directly as "confirmed" for walk-ins
-- **Calendar View** - Month/week/day calendar replacing the default reservations list view
-- **Click-to-Create** - Click any calendar cell to create a reservation with the start time pre-filled
-- **Event Tooltips** - Hover events to see full details (service, time range, customer, resource, status)
-- **Status Legend** - Color key displayed in the calendar explaining each status color
-- **Current Time Indicator** - Red line in week/day views marking the current time
-- **Dashboard Widget** - Server component showing today's booking stats at a glance
-- **Customer Picker** - Rich customer search field with multi-field search (firstName, lastName, phone, email), inline create/edit via document drawer
-- **Availability Grid** - Weekly overview of resource availability vs. booked slots
-- **Recurring & Manual Schedules** - Flexible schedule types with exception dates
-- **Fully Configurable** - Override slugs, access control, buffer times, and admin grouping
-- **Type-Safe** - Full TypeScript support with exported types
+- **4 Domain Collections** — Services, Resources, Schedules, Reservations with full CRUD
+- **User Collection Extension** — Extends your existing auth collection with booking fields instead of creating a separate Customers collection
+- **Configurable Status Machine** — Define your own statuses, transitions, and terminal states
+- **Double-Booking Prevention** — Server-side conflict detection with configurable buffer times
+- **Auto End Time** — Calculates `endTime` from `startTime + service.duration` automatically
+- **Three Duration Types** — Fixed, flexible (customer-specified end), and full-day bookings
+- **Multi-Resource Bookings** — Single reservation that spans multiple resources simultaneously
+- **Capacity and Inventory** — `quantity > 1` allows multiple concurrent bookings per resource; `capacityMode` switches between per-reservation and per-guest counting
+- **Idempotency** — Optional `idempotencyKey` field prevents duplicate submissions
+- **Cancellation Policy** — Configurable minimum notice period enforcement
+- **Plugin Hooks API** — Fire callbacks on create, confirm, cancel, and status change
+- **Public REST API** — Four pre-built endpoints for availability checking, slot listing, booking, and cancellation
+- **Calendar View** — Month/week/day calendar replacing the default reservations list view
+- **Dashboard Widget** — Server component showing today's booking stats
+- **Availability Overview** — Weekly grid of resource availability vs. booked slots
+- **Recurring and Manual Schedules** — Weekly patterns with exception dates, or specific one-off dates
+- **Localization Support** — Collection fields can be localized when Payload localization is enabled
+- **Type-Safe** — Full TypeScript support with exported types
 
 ---
 
 ## Installation
 
 ```bash
-# Install the plugin as a dependency
 pnpm add payload-reserve
-
-# Or if developing locally, link it
-pnpm link ./plugins/payload-reserve
+# or
+npm install payload-reserve
 ```
 
-**Peer Dependency:** Requires `payload ^3.76.1`.
+**Peer dependency:** `payload ^3.37.0`
 
 ---
 
@@ -81,48 +79,55 @@ import { buildConfig } from 'payload'
 import { payloadReserve } from 'payload-reserve'
 
 export default buildConfig({
-  // ... your existing config
+  collections: [
+    // Your existing collections including your users/auth collection
+  ],
   plugins: [
     payloadReserve(),
   ],
 })
 ```
 
-That's it. The plugin registers 5 collections (Services, Resources, Schedules, Reservations, Customers), and adds a dashboard widget, a calendar list view, and an availability admin view automatically. All plugin collections appear under the **"Reservations"** group in the admin panel. The plugin does **not** modify your existing users collection.
+The plugin registers the domain collections, adds a dashboard widget, replaces the reservations list view with a calendar, and mounts the public API endpoints. All plugin collections appear under the **"Reservations"** admin group by default.
+
+By default, the plugin creates a standalone `customers` auth collection. To use your existing users collection instead, set the `userCollection` option.
 
 ---
 
-## Configuration
+## Configuration Reference
 
-All options are optional. The plugin works out of the box with sensible defaults.
+All options are optional. The plugin works with sensible defaults.
 
 ```typescript
 import { payloadReserve } from 'payload-reserve'
 import type { ReservationPluginConfig } from 'payload-reserve'
 
-const config: ReservationPluginConfig = {
-  // Disable the plugin entirely (collections are still registered for schema consistency)
+payloadReserve({
+  // Disable the plugin entirely while keeping the config type-safe
   disabled: false,
+
+  // Admin group label for all reservation collections
+  adminGroup: 'Reservations',
+
+  // Minutes of buffer between reservations when a service has none defined
+  defaultBufferTime: 0,
+
+  // Minimum hours of notice required before a cancellation is allowed
+  cancellationNoticePeriod: 24,
+
+  // Extend an existing auth collection instead of creating a standalone Customers collection.
+  // The named collection must exist in your Payload config before the plugin runs.
+  userCollection: 'users',
 
   // Override collection slugs
   slugs: {
-    services: 'services',       // default
-    resources: 'resources',      // default
-    schedules: 'schedules',      // default
-    reservations: 'reservations',            // default
-    customers: 'customers',      // default
-    media: 'media',              // default (used by Resources image field)
+    services: 'services',
+    resources: 'resources',
+    schedules: 'schedules',
+    reservations: 'reservations',
+    customers: 'customers',
+    media: 'media',
   },
-
-  // Admin panel group name
-  adminGroup: 'Reservations',               // default
-
-  // Default buffer time (minutes) between reservations
-  // Applied when a service doesn't define its own buffer times
-  defaultBufferTime: 0,                     // default
-
-  // Minimum hours of notice required before cancellation
-  cancellationNoticePeriod: 24,             // default (hours)
 
   // Override access control per collection
   access: {
@@ -132,30 +137,55 @@ const config: ReservationPluginConfig = {
       update: ({ req }) => !!req.user,
       delete: ({ req }) => !!req.user,
     },
-    resources: { /* ... */ },
-    schedules: { /* ... */ },
-    reservations: { /* ... */ },
-    customers: { /* ... */ },
+    resources: { read: () => true },
+    schedules: { read: () => true },
+    reservations: { create: () => true },
+    customers: { create: () => true },
   },
-}
 
-payloadReserve(config)
+  // Configurable status machine
+  statusMachine: {
+    statuses: ['pending', 'confirmed', 'completed', 'cancelled', 'no-show'],
+    defaultStatus: 'pending',
+    terminalStatuses: ['completed', 'cancelled', 'no-show'],
+    blockingStatuses: ['pending', 'confirmed'],
+    transitions: {
+      pending: ['confirmed', 'cancelled'],
+      confirmed: ['completed', 'cancelled', 'no-show'],
+      completed: [],
+      cancelled: [],
+      'no-show': [],
+    },
+  },
+
+  // Plugin hook callbacks — see Plugin Hooks API section
+  hooks: {
+    afterBookingCreate: [
+      async ({ doc, req }) => {
+        // Send confirmation email, etc.
+      },
+    ],
+  },
+})
 ```
 
 ### Configuration Defaults
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `disabled` | `false` | Disable plugin functionality |
-| `slugs.services` | `'services'` | Services collection slug |
-| `slugs.resources` | `'resources'` | Resources collection slug |
-| `slugs.schedules` | `'schedules'` | Schedules collection slug |
-| `slugs.reservations` | `'reservations'` | Reservations collection slug |
-| `slugs.customers` | `'customers'` | Customers collection slug |
-| `slugs.media` | `'media'` | Media collection slug (used by Resources image field) |
-| `adminGroup` | `'Reservations'` | Admin panel group name |
-| `defaultBufferTime` | `0` | Default buffer (minutes) between bookings |
-| `cancellationNoticePeriod` | `24` | Minimum hours notice for cancellation |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `disabled` | `boolean` | `false` | Disable plugin functionality |
+| `adminGroup` | `string` | `'Reservations'` | Admin panel group label |
+| `defaultBufferTime` | `number` | `0` | Default buffer between bookings (minutes) |
+| `cancellationNoticePeriod` | `number` | `24` | Minimum hours notice for cancellation |
+| `userCollection` | `string` | `undefined` | Existing auth collection slug to extend |
+| `slugs.services` | `string` | `'services'` | Services collection slug |
+| `slugs.resources` | `string` | `'resources'` | Resources collection slug |
+| `slugs.schedules` | `string` | `'schedules'` | Schedules collection slug |
+| `slugs.reservations` | `string` | `'reservations'` | Reservations collection slug |
+| `slugs.customers` | `string` | `'customers'` | Customers collection slug |
+| `slugs.media` | `string` | `'media'` | Media collection slug (used by image fields) |
+| `statusMachine` | `Partial<StatusMachineConfig>` | Default 5-status machine | Custom status machine |
+| `hooks` | `ReservationPluginHooks` | `{}` | Plugin hook callbacks |
 
 ---
 
@@ -169,22 +199,23 @@ Defines what can be booked (e.g., "Haircut", "Consultation", "Massage").
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | Text | Yes | Service name (max 200 chars, used as title) |
+| `name` | Text | Yes | Service name (max 200 chars) |
+| `image` | Upload | No | Service image |
 | `description` | Textarea | No | Service description |
 | `duration` | Number | Yes | Duration in minutes (min: 1) |
+| `durationType` | Select | Yes | `'fixed'`, `'flexible'`, or `'full-day'` (default: `'fixed'`) |
 | `price` | Number | No | Price (min: 0, step: 0.01) |
-| `bufferTimeBefore` | Number | No | Buffer minutes before appointment (default: 0) |
-| `bufferTimeAfter` | Number | No | Buffer minutes after appointment (default: 0) |
-| `active` | Checkbox | No | Whether service is active (default: true, sidebar) |
+| `bufferTimeBefore` | Number | No | Buffer minutes before the slot (default: 0) |
+| `bufferTimeAfter` | Number | No | Buffer minutes after the slot (default: 0) |
+| `active` | Checkbox | No | Whether service is bookable (default: true) |
 
-**Example:**
 ```typescript
 await payload.create({
   collection: 'services',
   data: {
     name: 'Haircut',
-    description: 'Standard haircut service',
     duration: 30,
+    durationType: 'fixed',
     price: 35.00,
     bufferTimeBefore: 5,
     bufferTimeAfter: 10,
@@ -197,24 +228,26 @@ await payload.create({
 
 **Slug:** `resources`
 
-Who or what performs the service (e.g., a stylist, a room, a consultant).
+Who or what performs the service (a stylist, a room, a machine, a yoga instructor).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | Text | Yes | Resource name (max 200 chars, used as title) |
-| `image` | Upload | No | Resource image (references media collection) |
+| `name` | Text | Yes | Resource name (max 200 chars) |
+| `image` | Upload | No | Resource photo |
 | `description` | Textarea | No | Resource description |
 | `services` | Relationship | Yes | Services this resource can perform (hasMany) |
-| `active` | Checkbox | No | Whether resource is active (default: true, sidebar) |
+| `active` | Checkbox | No | Whether resource accepts bookings (default: true) |
+| `quantity` | Number | Yes | How many concurrent bookings allowed (default: 1) |
+| `capacityMode` | Select | No | `'per-reservation'` or `'per-guest'` — shown only when `quantity > 1` |
+| `timezone` | Text | No | IANA timezone for display purposes |
 
-**Example:**
 ```typescript
 await payload.create({
   collection: 'resources',
   data: {
-    name: 'Alice Johnson',
-    description: 'Senior Stylist',
-    services: [haircutId, coloringId],
+    name: 'Room 101',
+    services: [conferenceServiceId],
+    quantity: 1,
     active: true,
   },
 })
@@ -224,32 +257,25 @@ await payload.create({
 
 **Slug:** `schedules`
 
-Defines when a resource is available. Supports **recurring** (weekly pattern) and **manual** (specific dates) modes, plus exception dates.
+Defines when a resource is available. Supports **recurring** (weekly pattern) and **manual** (specific dates) types, plus exception dates.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | Text | Yes | Schedule name (used as title) |
-| `resource` | Relationship | Yes | Which resource this schedule belongs to |
-| `scheduleType` | Select | No | `'recurring'` or `'manual'` (default: `'recurring'`) |
-| `recurringSlots` | Array | No | Weekly slots (shown when type is recurring) |
-| `recurringSlots.day` | Select | Yes | Day of week (mon-sun) |
-| `recurringSlots.startTime` | Text | Yes | Start time (HH:mm format) |
-| `recurringSlots.endTime` | Text | Yes | End time (HH:mm format) |
-| `manualSlots` | Array | No | Specific date slots (shown when type is manual) |
-| `manualSlots.date` | Date | Yes | Specific date (day only) |
-| `manualSlots.startTime` | Text | Yes | Start time (HH:mm format) |
-| `manualSlots.endTime` | Text | Yes | End time (HH:mm format) |
-| `exceptions` | Array | No | Dates when the resource is unavailable |
-| `exceptions.date` | Date | Yes | Exception date (day only) |
-| `exceptions.reason` | Text | No | Reason for unavailability |
-| `active` | Checkbox | No | Whether schedule is active (default: true, sidebar) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | Text | Schedule name |
+| `resource` | Relationship | Which resource this schedule belongs to |
+| `scheduleType` | Select | `'recurring'` or `'manual'` (default: `'recurring'`) |
+| `recurringSlots` | Array | Weekly slots with `day`, `startTime`, `endTime` |
+| `manualSlots` | Array | Specific date slots with `date`, `startTime`, `endTime` |
+| `exceptions` | Array | Dates the resource is unavailable (`date`, `reason`) |
+| `active` | Checkbox | Whether this schedule is in effect (default: true) |
 
-**Example - Recurring Schedule:**
+Times use `HH:mm` format (24-hour). Exception dates block out the entire day.
+
 ```typescript
 await payload.create({
   collection: 'schedules',
   data: {
-    name: 'Alice - Weekdays',
+    name: 'Alice - Standard Week',
     resource: aliceId,
     scheduleType: 'recurring',
     recurringSlots: [
@@ -269,230 +295,95 @@ await payload.create({
 
 ### Customers
 
-**Slug:** `customers`
+**Slug:** `customers` (or your `userCollection` slug)
 
-A dedicated auth collection for customers. Has `auth: true` for JWT login/register/forgot-password REST endpoints, but `access.admin: () => false` to block admin panel login. Customers are managed by admins through the admin panel.
+Either a standalone auth collection (default) or fields injected into your existing auth collection when `userCollection` is set.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `email` | Email | Yes | Customer email (auto-provided by Payload's `auth: true`) |
-| `firstName` | Text | Yes | First name (max 200 chars, used as title) |
-| `lastName` | Text | Yes | Last name (max 200 chars) |
-| `phone` | Text | No | Phone number (max 50 chars) |
-| `notes` | Textarea | No | Internal notes |
-| `bookings` | Join | No | Virtual field: all reservations for this customer |
+**Standalone mode (default):** A dedicated auth collection with `auth: true` for customer JWT login. Has `access.admin: () => false` to block customers from the admin panel.
 
-The `bookings` field is a **join** — it shows all reservations linked to this customer without storing anything on the customer document itself.
+**User collection mode (`userCollection` set):** The plugin injects `phone`, `notes`, and a `bookings` join field into your existing auth collection. No new collection is created.
 
-**Auth endpoints** (auto-provided by Payload):
-- `POST /api/customers/login` — customer login
-- `POST /api/customers/forgot-password` — password reset
-- `GET /api/customers/me` — current customer
-
-**Example:**
-```typescript
-await payload.create({
-  collection: 'customers',
-  data: {
-    firstName: 'Jane',
-    lastName: 'Doe',
-    email: 'jane@example.com',
-    password: 'securepassword',
-    phone: '555-0101',
-    notes: 'Prefers morning appointments',
-  },
-})
-```
-
-> **Note:** Since customers is an auth collection, you must provide `email` and `password` when creating customers. The `email` field comes from Payload's built-in auth — the plugin does not add it.
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | Email | Customer email (from Payload auth) |
+| `firstName` | Text | First name (standalone mode only) |
+| `lastName` | Text | Last name (standalone mode only) |
+| `phone` | Text | Phone number (max 50 chars) |
+| `notes` | Textarea | Internal notes visible only to admins |
+| `bookings` | Join | Virtual field — all reservations for this customer |
 
 ### Reservations
 
 **Slug:** `reservations`
 
-The core booking records. Each reservation links a customer to a service performed by a resource at a specific time.
+The core booking records. Each reservation links a customer to a service performed by a resource.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `service` | Relationship | Yes | Which service is being booked |
-| `resource` | Relationship | Yes | Which resource performs the service |
-| `customer` | Relationship | Yes | Who is booking (references Customers collection) |
+| `service` | Relationship | Yes | Service being booked |
+| `resource` | Relationship | Yes | Resource performing the service |
+| `customer` | Relationship | Yes | Customer making the booking |
 | `startTime` | Date | Yes | Appointment start (date + time picker) |
-| `endTime` | Date | No | Auto-calculated, read-only (date + time picker) |
+| `endTime` | Date | No | Auto-calculated from service duration (read-only) |
 | `status` | Select | No | Workflow status (default: `'pending'`) |
-| `cancellationReason` | Textarea | No | Shown only when status is `'cancelled'` |
+| `guestCount` | Number | No | Number of guests (default: 1, min: 1) |
+| `cancellationReason` | Textarea | No | Visible only when status is `'cancelled'` |
 | `notes` | Textarea | No | Additional notes |
-
-**Status Options:** `pending`, `confirmed`, `completed`, `cancelled`, `no-show`
-
-#### Status Definitions
-
-| Status | Meaning | Terminal? |
-|--------|---------|-----------|
-| `pending` | Reservation created but not yet confirmed. Awaiting admin review, payment, or other verification. This is the default status for all new public reservations. | No |
-| `confirmed` | Reservation is locked in. Payment received, admin approved, or created as a walk-in by staff. The time slot is committed. | No |
-| `completed` | Appointment took place successfully. Set by admin after the service is delivered. | Yes |
-| `cancelled` | Reservation was cancelled before the appointment (by customer or admin). Subject to the cancellation notice period. | Yes |
-| `no-show` | Customer did not show up for a confirmed appointment. Set by admin after the scheduled time passes. | Yes |
-
-Terminal statuses cannot transition to any other status. Once a reservation is `completed`, `cancelled`, or `no-show`, it is permanently closed.
-
-**Example:**
-```typescript
-// Create a reservation (endTime is auto-calculated)
-const reservation = await payload.create({
-  collection: 'reservations',
-  data: {
-    service: haircutId,
-    resource: aliceId,
-    customer: janeCustomerId,
-    startTime: '2025-06-15T10:00:00.000Z',
-    status: 'pending',
-  },
-})
-
-// endTime is automatically set to 10:30 (30 min haircut)
-console.log(reservation.endTime) // '2025-06-15T10:30:00.000Z'
-```
+| `items` | Array | No | Additional resources in a multi-resource booking |
+| `idempotencyKey` | Text | No | Unique key to prevent duplicate submissions |
 
 ---
 
-## Business Logic Hooks
+## Status Machine
 
-Four `beforeChange` hooks are applied to the Reservations collection, executing in order:
+The plugin ships with a default 5-status machine. You can replace it entirely or override individual properties using the `statusMachine` option.
 
-### Auto End Time Calculation
-
-**Hook:** `calculateEndTime`
-
-Automatically computes `endTime` from `startTime + service.duration` on every create and update. The end time field is read-only in the admin UI.
+### Default Machine
 
 ```
-endTime = startTime + service.duration (minutes)
+pending ---> confirmed ---> completed
+        \               \-> cancelled
+         \               \-> no-show
+          \-> cancelled
 ```
 
-**Why this matters:** Prevents manual calculation errors and ensures the calendar view and conflict detection always have accurate time ranges. Without auto-calculation, admins could accidentally enter wrong end times, causing invisible scheduling gaps or double-bookings that conflict detection wouldn't catch.
+| Status | Meaning | Terminal |
+|--------|---------|----------|
+| `pending` | Created, awaiting confirmation | No |
+| `confirmed` | Confirmed and time slot committed | No |
+| `completed` | Service was delivered | Yes |
+| `cancelled` | Cancelled before the appointment | Yes |
+| `no-show` | Customer did not show up | Yes |
 
-### Conflict Detection
+Terminal statuses cannot transition to anything. Once a reservation is terminal, it is permanently closed.
 
-**Hook:** `validateConflicts`
+`blockingStatuses` controls which statuses count as occupying the time slot for conflict detection. By default both `pending` and `confirmed` block the slot.
 
-Prevents double-booking on the same resource. Checks for overlapping time ranges considering buffer times.
+### Custom Status Machine
 
-**How it works:**
-1. Loads the service's `bufferTimeBefore` and `bufferTimeAfter` (falls back to `defaultBufferTime` from plugin config)
-2. Computes the **blocked window**: `[startTime - bufferBefore, endTime + bufferAfter]`
-3. Queries existing reservations for the same resource where status is not `cancelled` or `no-show`
-4. On updates, excludes the current reservation from the conflict check
-5. Throws a `ValidationError` if any overlap is found
-
-**Example scenario:**
-```
-Service: Haircut (30 min, 5 min buffer before, 10 min buffer after)
-Reservation: 10:00 - 10:30
-Blocked window: 09:55 - 10:40
-
-Another booking at 10:20 on the same resource -> CONFLICT ERROR
-Another booking at 10:45 on the same resource -> OK
-Another booking at 10:20 on a DIFFERENT resource -> OK
-```
-
-**Why this matters:** Protects against double-booking even when multiple users book simultaneously or when frontend data is stale. The server-side check is the single source of truth. Buffer times account for real-world setup and cleanup between appointments — a stylist needs time to clean their station, a room needs to be prepared, etc.
-
-### Status Transition Enforcement
-
-**Hook:** `validateStatusTransition`
-
-Enforces a strict status state machine:
-
-```
-              +-> confirmed --+-> completed
-              |               |
-pending ------+               +-> cancelled
-              |               |
-              +-> cancelled   +-> no-show
+```typescript
+payloadReserve({
+  statusMachine: {
+    statuses: ['requested', 'approved', 'in-progress', 'done', 'cancelled'],
+    defaultStatus: 'requested',
+    terminalStatuses: ['done', 'cancelled'],
+    blockingStatuses: ['approved', 'in-progress'],
+    transitions: {
+      requested: ['approved', 'cancelled'],
+      approved: ['in-progress', 'cancelled'],
+      'in-progress': ['done', 'cancelled'],
+      done: [],
+      cancelled: [],
+    },
+  },
+})
 ```
 
-**Rules:**
-- **On create (public/unauthenticated):** Status must be `pending` (or not set, defaults to `pending`)
-- **On create (authenticated admin):** Status can be `pending` or `confirmed` — this allows staff to create walk-in reservations that are already confirmed without a second step
-- **On update:** Only valid transitions are allowed:
-  - `pending` -> `confirmed`, `cancelled`
-  - `confirmed` -> `completed`, `cancelled`, `no-show`
-  - `completed`, `cancelled`, `no-show` -> *(terminal, no transitions allowed)*
-
-Invalid transitions throw a `ValidationError`.
-
-**Why this matters:** The state machine ensures data integrity by preventing nonsensical transitions (e.g., marking a cancelled reservation as completed). Terminal states (`completed`, `cancelled`, `no-show`) prevent accidental reopening of closed reservations. The admin quick-confirm feature supports walk-in workflows without bypassing the state machine — staff can create a reservation as `confirmed` in one step, but they still cannot skip directly to `completed`.
-
-### Common Workflows
-
-These workflows show how the status lifecycle and hooks work together in real-world scenarios.
-
-**1. Online Booking (standard)**
-```
-Customer visits booking page → selects service, resource, time slot
-  → payload.create({ status: 'pending' })          [hooks: endTime calculated, conflicts checked]
-  → Admin reviews in admin panel
-  → payload.update({ status: 'confirmed' })         [hooks: transition validated]
-  → Appointment takes place
-  → payload.update({ status: 'completed' })          [hooks: transition validated]
-```
-
-**2. Walk-In Booking**
-```
-Customer walks in, staff creates booking in admin panel
-  → payload.create({ status: 'confirmed' })          [admin user, hooks: endTime + conflicts]
-  → Appointment takes place
-  → payload.update({ status: 'completed' })
-```
-Skips the `pending` step entirely — authenticated admin users can create directly as `confirmed`.
-
-**3. Payment-Gated Booking**
-```
-Customer selects time slot on your frontend
-  → payload.create({ status: 'pending' })            [slot is now held]
-  → Your app creates a Stripe Checkout Session
-  → Customer completes payment
-  → Stripe webhook fires → payload.update({ status: 'confirmed' })
-  → Appointment takes place → 'completed'
-```
-The `pending → confirmed` transition fits payment flows naturally. The slot is held from the moment of creation (conflict detection ran on create), so no one else can book the same time while payment processes. See [Integration Patterns](#integration-patterns) for a full code example.
-
-**4. Customer Cancellation**
-```
-Customer requests cancellation (from 'pending' or 'confirmed')
-  → payload.update({ status: 'cancelled', cancellationReason: '...' })
-  → Hook checks: hours_until_appointment >= cancellationNoticePeriod
-  → If enough notice: cancellation succeeds
-  → If too late: ValidationError thrown, reservation unchanged
-```
-
-**5. No-Show Handling**
-```
-Appointment time passes, customer does not arrive
-  → Admin marks: payload.update({ status: 'no-show' })      [only from 'confirmed']
-  → Reservation is terminal — cannot be reopened
-```
-No-shows can only be marked on `confirmed` reservations. A `pending` reservation that nobody showed up for should be `cancelled` instead, since it was never confirmed.
-
-### Cancellation Policy
-
-**Hook:** `validateCancellation`
-
-Enforces a minimum notice period for cancellations. When transitioning to `cancelled`, the hook checks that:
-
-```
-hours_until_appointment >= cancellationNoticePeriod
-```
-
-With the default `cancellationNoticePeriod: 24`, you cannot cancel a reservation that starts within the next 24 hours. The hook throws a `ValidationError` with details about how many hours remain.
-
-**Why this matters:** Protects the business from last-minute cancellations that leave empty time slots that can't be filled by other customers. The configurable notice period lets each business set their own policy — a busy salon might require 48 hours, while a consultant might only need 2. Automated cleanup tasks can use the escape hatch to bypass this check when cancelling stale pending reservations.
+The `statuses` array drives the select field options in the admin UI. The `transitions` map controls which updates the `validateStatusTransition` hook allows. The `blockingStatuses` array determines which statuses occupy the time slot in conflict detection.
 
 ### Escape Hatch
 
-All four hooks check for `context.skipReservationHooks` and skip validation if it's truthy. This lets you bypass hooks for administrative operations, data migrations, or seeding:
+All hooks check `context.skipReservationHooks` and skip all validation if truthy. Use this for data migrations, seeding, and administrative operations:
 
 ```typescript
 await payload.create({
@@ -502,49 +393,771 @@ await payload.create({
     resource: resourceId,
     customer: customerId,
     startTime: '2025-06-15T10:00:00.000Z',
-    status: 'completed', // Normally would fail (only pending/confirmed allowed on create)
+    status: 'completed', // bypasses status transition check
   },
-  context: {
-    skipReservationHooks: true,
+  context: { skipReservationHooks: true },
+})
+```
+
+---
+
+## Duration Types
+
+Set on each service via the `durationType` field.
+
+### Fixed (default)
+
+`endTime = startTime + service.duration`
+
+The standard appointment mode. The service duration is fixed and always applied. Used for haircuts, consultations, classes with defined runtimes.
+
+```typescript
+{ duration: 60, durationType: 'fixed' }
+// A 60-minute appointment — endTime is always startTime + 60 min
+```
+
+### Flexible
+
+`endTime` is provided by the caller in the booking request. The service `duration` field acts as the minimum; if the provided `endTime` results in less than `duration` minutes the booking is rejected.
+
+Used for open-ended services where the customer specifies how long they need — workspace rentals, recording studios, vehicle bays.
+
+```typescript
+{ duration: 30, durationType: 'flexible' }
+// Minimum 30 minutes, but the caller can book 90 minutes by providing endTime
+```
+
+When creating a flexible booking, pass both `startTime` and `endTime`:
+
+```typescript
+await payload.create({
+  collection: 'reservations',
+  data: {
+    service: flexibleServiceId,
+    resource: resourceId,
+    customer: customerId,
+    startTime: '2025-06-15T10:00:00.000Z',
+    endTime: '2025-06-15T12:30:00.000Z', // 2.5 hours
   },
 })
 ```
 
-> **Note:** Authenticated admin users can create reservations with `'confirmed'` status without the escape hatch. The escape hatch is only needed for statuses that are never allowed on create (e.g., `'completed'`, `'cancelled'`, `'no-show'`) or to bypass conflict detection and cancellation policy checks.
+### Full-Day
 
-### Integration Patterns
+`endTime = end of the calendar day (23:59:59)` relative to `startTime`.
 
-#### Payment Integration (Stripe)
+Used for day-rate resources: hotel rooms, venue hire, equipment daily rental.
 
-The `pending → confirmed` transition is a natural fit for payment-gated bookings. The reservation holds the time slot while payment processes, and the conflict detection hook has already validated availability on create.
+```typescript
+{ duration: 480, durationType: 'full-day' }
+// Always occupies the entire day, regardless of start time
+```
 
-**Flow:**
-1. Customer creates a reservation → status is `pending`, slot is held
-2. Your app creates a Stripe Checkout Session with the reservation ID in metadata
-3. Customer completes payment on Stripe's hosted page
-4. Stripe sends a `checkout.session.completed` webhook to your app
-5. Your webhook handler updates the reservation to `confirmed`
-6. If payment fails or expires, the reservation stays `pending` for cleanup
+---
 
-**Webhook handler example:**
+## Multi-Resource Bookings
 
-```ts
+A single reservation can include multiple resources simultaneously using the `items` array. This is used for bookings that require a combination of resources — a couple's massage (two therapists), a wedding (venue + catering team), a film shoot (studio + equipment set).
+
+The top-level `service`, `resource`, and `startTime` fields represent the primary booking. Additional resources go in the `items` array:
+
+```typescript
+await payload.create({
+  collection: 'reservations',
+  data: {
+    service: primaryServiceId,
+    resource: primaryResourceId,
+    customer: customerId,
+    startTime: '2025-06-15T14:00:00.000Z',
+    items: [
+      {
+        resource: secondResourceId,
+        service: secondServiceId,
+        startTime: '2025-06-15T14:00:00.000Z',
+        endTime: '2025-06-15T15:00:00.000Z',
+        guestCount: 2,
+      },
+      {
+        resource: thirdResourceId,
+        // service is optional — inherit primary if omitted
+      },
+    ],
+  },
+})
+```
+
+Each item in the `items` array has its own `resource`, optional `service`, optional `startTime`/`endTime` (for staggered scheduling), and optional `guestCount`.
+
+Conflict detection runs independently for each resource in the `items` array as well as the primary resource.
+
+---
+
+## Capacity and Inventory
+
+By default, each resource allows only one concurrent booking. Set `quantity > 1` to enable inventory mode.
+
+### quantity
+
+The number of concurrent bookings the resource can accept for overlapping time windows.
+
+```typescript
+await payload.create({
+  collection: 'resources',
+  data: {
+    name: 'Standard Room',
+    services: [hotelNightId],
+    quantity: 20, // 20 identical rooms
+    capacityMode: 'per-reservation',
+  },
+})
+```
+
+With `quantity: 20`, up to 20 reservations can overlap. The 21st booking for the same time window is rejected.
+
+### capacityMode
+
+Controls how the `quantity` limit is counted. Only relevant when `quantity > 1`.
+
+**`per-reservation` (default):** Each booking occupies one unit, regardless of how many guests it contains. Use this for hotel rooms, parking spaces, equipment units, or any resource where each booking takes one slot.
+
+```
+quantity: 5 allows 5 simultaneous bookings
+Booking with guestCount: 3 still occupies 1 slot
+```
+
+**`per-guest`:** Each booking occupies `guestCount` units. Use this for group venues, yoga classes, boat tours, or any resource with a total people capacity.
+
+```typescript
+await payload.create({
+  collection: 'resources',
+  data: {
+    name: 'Yoga Studio',
+    services: [yogaClassId],
+    quantity: 20,       // 20 total spots
+    capacityMode: 'per-guest',
+  },
+})
+
+// Booking with guestCount: 3 occupies 3 of the 20 spots
+// When 20 total guests are booked, the class is full
+```
+
+---
+
+## Plugin Hooks API
+
+The plugin exposes hook callbacks that fire at key points in the booking lifecycle. Register them in the `hooks` option. All hooks receive the `req` object (Payload request) so you have access to the full Payload instance and request context.
+
+```typescript
+import type { ReservationPluginHooks } from 'payload-reserve'
+
+const hooks: ReservationPluginHooks = {
+  // ... hook definitions
+}
+
+payloadReserve({ hooks })
+```
+
+### beforeBookingCreate
+
+Fires before a new reservation is saved. Can modify the booking data.
+
+```typescript
+type beforeBookingCreate = Array<
+  (args: {
+    data: Record<string, unknown>
+    req: PayloadRequest
+  }) => Promise<Record<string, unknown>> | Record<string, unknown>
+>
+```
+
+Return the (optionally modified) data. Returning `undefined` keeps the original data.
+
+```typescript
+hooks: {
+  beforeBookingCreate: [
+    async ({ data, req }) => {
+      // Attach the logged-in user as the customer
+      if (req.user && !data.customer) {
+        return { ...data, customer: req.user.id }
+      }
+      return data
+    },
+  ],
+}
+```
+
+### beforeBookingConfirm
+
+Fires before a reservation transitions to `confirmed`.
+
+```typescript
+type beforeBookingConfirm = Array<
+  (args: {
+    doc: Record<string, unknown>
+    newStatus: string
+    req: PayloadRequest
+  }) => Promise<void> | void
+>
+```
+
+```typescript
+hooks: {
+  beforeBookingConfirm: [
+    async ({ doc, req }) => {
+      // Verify payment before confirming
+      const paid = await checkPaymentStatus(doc.stripeSessionId as string)
+      if (!paid) {
+        throw new Error('Payment not completed')
+      }
+    },
+  ],
+}
+```
+
+### beforeBookingCancel
+
+Fires before a reservation transitions to `cancelled`.
+
+```typescript
+type beforeBookingCancel = Array<
+  (args: {
+    doc: Record<string, unknown>
+    reason?: string
+    req: PayloadRequest
+  }) => Promise<void> | void
+>
+```
+
+```typescript
+hooks: {
+  beforeBookingCancel: [
+    async ({ doc, reason }) => {
+      await notifyResourceOfCancellation(doc, reason)
+    },
+  ],
+}
+```
+
+### afterBookingCreate
+
+Fires after a new reservation is saved to the database.
+
+```typescript
+type afterBookingCreate = Array<
+  (args: {
+    doc: Record<string, unknown>
+    req: PayloadRequest
+  }) => Promise<void> | void
+>
+```
+
+```typescript
+hooks: {
+  afterBookingCreate: [
+    async ({ doc, req }) => {
+      await sendBookingConfirmationEmail(doc)
+      await slackNotify(`New booking: ${doc.id}`)
+    },
+  ],
+}
+```
+
+### afterBookingConfirm
+
+Fires after a reservation transitions to `confirmed`.
+
+```typescript
+type afterBookingConfirm = Array<
+  (args: {
+    doc: Record<string, unknown>
+    req: PayloadRequest
+  }) => Promise<void> | void
+>
+```
+
+```typescript
+hooks: {
+  afterBookingConfirm: [
+    async ({ doc }) => {
+      await sendConfirmationEmail(doc)
+      await addToCalendar(doc)
+    },
+  ],
+}
+```
+
+### afterBookingCancel
+
+Fires after a reservation transitions to `cancelled`.
+
+```typescript
+type afterBookingCancel = Array<
+  (args: {
+    doc: Record<string, unknown>
+    req: PayloadRequest
+  }) => Promise<void> | void
+>
+```
+
+```typescript
+hooks: {
+  afterBookingCancel: [
+    async ({ doc }) => {
+      await sendCancellationEmail(doc)
+      await releaseStripeHold(doc.stripePaymentIntentId as string)
+    },
+  ],
+}
+```
+
+### afterStatusChange
+
+Generic hook that fires on every status transition.
+
+```typescript
+type afterStatusChange = Array<
+  (args: {
+    doc: Record<string, unknown>
+    newStatus: string
+    previousStatus: string
+    req: PayloadRequest
+  }) => Promise<void> | void
+>
+```
+
+```typescript
+hooks: {
+  afterStatusChange: [
+    async ({ doc, newStatus, previousStatus }) => {
+      console.log(`Reservation ${doc.id}: ${previousStatus} -> ${newStatus}`)
+      await auditLog.record({ docId: doc.id, event: 'status_change', newStatus, previousStatus })
+    },
+  ],
+}
+```
+
+---
+
+## Public API Endpoints
+
+The plugin mounts four endpoints under `/api/reserve/`. These are Payload custom endpoints — they respect the same access control as the rest of the API.
+
+### GET /api/reserve/availability
+
+Returns available time slots for a resource and service on a given date. This is a convenience alias for the slots endpoint with a simpler response shape.
+
+**Query parameters:**
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `resource` | Yes | Resource ID |
+| `service` | Yes | Service ID |
+| `date` | Yes | Date in `YYYY-MM-DD` format |
+
+**Example request:**
+
+```
+GET /api/reserve/availability?resource=abc123&service=def456&date=2025-06-15
+```
+
+**Response:**
+
+```json
+{
+  "slots": [
+    { "start": "2025-06-15T09:00:00.000Z", "end": "2025-06-15T09:30:00.000Z" },
+    { "start": "2025-06-15T09:30:00.000Z", "end": "2025-06-15T10:00:00.000Z" },
+    { "start": "2025-06-15T10:30:00.000Z", "end": "2025-06-15T11:00:00.000Z" }
+  ]
+}
+```
+
+Slots are derived from the resource's active schedules for that date minus any overlapping reservations with blocking statuses.
+
+### GET /api/reserve/slots
+
+Returns available slots with richer metadata. Accepts an optional `guestCount` parameter for capacity-aware filtering.
+
+**Query parameters:**
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `resource` | Yes | — | Resource ID |
+| `service` | Yes | — | Service ID |
+| `date` | Yes | — | Date in `YYYY-MM-DD` format |
+| `guestCount` | No | `1` | Number of guests (used for `per-guest` capacity mode) |
+
+**Example request:**
+
+```
+GET /api/reserve/slots?resource=abc123&service=def456&date=2025-06-15&guestCount=2
+```
+
+**Response:**
+
+```json
+{
+  "date": "2025-06-15",
+  "guestCount": 2,
+  "slots": [
+    { "start": "2025-06-15T09:00:00.000Z", "end": "2025-06-15T09:30:00.000Z" },
+    { "start": "2025-06-15T09:30:00.000Z", "end": "2025-06-15T10:00:00.000Z" }
+  ]
+}
+```
+
+Returns `400` with `{ "error": "..." }` if required parameters are missing or the date is invalid.
+
+### POST /api/reserve/book
+
+Creates a new reservation. All Payload collection hooks (conflict detection, end time calculation, status transition validation) run as normal. Runs any registered `beforeBookingCreate` plugin hooks before saving.
+
+**Request body:** Same as `payload.create` data for the reservations collection.
+
+```json
+{
+  "service": "def456",
+  "resource": "abc123",
+  "customer": "cus789",
+  "startTime": "2025-06-15T10:00:00.000Z",
+  "guestCount": 1,
+  "notes": "Please use the side entrance.",
+  "idempotencyKey": "frontend-uuid-or-form-id"
+}
+```
+
+**Response:** `201` with the created reservation document, or `400`/`409` if validation fails.
+
+The `idempotencyKey` field prevents duplicate submissions — if a key has already been used, the request is rejected with a validation error.
+
+### POST /api/reserve/cancel
+
+Cancels a reservation. Requires an authenticated session (`req.user`).
+
+**Request body:**
+
+```json
+{
+  "reservationId": "res123",
+  "reason": "Change of plans"
+}
+```
+
+**Response:** `200` with the updated reservation document.
+
+Returns `401` if not authenticated, `400` if `reservationId` is missing. The `validateCancellation` hook enforces the minimum notice period configured in `cancellationNoticePeriod`.
+
+---
+
+## Admin Components
+
+### Calendar View
+
+Replaces the default Reservations list view with a CSS Grid-based calendar (no external dependencies).
+
+**View modes:** Month, Week, Day — switchable in the header toolbar.
+
+**Features:**
+- Color-coded reservations by status (configurable when using a custom status machine)
+- Click any empty cell to open a create drawer with the time pre-filled
+- Click any reservation chip to open its edit drawer
+- Hover tooltips showing service, time range, customer, resource, and status
+- Current time indicator (red line) in week and day views
+- Status legend below the toolbar
+
+Status colors are derived from the status machine configuration exposed via `config.admin.custom.reservationStatusMachine`.
+
+### Dashboard Widget
+
+A Payload modular dashboard widget (RSC) that shows today's booking statistics:
+
+- Total reservations today
+- Upcoming (not yet completed or cancelled)
+- Completed
+- Cancelled
+- Next appointment time and status
+
+The widget uses the Payload Local API server-side — no HTTP round-trip. It respects the configured `reservations` slug.
+
+**Widget slug:** `reservation-todays-reservations`
+
+### Availability Overview
+
+A custom admin view at `/admin/reservation-availability`. Displays a weekly grid:
+
+- **Rows** — active resources
+- **Columns** — days of the current week
+- **Green slots** — available windows (from schedules)
+- **Blue slots** — booked windows (from reservations)
+- **Gray** — exception dates (unavailable)
+
+Navigate between weeks with previous/next buttons. Shows remaining capacity for multi-unit resources.
+
+---
+
+## Use Case Examples
+
+### Salon / Barbershop
+
+Staff are resources, services are treatments. Each stylist has their own recurring weekly schedule.
+
+```typescript
+payloadReserve({
+  adminGroup: 'Salon',
+  defaultBufferTime: 0,
+  cancellationNoticePeriod: 24,
+  slugs: {
+    resources: 'stylists',
+    services: 'treatments',
+    reservations: 'appointments',
+  },
+})
+```
+
+Typical services: `duration: 30, durationType: 'fixed', bufferTimeAfter: 10`
+
+### Hotel
+
+Rooms are resources with `quantity` equal to the number of identical rooms of that type. Each guest stays for a full calendar day — use `full-day` duration.
+
+```typescript
+payloadReserve({
+  adminGroup: 'Hotel',
+  cancellationNoticePeriod: 48,
+  slugs: {
+    resources: 'rooms',
+    services: 'room-types',
+    reservations: 'bookings',
+  },
+})
+
+// Room type service
+await payload.create({
+  collection: 'room-types',
+  data: {
+    name: 'Standard Double',
+    duration: 1440,
+    durationType: 'full-day',
+    price: 149.00,
+  },
+})
+
+// Room resource (10 identical standard doubles)
+await payload.create({
+  collection: 'rooms',
+  data: {
+    name: 'Standard Double',
+    services: [standardDoubleId],
+    quantity: 10,
+    capacityMode: 'per-reservation',
+  },
+})
+```
+
+### Restaurant / Event Space
+
+Group bookings where total guest count matters. Use `per-guest` capacity mode with a maximum party size enforced via `guestCount`.
+
+```typescript
+payloadReserve({
+  adminGroup: 'Restaurant',
+  cancellationNoticePeriod: 2,
+})
+
+// Dining room resource (max 60 guests total)
+await payload.create({
+  collection: 'resources',
+  data: {
+    name: 'Main Dining Room',
+    services: [diningServiceId],
+    quantity: 60,
+    capacityMode: 'per-guest',
+  },
+})
+```
+
+Bookings with `guestCount: 4` occupy 4 of the 60 total seats. The room is full when total booked guests reach 60.
+
+### Event Venue (Custom Status Machine)
+
+Events go through an approval workflow before being confirmed. Use a custom status machine.
+
+```typescript
+payloadReserve({
+  adminGroup: 'Events',
+  statusMachine: {
+    statuses: ['enquiry', 'quote-sent', 'deposit-paid', 'confirmed', 'completed', 'cancelled'],
+    defaultStatus: 'enquiry',
+    terminalStatuses: ['completed', 'cancelled'],
+    blockingStatuses: ['deposit-paid', 'confirmed'],
+    transitions: {
+      enquiry: ['quote-sent', 'cancelled'],
+      'quote-sent': ['deposit-paid', 'cancelled'],
+      'deposit-paid': ['confirmed', 'cancelled'],
+      confirmed: ['completed', 'cancelled'],
+      completed: [],
+      cancelled: [],
+    },
+  },
+  hooks: {
+    afterStatusChange: [
+      async ({ doc, newStatus }) => {
+        if (newStatus === 'quote-sent') {
+          await sendQuoteEmail(doc)
+        }
+        if (newStatus === 'confirmed') {
+          await sendContractEmail(doc)
+        }
+      },
+    ],
+  },
+})
+```
+
+---
+
+## Performance: Recommended Indexes
+
+For production deployments with high booking volume, add these indexes to your database. The exact syntax depends on your Payload DB adapter.
+
+### MongoDB
+
+```js
+db.reservations.createIndex(
+  { resource: 1, status: 1, startTime: 1, endTime: 1 },
+  { name: 'reservation_conflict_lookup' }
+)
+db.reservations.createIndex(
+  { customer: 1, startTime: -1 },
+  { name: 'reservation_customer_history' }
+)
+db.reservations.createIndex(
+  { idempotencyKey: 1 },
+  { unique: true, sparse: true, name: 'reservation_idempotency' }
+)
+```
+
+### PostgreSQL
+
+```sql
+CREATE INDEX reservation_conflict_lookup
+  ON reservations (resource, status, "startTime", "endTime");
+CREATE INDEX reservation_customer_history
+  ON reservations (customer, "startTime" DESC);
+CREATE UNIQUE INDEX reservation_idempotency
+  ON reservations ("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL;
+```
+
+### SQLite
+
+```sql
+CREATE INDEX reservation_conflict_lookup
+  ON reservations (resource, status, startTime, endTime);
+```
+
+The conflict detection query filters by `resource`, `status`, `startTime`, and `endTime` on every create and update — the composite `reservation_conflict_lookup` index covers this query exactly and is the most important one to add.
+
+The `idempotencyKey` field has a `unique: true` index in the Payload schema definition, so Payload-managed databases will have this automatically. The snippets above are for manually adding it if your database was created before this field was introduced.
+
+---
+
+## Reconciliation Job
+
+For high-concurrency deployments, rare race conditions between two simultaneous bookings can slip past the hook-level conflict check. A background reconciliation job can detect and flag these after the fact.
+
+Add this to your Payload config's `jobs.tasks` array:
+
+```typescript
+import type { TaskConfig } from 'payload'
+
+export const reconcileReservations: TaskConfig = {
+  slug: 'reconcile-reservations',
+  handler: async ({ req }) => {
+    // Find all active reservations grouped by resource
+    const { docs: activeReservations } = await req.payload.find({
+      collection: 'reservations',
+      depth: 0,
+      limit: 1000,
+      overrideAccess: true,
+      req,
+      where: {
+        status: { in: ['pending', 'confirmed'] },
+      },
+    })
+
+    // Group by resource and detect overlaps
+    const byResource = new Map<string, typeof activeReservations>()
+    for (const reservation of activeReservations) {
+      const resourceId = String(reservation.resource)
+      if (!byResource.has(resourceId)) {
+        byResource.set(resourceId, [])
+      }
+      byResource.get(resourceId)!.push(reservation)
+    }
+
+    let conflictCount = 0
+    for (const [, reservations] of byResource) {
+      for (let i = 0; i < reservations.length; i++) {
+        for (let j = i + 1; j < reservations.length; j++) {
+          const a = reservations[i]
+          const b = reservations[j]
+          const aStart = new Date(a.startTime as string)
+          const aEnd = new Date(a.endTime as string)
+          const bStart = new Date(b.startTime as string)
+          const bEnd = new Date(b.endTime as string)
+          if (aStart < bEnd && aEnd > bStart) {
+            conflictCount++
+            // Flag or alert — e.g., add a note, send a Slack message, etc.
+            console.warn(`Conflict detected: ${a.id} overlaps ${b.id}`)
+          }
+        }
+      }
+    }
+
+    return { output: { conflicts: conflictCount } }
+  },
+}
+```
+
+Run this job on a schedule (e.g., hourly) using Payload's job queue. The job does not resolve conflicts automatically — it flags them for human review.
+
+---
+
+## Integration Examples
+
+### Stripe Payment Gate
+
+Hold the time slot with a `pending` reservation while the customer pays. Confirm on successful payment.
+
+```typescript
+// 1. Create reservation on your booking page (slot is held, conflict detection runs)
+const reservation = await payload.create({
+  collection: 'reservations',
+  data: {
+    service: serviceId,
+    resource: resourceId,
+    customer: customerId,
+    startTime: selectedSlot,
+  },
+  // status defaults to 'pending'
+})
+
+// 2. Create a Stripe Checkout Session with the reservation ID in metadata
+const session = await stripe.checkout.sessions.create({
+  line_items: [{ price: stripePriceId, quantity: 1 }],
+  metadata: { reservationId: String(reservation.id) },
+  mode: 'payment',
+  success_url: `${process.env.NEXT_PUBLIC_URL}/booking/success`,
+  cancel_url: `${process.env.NEXT_PUBLIC_URL}/booking/cancel`,
+})
+
+// 3. In your Stripe webhook handler, confirm the reservation
 // app/api/stripe-webhook/route.ts
-import { getPayload } from 'payload'
-import config from '@payload-config'
-import Stripe from 'stripe'
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
-
 export async function POST(req: Request) {
   const body = await req.text()
   const sig = req.headers.get('stripe-signature')!
-
-  const event = stripe.webhooks.constructEvent(
-    body,
-    sig,
-    process.env.STRIPE_WEBHOOK_SECRET!,
-  )
+  const event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
@@ -556,6 +1169,7 @@ export async function POST(req: Request) {
         collection: 'reservations',
         id: reservationId,
         data: { status: 'confirmed' },
+        context: { skipReservationHooks: false }, // hooks run — validates transition
       })
     }
   }
@@ -564,431 +1178,82 @@ export async function POST(req: Request) {
 }
 ```
 
-> **Slot protection:** The `validateConflicts` hook runs on create, so the time slot is already reserved while the customer pays. No other booking can claim the same slot, even if the payment takes several minutes.
+### Email Notifications
 
-#### Notification Integration
+Use `afterBookingCreate` and `afterStatusChange` hooks to send transactional emails:
 
-Use Payload's `afterChange` hook on the Reservations collection (in your app config, outside the plugin) to trigger notifications when status changes. The plugin does not send notifications itself, giving you full control over messaging.
-
-**Example scenarios:**
-- **Confirmed** — send a confirmation email with appointment details
-- **Upcoming reminder** — trigger a reminder 24 hours before the appointment (via a scheduled task)
-- **Cancelled** — notify the customer and optionally alert staff about the freed slot
-- **No-show** — notify staff for internal tracking
-
-```ts
-// In your payload.config.ts, add an afterChange hook to the reservations collection
-// using Payload's collections override or a separate plugin
-
-const notifyOnStatusChange: CollectionAfterChangeHook = async ({
-  doc,
-  previousDoc,
-  operation,
-}) => {
-  if (operation === 'update' && doc.status !== previousDoc.status) {
-    switch (doc.status) {
-      case 'confirmed':
-        await sendConfirmationEmail(doc)
-        break
-      case 'cancelled':
-        await sendCancellationEmail(doc)
-        break
-    }
-  }
-}
-```
-
-#### Scheduled Cleanup
-
-Reservations that stay `pending` indefinitely (e.g., abandoned payment flows) hold time slots that could be used by other customers. Set up a scheduled task to cancel stale pending reservations:
-
-- Query for `pending` reservations older than your threshold (e.g., 30 minutes)
-- Update them to `cancelled` using the escape hatch to bypass the cancellation notice period
-- Optionally notify the customer that their hold expired
-
-```ts
-// Example: cron job or scheduled task
-const payload = await getPayload({ config })
-
-const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
-
-const { docs: staleReservations } = await payload.find({
-  collection: 'reservations',
-  where: {
-    status: { equals: 'pending' },
-    createdAt: { less_than: thirtyMinutesAgo.toISOString() },
+```typescript
+payloadReserve({
+  hooks: {
+    afterBookingCreate: [
+      async ({ doc, req }) => {
+        const customer = await req.payload.findByID({
+          collection: 'customers',
+          id: doc.customer as string,
+          depth: 0,
+          req,
+        })
+        await sendEmail({
+          subject: 'Booking received',
+          template: 'booking-created',
+          to: customer.email as string,
+          variables: { bookingId: doc.id, startTime: doc.startTime },
+        })
+      },
+    ],
+    afterStatusChange: [
+      async ({ doc, newStatus, req }) => {
+        if (newStatus === 'confirmed') {
+          await sendEmail({ template: 'booking-confirmed', variables: doc })
+        }
+        if (newStatus === 'cancelled') {
+          await sendEmail({ template: 'booking-cancelled', variables: doc })
+        }
+      },
+    ],
   },
 })
-
-for (const reservation of staleReservations) {
-  await payload.update({
-    collection: 'reservations',
-    id: reservation.id,
-    data: {
-      status: 'cancelled',
-      cancellationReason: 'Automatically cancelled — payment not completed',
-    },
-    context: { skipReservationHooks: true }, // bypass cancellation notice period
-  })
-}
 ```
 
----
+### Multi-Tenant Deployments
 
-## Admin UI Components
+Scope all queries to a tenant using `beforeBookingCreate` to inject tenant metadata, and access control functions to filter by tenant:
 
-### Dashboard Widget
-
-**Type:** React Server Component (RSC)
-**Location:** Modular Dashboard Widget (`admin.dashboard.widgets`)
-**Widget slug:** `reservation-todays-reservations`
-**Default size:** medium–large
-
-Uses Payload's modular dashboard widget system (v3.69.0+), which supports configurable sizing, drag-and-drop layout, and add/remove functionality. Displays a summary of today's reservations:
-
-- **Total** reservations today
-- **Upcoming** reservations (not yet completed/cancelled, start time in future)
-- **Completed** reservations
-- **Cancelled** reservations
-- **Next Appointment** details (time and status)
-
-The widget queries the database directly via the Payload Local API (server-side, no HTTP requests).
-
-### Calendar View
-
-**Type:** Client Component
-**Location:** Replaces the Reservations list view
-
-A CSS Grid-based calendar (no external dependencies) with three view modes:
-
-- **Month View** - 6-week grid showing all days with reservation chips
-- **Week View** - 7-day grid with hourly rows (7am-6pm)
-- **Day View** - Single day with hourly rows (7am-8pm)
-
-**Features:**
-- Navigation (previous/next, "Today" button)
-- Color-coded by status:
-  - Pending: Yellow
-  - Confirmed: Blue
-  - Completed: Green
-  - Cancelled: Gray
-  - No-show: Red
-- **Status legend** displayed below the header explaining what each color means
-- **Click-to-create:** Click any calendar cell to open a new reservation drawer with the start time pre-filled
-  - Month view: clicking a day cell pre-fills start time at 9:00 AM on that date
-  - Week/day views: clicking a time cell pre-fills the exact hour for that slot
-- Click any existing reservation to open a Payload document drawer for editing
-- **Enhanced event display:**
-  - Month view (compact): shows time + service name
-  - Week/day views (full): shows time + service name + customer name
-- **Tooltips:** Hover any reservation event to see full details (service, time range, customer, resource, status) via native browser tooltip
-- **Current time indicator:** A red horizontal line in week/day views showing the current time position within the matching hour cell
-- Fetches data via REST API for the visible date range
-
-### Customer Picker
-
-**Type:** Client Component
-**Location:** Replaces the default Reservations `customer` relationship field
-
-A custom field component that replaces the standard relationship dropdown with a rich customer search experience:
-
-- **Multi-field search** — searches across firstName, lastName, phone, and email simultaneously using debounced `contains` queries (300ms debounce)
-- **Rich dropdown** — each result shows the customer's full name (bold), phone number, and email address
-- **Selected display** — selected customer shows full details (name, phone, email) instead of just a name
-- **Inline create** — "Create new customer" button opens a Payload document drawer to create a customer without leaving the reservation form
-- **Custom search endpoint** — uses `/api/reservation-customer-search` for efficient multi-field search with pagination
-
-### Availability Overview
-
-**Type:** Client Component
-**Location:** Custom admin view at `/admin/reservation-availability`
-
-A weekly grid showing resource availability:
-
-- **Rows** = Active resources
-- **Columns** = Days of the week
-- **Green slots** = Available time ranges (from schedules)
-- **Blue slots** = Booked times (from reservations)
-- **Gray slots** = Exception dates (unavailable)
-
-Navigate between weeks with previous/next buttons or jump to "This Week".
-
----
-
-## Utilities
-
-### slotUtils.ts
-
-Time math helpers used by hooks:
-
-| Function | Description |
-|----------|-------------|
-| `addMinutes(date, minutes)` | Add minutes to a date, returns new Date |
-| `doRangesOverlap(startA, endA, startB, endB)` | Check if two time ranges overlap (half-open intervals) |
-| `computeBlockedWindow(start, end, bufferBefore, bufferAfter)` | Compute effective blocked window with buffers |
-| `hoursUntil(futureDate, now?)` | Calculate hours between now and a future date |
-
-### scheduleUtils.ts
-
-Schedule resolution helpers used by admin components:
-
-| Function | Description |
-|----------|-------------|
-| `getDayOfWeek(date)` | Get the DayOfWeek value for a Date |
-| `dateMatchesDay(date, day)` | Check if a date matches a DayOfWeek |
-| `parseTime(time)` | Parse "HH:mm" string to hours/minutes |
-| `combineDateAndTime(date, time)` | Merge a date with a "HH:mm" time string |
-| `isExceptionDate(date, exceptions)` | Check if a date is an exception |
-| `resolveScheduleForDate(schedule, date)` | Resolve concrete time ranges for a date |
-
----
-
-## Frontend Reservation Guide
-
-The plugin is backend-only — it adds collections, hooks, and admin UI to Payload but does not include any customer-facing pages. However, you can build a full booking flow using Payload's built-in Local API (from Server Components / Server Actions) or REST API. No custom endpoints are needed.
-
-### Step 1: Configure Access Control
-
-By default all collections use Payload's default access control (authenticated users only). To allow public booking, pass `access` overrides in your plugin config:
-
-```ts
-import { payloadReserve } from 'payload-reserve'
-
+```typescript
 payloadReserve({
   access: {
-    services: {
-      read: () => true,       // anyone can browse services
-    },
-    resources: {
-      read: () => true,       // anyone can browse resources
-    },
-    schedules: {
-      read: () => true,       // anyone can check availability
-    },
     reservations: {
-      create: () => true,     // guests can book
       read: ({ req }) => {
-        // customers can only read their own reservations
-        if (req.user) return true
-        return false
+        if (!req.user) {return false}
+        return { tenant: { equals: req.user.tenant } }
       },
-    },
-    customers: {
-      create: () => true,     // allow public customer registration
+      create: ({ req }) => !!req.user,
     },
   },
-})
-```
-
-> **Important:** Always use `overrideAccess: false` in your frontend queries so these rules are enforced. Without it, Payload bypasses access control entirely.
-
-### Step 2: Fetch Available Services
-
-Use a React Server Component to list active services:
-
-```tsx
-// app/book/page.tsx
-import { getPayload } from 'payload'
-import config from '@payload-config'
-
-export default async function BookingPage() {
-  const payload = await getPayload({ config })
-
-  const { docs: services } = await payload.find({
-    collection: 'services',
-    overrideAccess: false,
-    where: { active: { equals: true } },
-  })
-
-  return (
-    <ul>
-      {services.map((service) => (
-        <li key={service.id}>
-          {service.name} — {service.duration} min — ${service.price}
-        </li>
-      ))}
-    </ul>
-  )
-}
-```
-
-### Step 3: Fetch Resources for a Service
-
-Once a customer picks a service, load the resources that offer it:
-
-```ts
-const { docs: resources } = await payload.find({
-  collection: 'resources',
-  overrideAccess: false,
-  where: {
-    services: { contains: selectedServiceId },
-    active: { equals: true },
-  },
-})
-```
-
-### Step 4: Check Availability
-
-Fetch the resource's schedule and existing reservations for the target date, then compute open slots:
-
-```ts
-import {
-  resolveScheduleForDate,
-  addMinutes,
-  doRangesOverlap,
-  computeBlockedWindow,
-} from 'payload-reserve'
-
-// 1. Get the resource's active schedule
-const { docs: schedules } = await payload.find({
-  collection: 'schedules',
-  overrideAccess: false,
-  where: {
-    resource: { equals: resourceId },
-    active: { equals: true },
-  },
-})
-
-// 2. Resolve available time ranges for the target date
-const targetDate = new Date('2025-03-15')
-const availableRanges = schedules.flatMap((schedule) =>
-  resolveScheduleForDate(schedule, targetDate),
-)
-
-// 3. Fetch existing reservations for that resource on that date
-const dayStart = new Date(targetDate)
-dayStart.setHours(0, 0, 0, 0)
-const dayEnd = new Date(targetDate)
-dayEnd.setHours(23, 59, 59, 999)
-
-const { docs: existingReservations } = await payload.find({
-  collection: 'reservations',
-  overrideAccess: false,
-  where: {
-    resource: { equals: resourceId },
-    startTime: { greater_than_equal: dayStart.toISOString() },
-    startTime: { less_than: dayEnd.toISOString() },
-    status: { not_equals: 'cancelled' },
-  },
-})
-
-// 4. Generate slots by stepping through available ranges
-//    and filtering out conflicts with existing reservations
-const slots = []
-for (const range of availableRanges) {
-  let cursor = range.start
-  while (addMinutes(cursor, serviceDuration) <= range.end) {
-    const slotEnd = addMinutes(cursor, serviceDuration)
-    const blocked = existingReservations.some((res) => {
-      const window = computeBlockedWindow(
-        new Date(res.startTime),
-        new Date(res.endTime),
-        service.bufferTimeBefore ?? 0,
-        service.bufferTimeAfter ?? 0,
-      )
-      return doRangesOverlap(cursor, slotEnd, window.start, window.end)
-    })
-    if (!blocked) slots.push(cursor)
-    cursor = addMinutes(cursor, 15) // 15-minute step
-  }
-}
-```
-
-### Step 5: Create the Reservation
-
-Use a Server Action to create the reservation. The plugin's `beforeChange` hooks automatically calculate the end time, validate conflicts, and enforce status transitions:
-
-```ts
-'use server'
-
-import { getPayload } from 'payload'
-import config from '@payload-config'
-
-export async function createReservation(data: {
-  service: string
-  resource: string
-  firstName: string
-  lastName: string
-  customerEmail: string
-  startTime: string
-  notes?: string
-}) {
-  const payload = await getPayload({ config })
-
-  // Find or create the customer
-  const existing = await payload.find({
-    collection: 'customers',
-    overrideAccess: false,
-    where: { email: { equals: data.customerEmail } },
-  })
-
-  let customerId: string
-  if (existing.docs.length > 0) {
-    customerId = String(existing.docs[0].id)
-  } else {
-    const customer = await payload.create({
-      collection: 'customers',
-      overrideAccess: false,
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.customerEmail,
-        password: generateSecurePassword(), // auth collection requires a password
+  hooks: {
+    beforeBookingCreate: [
+      async ({ data, req }) => {
+        // Inject tenant ID from the authenticated user
+        return { ...data, tenant: req.user?.tenant }
       },
-    })
-    customerId = String(customer.id)
-  }
-
-  // Create the reservation — hooks handle endTime calculation and conflict checks
-  const reservation = await payload.create({
-    collection: 'reservations',
-    overrideAccess: false,
-    data: {
-      service: data.service,
-      resource: data.resource,
-      customer: customerId,
-      startTime: data.startTime,
-      notes: data.notes,
-      // status defaults to 'pending'
-    },
-  })
-
-  return reservation
-}
-```
-
-If the time slot is already booked, the `validateConflicts` hook will throw a `ValidationError` — catch it in your UI and prompt the user to pick a different slot.
-
-### Security Notes
-
-- **Always pass `overrideAccess: false`** — without it, Payload skips access control and any user can read/write anything.
-- Validate and sanitize all user input before passing it to `payload.create`.
-- Consider adding rate limiting to your Server Actions or API routes to prevent abuse.
-- The plugin's hooks enforce conflict detection server-side, so double-bookings are prevented even if the frontend has stale data.
-
-### Alternative: REST API
-
-If you prefer a client-side-only approach (e.g., a separate SPA), use Payload's auto-generated REST API:
-
-```ts
-// Fetch services
-const res = await fetch('https://your-site.com/api/services?where[active][equals]=true')
-const { docs: services } = await res.json()
-
-// Create a reservation (customer is a customer ID)
-const res = await fetch('https://your-site.com/api/reservations', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    service: serviceId,
-    resource: resourceId,
-    customer: customerId,
-    startTime: '2025-03-15T10:00:00.000Z',
-  }),
+    ],
+  },
 })
 ```
 
-The same hooks and access control rules apply to REST API requests.
+---
+
+## Business Logic Hooks
+
+Four `beforeChange` hooks run on the Reservations collection in order on every create and update:
+
+1. **`checkIdempotency`** — Rejects creates where `idempotencyKey` has already been used.
+2. **`calculateEndTime`** — Computes `endTime` from `startTime + service.duration` (respects `durationType`).
+3. **`validateConflicts`** — Checks for overlapping reservations on the same resource using blocking statuses and buffer times.
+4. **`validateStatusTransition`** — Enforces allowed transitions defined in the status machine. On create, enforces that new public bookings start in `defaultStatus`.
+5. **`validateCancellation`** — When transitioning to `cancelled`, verifies the appointment is at least `cancellationNoticePeriod` hours away.
+
+All hooks skip processing when `context.skipReservationHooks` is truthy.
 
 ---
 
@@ -996,79 +1261,24 @@ The same hooks and access control rules apply to REST API requests.
 
 ### Prerequisites
 
-- Node.js ^18.20.2 or >=20.9.0
-- pnpm ^9 or ^10
-- MongoDB (or the in-memory server used for testing)
+- Node.js `^18.20.2` or `>=20.9.0`
+- pnpm `^9` or `^10`
 
 ### Commands
 
 ```bash
-# Start dev server (Next.js + Payload admin panel)
-pnpm dev
-
-# Generate Payload types after schema changes
-pnpm dev:generate-types
-
-# Generate import map after adding/removing components
-pnpm dev:generate-importmap
-
-# Run integration tests (Vitest)
-pnpm test:int
-
-# Run end-to-end tests (Playwright)
-pnpm test:e2e
-
-# Run all tests
-pnpm test
-
-# Lint source code
-pnpm lint
-
-# Auto-fix lint issues
-pnpm lint:fix
-
-# Build for production
-pnpm build
-
-# Clean build artifacts
-pnpm clean
+pnpm dev                    # Start dev server (Next.js + in-memory MongoDB)
+pnpm build                  # Build for distribution
+pnpm test:int               # Run integration tests (Vitest)
+pnpm test:e2e               # Run E2E tests (Playwright, requires dev server)
+pnpm test                   # Both test suites
+pnpm lint                   # ESLint check
+pnpm lint:fix               # ESLint auto-fix
+pnpm dev:generate-types     # Regenerate payload-types.ts after schema changes
+pnpm dev:generate-importmap # Regenerate import map after adding components
 ```
 
-### Dev Environment
-
-The `dev/` directory contains a complete Payload CMS app for testing:
-
-- **`dev/payload.config.ts`** - Payload config with the plugin installed
-- **`dev/seed.ts`** - Seeds sample data: 3 services, 2 resources, 2 schedules, 2 customers, 3 reservations
-- **`dev/int.spec.ts`** - Integration tests covering all hooks, CRUD operations, and customers auth collection
-
-The dev environment uses `mongodb-memory-server` for testing, so no external MongoDB instance is required.
-
-### Seed Data
-
-When you run `pnpm dev`, the seed script creates:
-
-**Services:**
-- Haircut (30 min, $35, 5 min buffer before, 10 min after)
-- Hair Coloring (90 min, $120, 10 min buffer before, 15 min after)
-- Consultation (15 min, free, 0 min buffer before, 5 min after)
-
-**Resources:**
-- Alice Johnson (Senior Stylist) - performs all 3 services
-- Bob Smith (Junior Stylist) - performs Haircut and Consultation
-
-**Schedules:**
-- Alice: Mon-Thu 9am-5pm, Fri 9am-3pm
-- Bob: Mon/Wed/Fri 10am-6pm, Sat 9am-2pm
-
-**Customers (dedicated auth collection):**
-- Jane Doe (jane@example.com)
-- John Public (john@example.com)
-
-**Reservations (today):**
-- 9:00 AM - Haircut with Alice (confirmed)
-- 10:00 AM - Consultation with Bob (pending)
-- 2:00 PM - Hair Coloring with Alice (pending)
+Run a single test by pattern: `pnpm vitest -t "conflict detection"`
 
 ---
 
@@ -1076,105 +1286,53 @@ When you run `pnpm dev`, the seed script creates:
 
 ```
 src/
-  index.ts                              # Public API: re-exports plugin + types
-  plugin.ts                             # Main plugin factory function
-  types.ts                              # All TypeScript types + status transitions
-  defaults.ts                           # Default config values + resolver
+  index.ts              # Public API: re-exports plugin + types
+  plugin.ts             # Main plugin factory function
+  types.ts              # All TypeScript types + DEFAULT_STATUS_MACHINE
+  defaults.ts           # Default config values + resolveConfig()
 
   collections/
-    Services.ts                         # Service definitions
-    Resources.ts                        # Providers/resources
-    Schedules.ts                        # Availability schedules
-    Reservations.ts                     # Bookings with hooks
-    Customers.ts                        # Customer auth collection
+    Services.ts         # Service definitions (name, duration, durationType, price, buffers)
+    Resources.ts        # Resources (quantity, capacityMode, timezone)
+    Schedules.ts        # Availability schedules (recurring/manual + exceptions)
+    Reservations.ts     # Bookings with hooks, guestCount, items, idempotencyKey
+    Customers.ts        # Standalone customer auth collection
 
-  hooks/
-    reservations/
-      calculateEndTime.ts              # Auto-compute endTime
-      validateConflicts.ts             # Double-booking prevention
-      validateStatusTransition.ts      # Status state machine
-      validateCancellation.ts          # Cancellation notice period
-    index.ts                            # Barrel export
+  hooks/reservations/
+    checkIdempotency.ts       # Duplicate submission prevention
+    calculateEndTime.ts       # Auto end time from service duration
+    validateConflicts.ts      # Double-booking prevention
+    validateStatusTransition.ts # Status machine enforcement
+    validateCancellation.ts   # Cancellation notice period
+    onStatusChange.ts         # afterChange hook — fires plugin hook callbacks
 
-  utilities/
-    slotUtils.ts                        # Time math helpers
-    scheduleUtils.ts                    # Schedule resolution helpers
+  services/
+    AvailabilityService.ts    # computeEndTime, checkAvailability, getAvailableSlots
 
   endpoints/
-    customerSearch.ts                    # Custom search endpoint for customer picker
+    checkAvailability.ts      # GET /api/reserve/availability
+    getSlots.ts               # GET /api/reserve/slots
+    createBooking.ts          # POST /api/reserve/book
+    cancelBooking.ts          # POST /api/reserve/cancel
+    customerSearch.ts         # GET /api/reservation-customer-search
+
+  utilities/
+    slotUtils.ts              # addMinutes, doRangesOverlap, computeBlockedWindow, hoursUntil
+    scheduleUtils.ts          # resolveScheduleForDate, combineDateAndTime, etc.
 
   components/
-    CalendarView/
-      index.tsx                         # Client: calendar for reservations
-      CalendarView.module.css
-    CustomerField/
-      index.tsx                         # Client: rich customer picker field
-      CustomerField.module.css
-    DashboardWidget/
-      DashboardWidgetServer.tsx         # RSC: today's booking stats
-      DashboardWidget.module.css
-    AvailabilityOverview/
-      index.tsx                         # Client: weekly availability grid
-      AvailabilityOverview.module.css
+    CalendarView/             # Client: month/week/day calendar
+    CustomerField/            # Client: rich customer search field
+    DashboardWidget/          # RSC: today's reservation stats
+    AvailabilityOverview/     # Client: weekly resource grid
 
   exports/
-    client.ts                           # CalendarView, AvailabilityOverview, CustomerField
-    rsc.ts                              # DashboardWidgetServer
+    client.ts                 # CalendarView, AvailabilityOverview, CustomerField
+    rsc.ts                    # DashboardWidgetServer
+
+dev/
+  payload.config.ts           # Dev Payload config (MongoDB Memory Server)
+  seed.ts                     # Sample salon data
+  int.spec.ts                 # Vitest integration tests
+  e2e.spec.ts                 # Playwright E2E tests
 ```
-
----
-
-## API Reference
-
-### Plugin Export
-
-```typescript
-import { payloadReserve } from 'payload-reserve'
-import type { ReservationPluginConfig } from 'payload-reserve'
-```
-
-### Client Exports
-
-```typescript
-import { CalendarView, AvailabilityOverview, CustomerField } from 'payload-reserve/client'
-```
-
-### RSC Exports
-
-```typescript
-import { DashboardWidgetServer } from 'payload-reserve/rsc'
-```
-
-### Type Exports
-
-```typescript
-import type {
-  ReservationPluginConfig,
-  ResolvedReservationPluginConfig,
-} from 'payload-reserve'
-```
-
-### Integration Test Coverage
-
-The plugin ships with 18 integration tests covering:
-
-| Test | What It Verifies |
-|------|-----------------|
-| Collections registered | All 5 plugin collections exist after plugin init |
-| Customers auth enabled | Customers collection has `auth: true` |
-| Customers blocks admin | `access.admin` returns `false` for customers |
-| Users not modified | Plugin does not inject fields into users collection |
-| Create service | Service CRUD with all fields |
-| Create resource | Resource with service relationship |
-| Create schedule | Recurring schedule with slots |
-| Create customer | Customer with firstName, lastName, email, auth |
-| Auto endTime | endTime = startTime + duration |
-| Conflict: same resource | Double-booking is rejected |
-| Conflict: different resource | Same time on different resource is allowed |
-| Status: must start pending | Creating with non-pending status fails (public context) |
-| Status: valid transition | pending -> confirmed succeeds |
-| Status: admin create confirmed | Admin user can create reservation as confirmed |
-| Status: admin create completed | Admin user cannot create reservation as completed |
-| Status: invalid transition | completed -> pending fails |
-| Cancel: too late | Cancellation within notice period fails |
-| Cancel: sufficient notice | Cancellation with enough notice succeeds |

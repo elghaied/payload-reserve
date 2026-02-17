@@ -127,9 +127,9 @@ export const seed = async (payload: Payload) => {
   const customer1 = await payload.create({
     collection: 'customers' as 'users',
     data: {
+      email: 'jane@example.com',
       firstName: 'Jane',
       lastName: 'Doe',
-      email: 'jane@example.com',
       notes: 'Prefers morning appointments',
       password: 'customer123',
       phone: '555-0101',
@@ -139,9 +139,9 @@ export const seed = async (payload: Payload) => {
   const customer2 = await payload.create({
     collection: 'customers' as 'users',
     data: {
+      email: 'john@example.com',
       firstName: 'John',
       lastName: 'Public',
-      email: 'john@example.com',
       password: 'customer123',
       phone: '555-0202',
     },
@@ -190,6 +190,130 @@ export const seed = async (payload: Payload) => {
       service: coloring.id,
       startTime: makeTime(14, 0),
       status: 'pending',
+    },
+  })
+
+  // --- New: multi-unit and capacity resources ---
+
+  // Service for massage (fixed duration, no group capacity)
+  const massage = await payload.create({
+    collection: 'services' as 'users',
+    data: {
+      name: 'Swedish Massage',
+      active: true,
+      bufferTimeAfter: 15,
+      bufferTimeBefore: 5,
+      description: '60-minute Swedish massage session',
+      duration: 60,
+      durationType: 'fixed',
+      price: 85,
+    },
+  })
+
+  // Service for group yoga (fixed duration, per-guest capacity)
+  const groupYoga = await payload.create({
+    collection: 'services' as 'users',
+    data: {
+      name: 'Group Yoga Session',
+      active: true,
+      bufferTimeAfter: 10,
+      bufferTimeBefore: 0,
+      description: '45-minute group yoga class, up to 20 participants',
+      duration: 45,
+      durationType: 'fixed',
+      price: 20,
+    },
+  })
+
+  // Multi-unit resource: 5 massage tables (per-reservation capacity)
+  await payload.create({
+    collection: 'resources' as 'users',
+    data: {
+      name: 'Massage Table',
+      active: true,
+      capacityMode: 'per-reservation',
+      description: 'Private massage table — 5 available',
+      quantity: 5,
+      services: [massage.id],
+    },
+  })
+
+  // Capacity resource: yoga room with 20-person per-guest capacity
+  const yogaRoom = await payload.create({
+    collection: 'resources' as 'users',
+    data: {
+      name: 'Yoga Class Room',
+      active: true,
+      capacityMode: 'per-guest',
+      description: 'Group yoga studio — 20 participant capacity',
+      quantity: 20,
+      services: [groupYoga.id],
+    },
+  })
+
+  // Schedule for the yoga room (daily classes)
+  await payload.create({
+    collection: 'schedules' as 'users',
+    data: {
+      name: 'Yoga Room - Daily Schedule',
+      active: true,
+      exceptions: [],
+      recurringSlots: [
+        { day: 'mon', endTime: '20:00', startTime: '07:00' },
+        { day: 'tue', endTime: '20:00', startTime: '07:00' },
+        { day: 'wed', endTime: '20:00', startTime: '07:00' },
+        { day: 'thu', endTime: '20:00', startTime: '07:00' },
+        { day: 'fri', endTime: '20:00', startTime: '07:00' },
+        { day: 'sat', endTime: '14:00', startTime: '08:00' },
+        { day: 'sun', endTime: '12:00', startTime: '08:00' },
+      ],
+      resource: yogaRoom.id,
+      scheduleType: 'recurring',
+    },
+  })
+
+  // Multi-resource reservation: books Alice (haircut) and Bob (consultation) at the same time
+  // Uses items array; skipReservationHooks to bypass conflict checks during seeding
+  await payload.create({
+    collection: 'reservations',
+    context: { skipReservationHooks: true },
+    data: {
+      customer: customer1.id,
+      items: [
+        {
+          endTime: makeTime(11, 30),
+          resource: alice.id,
+          service: haircut.id,
+          startTime: makeTime(11, 0),
+        },
+        {
+          endTime: makeTime(11, 15),
+          resource: bob.id,
+          service: consultation.id,
+          startTime: makeTime(11, 0),
+        },
+      ],
+      notes: 'Back-to-back services with two stylists',
+      resource: alice.id,
+      service: haircut.id,
+      startTime: makeTime(11, 0),
+      status: 'confirmed',
+    },
+  })
+
+  // Reservation with guestCount: 4 guests attending a yoga class
+  // skipReservationHooks to avoid potential schedule/conflict validation during seeding
+  await payload.create({
+    collection: 'reservations',
+    context: { skipReservationHooks: true },
+    data: {
+      customer: customer2.id,
+      guestCount: 4,
+      notes: 'Group booking for yoga class',
+      resource: yogaRoom.id,
+      service: groupYoga.id,
+      startTime: makeTime(8, 0),
+      status: 'confirmed',
     },
   })
 
