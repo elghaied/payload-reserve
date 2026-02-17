@@ -1,5 +1,7 @@
 import type { ReservationPluginConfig, ResolvedReservationPluginConfig } from './types.js'
 
+import { DEFAULT_STATUS_MACHINE } from './types.js'
+
 export const DEFAULT_SLUGS = {
   customers: 'customers',
   media: 'media',
@@ -12,10 +14,12 @@ export const DEFAULT_SLUGS = {
 export const DEFAULT_ADMIN_GROUP = 'Reservations'
 export const DEFAULT_BUFFER_TIME = 0
 export const DEFAULT_CANCELLATION_NOTICE_PERIOD = 24
+export const DEFAULT_USER_COLLECTION = 'users'
 
 export function resolveConfig(
   pluginOptions: ReservationPluginConfig,
 ): ResolvedReservationPluginConfig {
+  const userStatusMachine = pluginOptions.statusMachine
   return {
     access: pluginOptions.access ?? {},
     adminGroup: pluginOptions.adminGroup ?? DEFAULT_ADMIN_GROUP,
@@ -23,6 +27,7 @@ export function resolveConfig(
       pluginOptions.cancellationNoticePeriod ?? DEFAULT_CANCELLATION_NOTICE_PERIOD,
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,
+    hooks: pluginOptions.hooks ?? {},
     localized: false,
     slugs: {
       customers: pluginOptions.slugs?.customers ?? DEFAULT_SLUGS.customers,
@@ -32,5 +37,17 @@ export function resolveConfig(
       schedules: pluginOptions.slugs?.schedules ?? DEFAULT_SLUGS.schedules,
       services: pluginOptions.slugs?.services ?? DEFAULT_SLUGS.services,
     },
+    statusMachine: userStatusMachine
+      ? {
+          blockingStatuses:
+            userStatusMachine.blockingStatuses ?? DEFAULT_STATUS_MACHINE.blockingStatuses,
+          defaultStatus: userStatusMachine.defaultStatus ?? DEFAULT_STATUS_MACHINE.defaultStatus,
+          statuses: userStatusMachine.statuses ?? DEFAULT_STATUS_MACHINE.statuses,
+          terminalStatuses:
+            userStatusMachine.terminalStatuses ?? DEFAULT_STATUS_MACHINE.terminalStatuses,
+          transitions: userStatusMachine.transitions ?? DEFAULT_STATUS_MACHINE.transitions,
+        }
+      : { ...DEFAULT_STATUS_MACHINE },
+    userCollection: pluginOptions.userCollection ?? DEFAULT_USER_COLLECTION,
   }
 }

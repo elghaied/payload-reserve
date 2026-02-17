@@ -48,11 +48,12 @@ export const payloadReserve =
     if (!config.admin) {config.admin = {}}
     if (!config.admin.components) {config.admin.components = {}}
 
-    // Store slugs in admin custom for component access
+    // Store slugs and status machine in admin custom for component access
     if (!config.admin.custom) {config.admin.custom = {}}
     config.admin.custom.reservationSlugs = {
       ...resolved.slugs,
     }
+    config.admin.custom.reservationStatusMachine = resolved.statusMachine
 
     // Add dashboard widget
     if (!config.admin.dashboard) {
