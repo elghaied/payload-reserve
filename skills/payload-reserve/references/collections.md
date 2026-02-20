@@ -1,38 +1,30 @@
 # Collection Schemas
 
-## Table of Contents
-
-- [Services](#services)
-- [Resources](#resources)
-- [Schedules](#schedules)
-- [Reservations](#reservations)
-- [Customers](#customers)
-
----
-
 ## Services
 
-**Default slug:** `services`
+**Slug:** `services` (configurable via `slugs.services`)
 
-Defines what can be booked (e.g., "Haircut", "Consultation", "Massage").
+Defines what can be booked (treatments, room types, service offerings).
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `name` | Text | Yes | — | Service name (max 200 chars, used as title) |
-| `description` | Textarea | No | — | Service description |
-| `duration` | Number | Yes | — | Duration in minutes (min: 1) |
-| `price` | Number | No | — | Price (min: 0, step: 0.01) |
-| `bufferTimeBefore` | Number | No | 0 | Buffer minutes before appointment |
-| `bufferTimeAfter` | Number | No | 0 | Buffer minutes after appointment |
-| `active` | Checkbox | No | true | Whether service is active (sidebar field) |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | Text | Yes | Service name (max 200 chars) |
+| `image` | Upload | No | Service image |
+| `description` | Textarea | No | Service description |
+| `duration` | Number | Yes | Duration in minutes (min: 1) |
+| `durationType` | Select | Yes | `'fixed'`, `'flexible'`, or `'full-day'` (default: `'fixed'`) |
+| `price` | Number | No | Price (min: 0, step: 0.01) |
+| `bufferTimeBefore` | Number | No | Buffer minutes before slot (default: 0) |
+| `bufferTimeAfter` | Number | No | Buffer minutes after slot (default: 0) |
+| `active` | Checkbox | No | Whether service is bookable (default: true) |
 
-```ts
+```typescript
 await payload.create({
   collection: 'services',
   data: {
     name: 'Haircut',
-    description: 'Standard haircut service',
     duration: 30,
+    durationType: 'fixed',
     price: 35.00,
     bufferTimeBefore: 5,
     bufferTimeAfter: 10,
@@ -45,25 +37,28 @@ await payload.create({
 
 ## Resources
 
-**Default slug:** `resources`
+**Slug:** `resources` (configurable via `slugs.resources`)
 
-Who or what performs the service (e.g., a stylist, a room, a consultant).
+Who or what performs the service (a stylist, a room, a machine).
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `name` | Text | Yes | — | Resource name (max 200 chars, used as title) |
-| `image` | Upload | No | — | Resource image (references media collection, configurable via `slugs.media`) |
-| `description` | Textarea | No | — | Resource description |
-| `services` | Relationship | Yes | — | Services this resource can perform (hasMany, references Services) |
-| `active` | Checkbox | No | true | Whether resource is active (sidebar field) |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | Text | Yes | Resource name (max 200 chars) |
+| `image` | Upload | No | Resource photo |
+| `description` | Textarea | No | Resource description |
+| `services` | Relationship | Yes | Services this resource can perform (hasMany) |
+| `active` | Checkbox | No | Whether resource accepts bookings (default: true) |
+| `quantity` | Number | Yes | Concurrent bookings allowed (default: 1) |
+| `capacityMode` | Select | No | `'per-reservation'` or `'per-guest'` — shown only when `quantity > 1` |
+| `timezone` | Text | No | IANA timezone for display |
 
-```ts
+```typescript
 await payload.create({
   collection: 'resources',
   data: {
-    name: 'Alice Johnson',
-    description: 'Senior Stylist',
-    services: [haircutId, coloringId],
+    name: 'Room 101',
+    services: [conferenceServiceId],
+    quantity: 1,
     active: true,
   },
 })
@@ -73,39 +68,34 @@ await payload.create({
 
 ## Schedules
 
-**Default slug:** `schedules`
+**Slug:** `schedules` (configurable via `slugs.schedules`)
 
-Defines when a resource is available. Supports **recurring** (weekly pattern) and **manual** (specific dates) modes, plus exception dates.
+Defines when a resource is available. Supports **recurring** (weekly pattern) and **manual** (specific dates), plus exception dates.
 
-| Field | Type | Required | Condition | Description |
-|-------|------|----------|-----------|-------------|
-| `name` | Text | Yes | — | Schedule name (used as title) |
-| `resource` | Relationship | Yes | — | Which resource this schedule belongs to |
-| `scheduleType` | Select | No | — | `'recurring'` or `'manual'` (default: `'recurring'`) |
-| `recurringSlots` | Array | No | type=recurring | Weekly slots |
-| `recurringSlots.day` | Select | Yes | — | Day of week (`mon`-`sun`) |
-| `recurringSlots.startTime` | Text | Yes | — | Start time (`HH:mm` format) |
-| `recurringSlots.endTime` | Text | Yes | — | End time (`HH:mm` format) |
-| `manualSlots` | Array | No | type=manual | Specific date slots |
-| `manualSlots.date` | Date | Yes | — | Specific date (day only) |
-| `manualSlots.startTime` | Text | Yes | — | Start time (`HH:mm` format) |
-| `manualSlots.endTime` | Text | Yes | — | End time (`HH:mm` format) |
-| `exceptions` | Array | No | — | Dates when the resource is unavailable |
-| `exceptions.date` | Date | Yes | — | Exception date (day only) |
-| `exceptions.reason` | Text | No | — | Reason for unavailability |
-| `active` | Checkbox | No | — | Whether schedule is active (default: true, sidebar field) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | Text | Schedule name |
+| `resource` | Relationship | Which resource this belongs to |
+| `scheduleType` | Select | `'recurring'` or `'manual'` (default: `'recurring'`) |
+| `recurringSlots` | Array | Weekly slots: `day`, `startTime`, `endTime` |
+| `manualSlots` | Array | Specific date slots: `date`, `startTime`, `endTime` |
+| `exceptions` | Array | Blocked dates: `date`, `reason` |
+| `active` | Checkbox | Whether this schedule is in effect (default: true) |
 
-```ts
-// Recurring schedule
+Times use `HH:mm` 24-hour format. Exception dates block the entire day.
+
+```typescript
 await payload.create({
   collection: 'schedules',
   data: {
-    name: 'Alice - Weekdays',
+    name: 'Alice - Standard Week',
     resource: aliceId,
     scheduleType: 'recurring',
     recurringSlots: [
       { day: 'mon', startTime: '09:00', endTime: '17:00' },
       { day: 'tue', startTime: '09:00', endTime: '17:00' },
+      { day: 'wed', startTime: '09:00', endTime: '17:00' },
+      { day: 'thu', startTime: '09:00', endTime: '17:00' },
       { day: 'fri', startTime: '09:00', endTime: '15:00' },
     ],
     exceptions: [
@@ -118,76 +108,45 @@ await payload.create({
 
 ---
 
-## Reservations
+## Customers
 
-**Default slug:** `reservations`
+**Slug:** `customers` (or your `userCollection` slug)
 
-The core booking records. Each reservation links a customer to a service performed by a resource at a specific time.
+### Standalone Mode (default — no `userCollection` set)
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `service` | Relationship | Yes | Which service is being booked (references Services) |
-| `resource` | Relationship | Yes | Which resource performs the service (references Resources) |
-| `customer` | Relationship | Yes | Who is booking (references Customers collection) |
-| `startTime` | Date | Yes | Appointment start (date + time picker) |
-| `endTime` | Date | No | Auto-calculated by hook, read-only |
-| `status` | Select | No | Workflow status (default: `'pending'`) |
-| `cancellationReason` | Textarea | No | Shown only when status is `'cancelled'` |
-| `notes` | Textarea | No | Additional notes |
+A dedicated auth collection with `auth: true` and `access.admin: () => false`. Customers can log in but cannot access the admin panel.
 
-**Status options:** `pending`, `confirmed`, `completed`, `cancelled`, `no-show`
+### User Collection Mode (`userCollection` set)
 
-```ts
-// endTime is auto-calculated from startTime + service.duration
-const reservation = await payload.create({
-  collection: 'reservations',
-  data: {
-    service: haircutId,
-    resource: aliceId,
-    customer: janeCustomerId,
-    startTime: '2025-06-15T10:00:00.000Z',
-    status: 'pending',
-  },
-})
-// reservation.endTime === '2025-06-15T10:30:00.000Z' (30 min haircut)
-```
+No new collection is created. The plugin injects `phone`, `notes`, and a `bookings` join field into your existing auth collection (deduplication prevents double-injection).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | Email | Customer email (from Payload auth) |
+| `firstName` | Text | First name (standalone mode only) |
+| `lastName` | Text | Last name (standalone mode only) |
+| `phone` | Text | Phone number (max 50 chars) |
+| `notes` | Textarea | Internal admin notes |
+| `bookings` | Join | Virtual — all reservations for this customer |
 
 ---
 
-## Customers
+## Reservations
 
-**Default slug:** `customers`
+**Slug:** `reservations` (configurable via `slugs.reservations`)
 
-A dedicated auth collection for customers. Has `auth: true` for JWT login/register/forgot-password REST endpoints, but `access.admin: () => false` to block admin panel login. Customers are managed by admins through the admin panel.
+The core booking records.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `email` | Email | Yes | Customer email (auto-provided by Payload's `auth: true`) |
-| `firstName` | Text | Yes | First name (max 200 chars, used as title) |
-| `lastName` | Text | Yes | Last name (max 200 chars) |
-| `phone` | Text | No | Phone number (max 50 chars) |
-| `notes` | Textarea | No | Internal notes |
-| `bookings` | Join | No | Virtual field: all reservations for this customer (join on `customer`) |
-
-The `bookings` field is a **join** — it shows all reservations linked to this customer without storing anything on the customer document.
-
-Since customers is an auth collection, `email` and `password` are required when creating customers. The `email` field comes from Payload's built-in auth — the plugin does not add it.
-
-**Auth endpoints** (auto-provided by Payload):
-- `POST /api/customers/login` — customer login
-- `POST /api/customers/forgot-password` — password reset
-- `GET /api/customers/me` — current customer
-
-```ts
-await payload.create({
-  collection: 'customers',
-  data: {
-    firstName: 'Jane',
-    lastName: 'Doe',
-    email: 'jane@example.com',
-    password: 'securepassword',
-    phone: '555-0101',
-    notes: 'Prefers morning appointments',
-  },
-})
-```
+| `service` | Relationship | Yes | Service being booked |
+| `resource` | Relationship | Yes | Resource performing the service |
+| `customer` | Relationship | Yes | Customer making the booking |
+| `startTime` | Date | Yes | Appointment start |
+| `endTime` | Date | No | Auto-calculated (do not set manually for fixed services) |
+| `status` | Select | No | Workflow status (default: `'pending'`) |
+| `guestCount` | Number | No | Number of guests (default: 1) |
+| `cancellationReason` | Textarea | No | Visible only when status is `'cancelled'` |
+| `notes` | Textarea | No | Additional notes |
+| `items` | Array | No | Additional resources in a multi-resource booking |
+| `idempotencyKey` | Text | No | Unique key to prevent duplicate submissions |
