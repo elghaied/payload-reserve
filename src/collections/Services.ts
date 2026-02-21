@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, CollectionSlug } from 'payload'
 
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
@@ -24,7 +24,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         name: 'image',
         type: 'upload',
         label: ({ t }) => (t as PluginT)('reservation:fieldImage'),
-        relationTo: config.slugs.media,
+        relationTo: config.slugs.media as unknown as CollectionSlug,
       },
       {
         name: 'description',

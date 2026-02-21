@@ -1,4 +1,4 @@
-import type { Config, Field } from 'payload'
+import type { CollectionSlug, Config, Field } from 'payload'
 
 import { deepMergeSimple } from 'payload/shared'
 
@@ -63,7 +63,7 @@ export const payloadReserve =
           {
             name: 'bookings',
             type: 'join',
-            collection: resolved.slugs.reservations as 'reservations',
+            collection: resolved.slugs.reservations as unknown as CollectionSlug,
             on: 'customer',
           },
         ]

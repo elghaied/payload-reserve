@@ -26,7 +26,7 @@ export const validateCancellation =
     const startDate = new Date(startTime)
     const hours = hoursUntil(startDate)
 
-    if (hours < config.cancellationNoticePeriod) {
+    if (hours > 0 && hours < config.cancellationNoticePeriod) {
       throw new ValidationError({
         errors: [
           {

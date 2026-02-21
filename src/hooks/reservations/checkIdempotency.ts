@@ -10,8 +10,9 @@ export const checkIdempotency =
     if (context?.skipReservationHooks) {return data}
     if (operation !== 'create' || !data?.idempotencyKey) {return data}
 
-    const { totalDocs } = await req.payload.count({
-      collection: config.slugs.reservations as 'reservations',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { totalDocs } = await (req.payload.count as any)({
+      collection: config.slugs.reservations,
       req,
       where: { idempotencyKey: { equals: data.idempotencyKey } },
     })

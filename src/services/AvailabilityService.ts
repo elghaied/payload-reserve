@@ -120,9 +120,10 @@ export async function checkAvailability(params: {
   } = params
 
   // Fetch resource for quantity and capacity mode
-  const resource = await payload.findByID({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resource = await (payload.findByID as any)({
     id: resourceId,
-    collection: resourceSlug as 'resources',
+    collection: resourceSlug,
     depth: 0,
     req,
   })
@@ -148,8 +149,9 @@ export async function checkAvailability(params: {
 
   if (capacityMode === 'per-guest') {
     // Must fetch docs to sum guestCount
-    const { docs } = await payload.find({
-      collection: reservationSlug as 'reservations',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { docs } = await (payload.find as any)({
+      collection: reservationSlug,
       depth: 0,
       limit: 0,
       req,
@@ -157,7 +159,7 @@ export async function checkAvailability(params: {
       where,
     })
     const currentGuests = docs.reduce(
-      (sum, doc) => sum + ((doc.guestCount as number) ?? 1),
+      (sum: number, doc: Record<string, unknown>) => sum + ((doc.guestCount as number) ?? 1),
       0,
     )
     return {
@@ -171,8 +173,9 @@ export async function checkAvailability(params: {
 
   // per-reservation mode: count is sufficient
   // TODO: batch queries — linear per-item cost acceptable for 2-5 items
-  const { totalDocs } = await payload.count({
-    collection: reservationSlug as 'reservations',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { totalDocs } = await (payload.count as any)({
+    collection: reservationSlug,
     req,
     where,
   })
@@ -210,9 +213,10 @@ export async function getAvailableSlots(params: {
   } = params
 
   // 1. Fetch service for duration + buffer times
-  const service = await payload.findByID({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = await (payload.findByID as any)({
     id: serviceId,
-    collection: serviceSlug as 'services',
+    collection: serviceSlug,
     depth: 0,
     req,
   })
@@ -222,8 +226,9 @@ export async function getAvailableSlots(params: {
   const durationType = ((service.durationType as string) ?? 'fixed') as DurationType
 
   // 2. Fetch resource's schedules for the date
-  const { docs: schedules } = await payload.find({
-    collection: scheduleSlug as 'schedules',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { docs: schedules } = await (payload.find as any)({
+    collection: scheduleSlug,
     depth: 0,
     limit: 100,
     req,

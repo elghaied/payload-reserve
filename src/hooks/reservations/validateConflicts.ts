@@ -24,9 +24,10 @@ export const validateConflicts =
 
     if (serviceId) {
       try {
-        const service = await req.payload.findByID({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const service = await (req.payload.findByID as any)({
           id: serviceId,
-          collection: config.slugs.services as 'services',
+          collection: config.slugs.services,
           req,
         })
         if (service) {

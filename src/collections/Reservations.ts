@@ -2,6 +2,7 @@ import type {
   CollectionAfterChangeHook,
   CollectionBeforeChangeHook,
   CollectionConfig,
+  CollectionSlug,
 } from 'payload'
 
 import type { PluginT } from '../translations/index.js'
@@ -72,14 +73,14 @@ export function createReservationsCollection(
         name: 'service',
         type: 'relationship',
         label: ({ t }) => (t as PluginT)('reservation:fieldService'),
-        relationTo: config.slugs.services,
+        relationTo: config.slugs.services as unknown as CollectionSlug,
         required: true,
       },
       {
         name: 'resource',
         type: 'relationship',
         label: ({ t }) => (t as PluginT)('reservation:fieldResource'),
-        relationTo: config.slugs.resources,
+        relationTo: config.slugs.resources as unknown as CollectionSlug,
         required: true,
       },
       {
@@ -93,7 +94,7 @@ export function createReservationsCollection(
           },
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldCustomer'),
-        relationTo: config.slugs.customers,
+        relationTo: config.slugs.customers as unknown as CollectionSlug,
         required: true,
       },
       {
@@ -163,14 +164,14 @@ export function createReservationsCollection(
             name: 'resource',
             type: 'relationship',
             label: ({ t }) => (t as PluginT)('reservation:fieldResource'),
-            relationTo: config.slugs.resources,
+            relationTo: config.slugs.resources as unknown as CollectionSlug,
             required: true,
           },
           {
             name: 'service',
             type: 'relationship',
             label: ({ t }) => (t as PluginT)('reservation:fieldService'),
-            relationTo: config.slugs.services,
+            relationTo: config.slugs.services as unknown as CollectionSlug,
           },
           {
             name: 'startTime',

@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, CollectionSlug } from 'payload'
 
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
@@ -24,7 +24,7 @@ export function createSchedulesCollection(
         name: 'resource',
         type: 'relationship',
         label: ({ t }) => (t as PluginT)('reservation:fieldResource'),
-        relationTo: config.slugs.resources,
+        relationTo: config.slugs.resources as unknown as CollectionSlug,
         required: true,
       },
       {

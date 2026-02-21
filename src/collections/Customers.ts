@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, CollectionSlug } from 'payload'
 
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
@@ -46,7 +46,7 @@ export function createCustomersCollection(
       {
         name: 'bookings',
         type: 'join',
-        collection: config.slugs.reservations,
+        collection: config.slugs.reservations as unknown as CollectionSlug,
         on: 'customer',
       },
     ],

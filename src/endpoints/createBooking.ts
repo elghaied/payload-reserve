@@ -17,8 +17,9 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
 
       // Create via Payload Local API — collection hooks handle conflict detection,
       // endTime calculation, and status transitions
-      const reservation = await req.payload.create({
-        collection: config.slugs.reservations as 'reservations',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const reservation = await (req.payload.create as any)({
+        collection: config.slugs.reservations,
         data: bookingData,
         req,
       })

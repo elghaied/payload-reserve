@@ -1,4 +1,4 @@
-import type { Endpoint, Field, Where } from 'payload'
+import type { CollectionSlug, Endpoint, Field, Where } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
@@ -32,7 +32,7 @@ export function createCustomerSearchEndpoint(
       const page = Math.max(Number(url.searchParams.get('page') ?? '1'), 1)
 
       // Detect which fields exist on the target collection at runtime
-      const collectionConfig = req.payload.collections[config.slugs.customers]?.config
+      const collectionConfig = req.payload.collections[config.slugs.customers as unknown as CollectionSlug]?.config
       const availableFields: Set<string> = collectionConfig
         ? getNamedFields(collectionConfig.fields)
         : new Set()
@@ -65,15 +65,16 @@ export function createCustomerSearchEndpoint(
         where = { or: orClauses }
       }
 
-      const result = await req.payload.find({
-        collection: config.slugs.customers as 'customers',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await (req.payload.find as any)({
+        collection: config.slugs.customers,
         limit,
         page,
         where,
       })
 
       return Response.json({
-        docs: result.docs.map((doc: Record<string, unknown>) => {
+        docs: (result.docs as Record<string, unknown>[]).map((doc) => {
           const entry: Record<string, unknown> = {
             id: doc['id'],
             email: doc['email'] ?? '',

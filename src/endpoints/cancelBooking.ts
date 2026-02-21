@@ -19,9 +19,10 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         return Response.json({ message: 'reservationId is required' }, { status: 400 })
       }
 
-      const reservation = await req.payload.update({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const reservation = await (req.payload.update as any)({
         id: reservationId,
-        collection: config.slugs.reservations as 'reservations',
+        collection: config.slugs.reservations,
         data: {
           cancellationReason: reason,
           status: 'cancelled',

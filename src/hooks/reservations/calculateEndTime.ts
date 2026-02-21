@@ -20,9 +20,10 @@ export const calculateEndTime =
       // Single-resource: compute top-level endTime
       const serviceId = typeof data.service === 'object' ? data.service.id : data.service
 
-      const service = await req.payload.findByID({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const service = await (req.payload.findByID as any)({
         id: serviceId,
-        collection: config.slugs.services as 'services',
+        collection: config.slugs.services,
         req,
       })
 
@@ -63,9 +64,10 @@ export const calculateEndTime =
 
         if (!itemServiceId) {continue}
 
-        const service = await req.payload.findByID({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const service = await (req.payload.findByID as any)({
           id: itemServiceId,
-          collection: config.slugs.services as 'services',
+          collection: config.slugs.services,
           req,
         })
 

@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, CollectionSlug } from 'payload'
 
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
@@ -26,7 +26,7 @@ export function createResourcesCollection(
         name: 'image',
         type: 'upload',
         label: ({ t }) => (t as PluginT)('reservation:fieldImage'),
-        relationTo: config.slugs.media,
+        relationTo: config.slugs.media as unknown as CollectionSlug,
       },
       {
         name: 'description',
@@ -39,7 +39,7 @@ export function createResourcesCollection(
         type: 'relationship',
         hasMany: true,
         label: ({ t }) => (t as PluginT)('reservation:fieldServices'),
-        relationTo: config.slugs.services,
+        relationTo: config.slugs.services as unknown as CollectionSlug,
         required: true,
       },
       {
