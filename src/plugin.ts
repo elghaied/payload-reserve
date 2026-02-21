@@ -144,11 +144,13 @@ export const payloadReserve =
     }
 
     // Merge plugin translations (user translations take precedence)
-    if (!config.i18n) {config.i18n = {}}
-    ;(config.i18n as Record<string, unknown>).translations = deepMergeSimple(
-      translations,
-      (config.i18n as Record<string, unknown>).translations ?? {},
-    )
+    config.i18n = {
+      ...(config.i18n ?? {}),
+      translations: deepMergeSimple(
+        translations,
+        (config.i18n?.translations as Record<string, Record<string, unknown>>) ?? {},
+      ),
+    }
 
     return config
   }
