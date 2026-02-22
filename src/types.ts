@@ -1,4 +1,4 @@
-import type { CollectionConfig, PayloadRequest } from 'payload'
+import type { CollectionConfig, Field, PayloadRequest } from 'payload'
 
 // --- Duration & Capacity models ---
 
@@ -87,16 +87,16 @@ export type ReservationPluginHooks = {
 export type ResourceOwnerModeConfig = {
   /** Roles that can see all records (default: check req.user.collection === adminCollection) */
   adminRoles?: string[]
-  /** Field name for the owner relationship on Resources (default: 'owner') */
-  ownerField?: string
   /** Whether Services also get an owner field (default: false — Services are platform-managed) */
   ownedServices?: boolean
+  /** Field name for the owner relationship on Resources (default: 'owner') */
+  ownerField?: string
 }
 
 export type ResolvedResourceOwnerModeConfig = {
   adminRoles: string[]
-  ownerField: string
   ownedServices: boolean
+  ownerField: string
 }
 
 // --- Plugin configuration ---
@@ -118,6 +118,8 @@ export type ReservationPluginConfig = {
   defaultBufferTime?: number
   /** Disable the plugin entirely */
   disabled?: boolean
+  /** Extra fields to append to the Reservations collection */
+  extraReservationFields?: Field[]
   /** Plugin hooks for external integrations */
   hooks?: ReservationPluginHooks
   /** Enable resource-owner multi-tenancy (opt-in) */
@@ -149,6 +151,7 @@ export type ResolvedReservationPluginConfig = {
   cancellationNoticePeriod: number
   defaultBufferTime: number
   disabled: boolean
+  extraReservationFields: Field[]
   hooks: ReservationPluginHooks
   localized: boolean
   resourceOwnerMode: ResolvedResourceOwnerModeConfig | undefined

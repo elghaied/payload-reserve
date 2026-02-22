@@ -4,7 +4,8 @@ import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 export const onStatusChange =
   (config: ResolvedReservationPluginConfig): CollectionAfterChangeHook =>
-  async ({ doc, previousDoc, req }) => {
+  async ({ context, doc, previousDoc, req }) => {
+    if (context?.skipReservationHooks) {return doc}
     if (!previousDoc || previousDoc.status === doc.status) {return doc}
 
     const prev = previousDoc.status as string

@@ -22,7 +22,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
           hooks: {
             beforeChange: [
               ({ operation, req, value }) => {
-                if (operation === 'create' && req.user) return req.user.id
+                if (operation === 'create' && req.user) {return req.user.id}
                 return value
               },
             ],

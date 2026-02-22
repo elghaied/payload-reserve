@@ -14,6 +14,8 @@ payloadReserve({ hooks })
 
 Each hook type is an array — hooks fire sequentially.
 
+> **Escape hatch:** All plugin hooks respect `context.skipReservationHooks`. When you call `payload.update()` or `payload.create()` with `context: { skipReservationHooks: true }`, none of these callbacks fire — including the `afterChange` hooks that trigger `afterBookingCancel`, `afterBookingConfirm`, and `afterStatusChange`. Use this when your code handles the side-effect (email, payment) itself and must not double-fire.
+
 ---
 
 ## beforeBookingCreate

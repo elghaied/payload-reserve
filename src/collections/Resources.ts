@@ -22,7 +22,7 @@ export function createResourcesCollection(
         hooks: {
           beforeChange: [
             ({ operation, req, value }) => {
-              if (operation === 'create' && req.user) return req.user.id
+              if (operation === 'create' && req.user) {return req.user.id}
               return value
             },
           ],

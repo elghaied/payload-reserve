@@ -8,14 +8,13 @@ import type {
 import type { PluginT } from '../translations/index.js'
 import type { ReservationPluginHooks, ResolvedReservationPluginConfig } from '../types.js'
 
-import { makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
-
 import { calculateEndTime } from '../hooks/reservations/calculateEndTime.js'
 import { checkIdempotency } from '../hooks/reservations/checkIdempotency.js'
 import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
 import { validateStatusTransition } from '../hooks/reservations/validateStatusTransition.js'
+import { makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
 
 function createPluginHooksBeforeCreate(
   hooks: ReservationPluginHooks,
@@ -206,6 +205,7 @@ export function createReservationsCollection(
         index: true,
         unique: true,
       },
+      ...config.extraReservationFields,
     ],
     hooks: {
       afterChange: [

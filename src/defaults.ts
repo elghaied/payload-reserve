@@ -27,13 +27,14 @@ export function resolveConfig(
       pluginOptions.cancellationNoticePeriod ?? DEFAULT_CANCELLATION_NOTICE_PERIOD,
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,
+    extraReservationFields: pluginOptions.extraReservationFields ?? [],
     hooks: pluginOptions.hooks ?? {},
     localized: false,
     resourceOwnerMode: rom
       ? {
           adminRoles: rom.adminRoles ?? [],
-          ownerField: rom.ownerField ?? 'owner',
           ownedServices: rom.ownedServices ?? false,
+          ownerField: rom.ownerField ?? 'owner',
         }
       : undefined,
     slugs: {

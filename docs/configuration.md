@@ -74,6 +74,11 @@ payloadReserve({
       },
     ],
   },
+
+  // Extra fields appended to the Reservations collection
+  extraReservationFields: [
+    { name: 'paymentReminderSent', type: 'checkbox', defaultValue: false },
+  ],
 })
 ```
 
@@ -94,6 +99,7 @@ payloadReserve({
 | `slugs.media` | `string` | `'media'` | Media collection slug (used by image fields) |
 | `statusMachine` | `Partial<StatusMachineConfig>` | Default 5-status machine | Custom status machine |
 | `hooks` | `ReservationPluginHooks` | `{}` | Plugin hook callbacks |
+| `extraReservationFields` | `Field[]` | `[]` | Extra Payload fields appended to the Reservations collection |
 
 ---
 

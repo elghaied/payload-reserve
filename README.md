@@ -18,6 +18,7 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Multi-Resource Bookings** — Single reservation that spans multiple resources simultaneously via the `items` array
 - **Capacity and Inventory** — `quantity > 1` allows multiple concurrent bookings per resource; `capacityMode` (`per-reservation` | `per-guest`) controls how capacity is counted
 - **Idempotency** — Optional `idempotencyKey` prevents duplicate submissions
+- **Extra Reservation Fields** — Inject custom fields into the Reservations collection via `extraReservationFields` without forking the plugin
 - **Cancellation Policy** — Configurable minimum notice period enforcement
 - **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems
 - **Availability Service** — Pure functions and DB helpers for slot generation and conflict checking

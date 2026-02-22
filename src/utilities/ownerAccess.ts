@@ -11,9 +11,9 @@ type CollectionAccess = NonNullable<CollectionConfig['access']>
  * - adminRoles empty → no bypass role; all authenticated users are treated as owners
  */
 function isAdmin(user: Record<string, unknown>, adminRoles: string[]): boolean {
-  if (!adminRoles.length) return false
+  if (!adminRoles.length) {return false}
   const role = user.role as string | string[] | undefined
-  if (!role) return false
+  if (!role) {return false}
   return Array.isArray(role) ? role.some((r) => adminRoles.includes(r)) : adminRoles.includes(role)
 }
 
@@ -25,9 +25,9 @@ export function makeResourceOwnerAccess(rom: ResolvedResourceOwnerModeConfig): C
   const { adminRoles, ownerField } = rom
 
   const ownerOrAdmin: Access = ({ req }: { req: PayloadRequest }) => {
-    if (!req.user) return false
+    if (!req.user) {return false}
     const user = req.user as Record<string, unknown>
-    if (isAdmin(user, adminRoles)) return true
+    if (isAdmin(user, adminRoles)) {return true}
     return { [ownerField]: { equals: user.id } }
   }
 
@@ -47,9 +47,9 @@ export function makeScheduleOwnerAccess(rom: ResolvedResourceOwnerModeConfig): C
   const { adminRoles, ownerField } = rom
 
   const ownerOrAdmin: Access = ({ req }: { req: PayloadRequest }) => {
-    if (!req.user) return false
+    if (!req.user) {return false}
     const user = req.user as Record<string, unknown>
-    if (isAdmin(user, adminRoles)) return true
+    if (isAdmin(user, adminRoles)) {return true}
     return { [`resource.${ownerField}`]: { equals: user.id } }
   }
 
@@ -72,14 +72,14 @@ export function makeReservationOwnerAccess(
   const { adminRoles, ownerField } = rom
 
   const readAccess: Access = ({ req }: { req: PayloadRequest }) => {
-    if (!req.user) return false
+    if (!req.user) {return false}
     const user = req.user as Record<string, unknown>
-    if (isAdmin(user, adminRoles)) return true
+    if (isAdmin(user, adminRoles)) {return true}
     return { [`resource.${ownerField}`]: { equals: user.id } }
   }
 
   const adminOnly: Access = ({ req }: { req: PayloadRequest }) => {
-    if (!req.user) return false
+    if (!req.user) {return false}
     const user = req.user as Record<string, unknown>
     return isAdmin(user, adminRoles)
   }
@@ -102,9 +102,9 @@ export function makeServiceOwnerAccess(
   const { adminRoles } = rom
 
   const ownerOrAdmin: Access = ({ req }: { req: PayloadRequest }) => {
-    if (!req.user) return false
+    if (!req.user) {return false}
     const user = req.user as Record<string, unknown>
-    if (isAdmin(user, adminRoles)) return true
+    if (isAdmin(user, adminRoles)) {return true}
     return { [ownerField]: { equals: user.id } }
   }
 

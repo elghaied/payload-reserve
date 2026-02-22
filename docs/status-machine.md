@@ -66,7 +66,7 @@ One `afterChange` hook also runs:
 
 ## Escape Hatch
 
-All hooks check `context.skipReservationHooks` and skip all validation when truthy. Use this for data migrations, seeding, and administrative operations:
+All hooks — both `beforeChange` and `afterChange` (including `onStatusChange`) — check `context.skipReservationHooks` and exit immediately when truthy. Use this for data migrations, seeding, and programmatic administrative operations where you want to handle side-effects (emails, payments) manually:
 
 ```typescript
 await payload.create({
@@ -80,6 +80,21 @@ await payload.create({
   },
   context: { skipReservationHooks: true },
 })
+```
+
+This is especially important for programmatic bulk updates. If you update a reservation's status with `skipReservationHooks: true`, the `afterBookingCancel` / `afterBookingConfirm` / `afterStatusChange` callbacks are **not** fired — preventing double-sends when you handle the notification yourself:
+
+```typescript
+// Cancel a stale reservation manually — no double email
+await req.payload.update({
+  collection: 'reservations',
+  id: reservation.id,
+  data: { status: 'cancelled' },
+  context: { skipReservationHooks: true },
+  req,
+})
+// Now send your own cancellation email
+await sendCancellationEmail(reservation)
 ```
 
 ---
