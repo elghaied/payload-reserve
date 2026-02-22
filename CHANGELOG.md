@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-02-22
+
+### Added
+
+- **Resource ownership** — Resources can now be owned by a user (customer). Useful for use cases where customers publish and manage their own services/resources
+
+### Fixed
+
+- Owner access control issues when a user owned a resource
+
 ## [1.0.3] - 2026-02-21
 
 ### Added
