@@ -1,14 +1,45 @@
-import type { CollectionConfig, CollectionSlug } from 'payload'
+import type { CollectionConfig, CollectionSlug, Field } from 'payload'
 
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { makeResourceOwnerAccess } from '../utilities/ownerAccess.js'
+
 export function createResourcesCollection(
   config: ResolvedReservationPluginConfig,
 ): CollectionConfig {
+  const rom = config.resourceOwnerMode
+  const ownerField = rom?.ownerField ?? 'owner'
+
+  // Build the owner field when resourceOwnerMode is enabled
+  const ownerFieldDef: Field | null = rom
+    ? {
+        name: ownerField,
+        type: 'relationship',
+        admin: {
+          position: 'sidebar',
+        },
+        hooks: {
+          beforeChange: [
+            ({ operation, req, value }) => {
+              if (operation === 'create' && req.user) return req.user.id
+              return value
+            },
+          ],
+        },
+        label: 'Owner',
+        relationTo: config.slugs.customers as unknown as CollectionSlug,
+        required: true,
+      }
+    : null
+
+  // Determine access: app override → owner-mode auto-wired → unrestricted
+  const access =
+    config.access.resources ?? (rom ? makeResourceOwnerAccess(rom) : {})
+
   return {
     slug: config.slugs.resources,
-    access: config.access.resources ?? {},
+    access,
     admin: {
       group: config.adminGroup,
       useAsTitle: 'name',
@@ -90,6 +121,7 @@ export function createResourcesCollection(
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldTimezone'),
       },
+      ...(ownerFieldDef ? [ownerFieldDef] : []),
     ],
     labels: {
       plural: ({ t }) => (t as PluginT)('reservation:collectionResources'),

@@ -19,6 +19,7 @@ export function resolveConfig(
   pluginOptions: ReservationPluginConfig,
 ): ResolvedReservationPluginConfig {
   const userStatusMachine = pluginOptions.statusMachine
+  const rom = pluginOptions.resourceOwnerMode
   return {
     access: pluginOptions.access ?? {},
     adminGroup: pluginOptions.adminGroup ?? DEFAULT_ADMIN_GROUP,
@@ -28,6 +29,13 @@ export function resolveConfig(
     disabled: pluginOptions.disabled ?? false,
     hooks: pluginOptions.hooks ?? {},
     localized: false,
+    resourceOwnerMode: rom
+      ? {
+          adminRoles: rom.adminRoles ?? [],
+          ownerField: rom.ownerField ?? 'owner',
+          ownedServices: rom.ownedServices ?? false,
+        }
+      : undefined,
     slugs: {
       customers: pluginOptions.slugs?.customers ?? DEFAULT_SLUGS.customers,
       media: pluginOptions.slugs?.media ?? DEFAULT_SLUGS.media,

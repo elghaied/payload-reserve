@@ -1453,3 +1453,245 @@ describe('AvailabilityService - pure functions', () => {
     expect(conditions.length).toBeGreaterThanOrEqual(4)
   })
 })
+
+// ---------------------------------------------------------------------------
+// resourceOwnerMode - access function factories (unit tests)
+// These tests call the access factory functions directly with mock req objects.
+// ---------------------------------------------------------------------------
+describe('resourceOwnerMode - ownerAccess utility', () => {
+  // Helper to build a minimal mock req
+  const makeReq = (user?: Record<string, unknown>) => ({ user }) as Parameters<import('payload').Access>[0]['req']
+
+  describe('makeResourceOwnerAccess', () => {
+    it('read: no user returns false', async () => {
+      const { makeResourceOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeResourceOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq(undefined) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(false)
+    })
+
+    it('read: regular user returns owner Where clause', async () => {
+      const { makeResourceOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeResourceOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq({ id: 'user-1', role: 'host' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toEqual({ owner: { equals: 'user-1' } })
+    })
+
+    it('read: admin user returns true (bypass)', async () => {
+      const { makeResourceOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeResourceOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq({ id: 'admin-1', role: 'admin' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(true)
+    })
+
+    it('create: authenticated user returns true', async () => {
+      const { makeResourceOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeResourceOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.create({ req: makeReq({ id: 'user-1' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(true)
+    })
+
+    it('create: unauthenticated returns false', async () => {
+      const { makeResourceOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeResourceOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.create({ req: makeReq(undefined) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(false)
+    })
+
+    it('update: regular user returns owner Where clause', async () => {
+      const { makeResourceOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeResourceOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.update({ req: makeReq({ id: 'user-2', role: 'host' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toEqual({ owner: { equals: 'user-2' } })
+    })
+
+    it('uses custom ownerField name when configured', async () => {
+      const { makeResourceOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeResourceOwnerAccess({ adminRoles: [], ownerField: 'managedBy', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq({ id: 'user-3' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toEqual({ managedBy: { equals: 'user-3' } })
+    })
+
+    it('no adminRoles: no bypass even for users with a role field', async () => {
+      const { makeResourceOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeResourceOwnerAccess({ adminRoles: [], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq({ id: 'user-4', role: 'admin' }) } as Parameters<import('payload').Access>[0])
+      // adminRoles is empty → isAdmin returns false → falls through to Where clause
+      expect(result).toEqual({ owner: { equals: 'user-4' } })
+    })
+  })
+
+  describe('makeScheduleOwnerAccess', () => {
+    it('read: no user returns false', async () => {
+      const { makeScheduleOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeScheduleOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq(undefined) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(false)
+    })
+
+    it('read: regular user returns resource.owner Where clause', async () => {
+      const { makeScheduleOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeScheduleOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq({ id: 'user-1', role: 'host' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toEqual({ 'resource.owner': { equals: 'user-1' } })
+    })
+
+    it('read: admin bypasses filter', async () => {
+      const { makeScheduleOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeScheduleOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq({ id: 'admin-1', role: 'admin' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(true)
+    })
+
+    it('uses custom ownerField in join path', async () => {
+      const { makeScheduleOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeScheduleOwnerAccess({ adminRoles: [], ownerField: 'managedBy', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq({ id: 'user-5' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toEqual({ 'resource.managedBy': { equals: 'user-5' } })
+    })
+  })
+
+  describe('makeReservationOwnerAccess', () => {
+    it('read: no user returns false', async () => {
+      const { makeReservationOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeReservationOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq(undefined) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(false)
+    })
+
+    it('read: owner user returns resource.owner Where clause', async () => {
+      const { makeReservationOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeReservationOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq({ id: 'user-1', role: 'host' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toEqual({ 'resource.owner': { equals: 'user-1' } })
+    })
+
+    it('read: admin bypasses filter', async () => {
+      const { makeReservationOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeReservationOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.read({ req: makeReq({ id: 'admin-1', role: 'admin' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(true)
+    })
+
+    it('update: regular user returns false (mutations are admin-only)', async () => {
+      const { makeReservationOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeReservationOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.update({ req: makeReq({ id: 'user-1', role: 'host' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(false)
+    })
+
+    it('update: admin returns true', async () => {
+      const { makeReservationOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeReservationOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.update({ req: makeReq({ id: 'admin-1', role: 'admin' }) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(true)
+    })
+
+    it('create: no user returns false (admin-only)', async () => {
+      const { makeReservationOwnerAccess } = await import('../src/utilities/ownerAccess.js')
+      const access = makeReservationOwnerAccess({ adminRoles: ['admin'], ownerField: 'owner', ownedServices: false }) as Record<string, import('payload').Access>
+      const result = access.create({ req: makeReq(undefined) } as Parameters<import('payload').Access>[0])
+      expect(result).toBe(false)
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// resourceOwnerMode - collection factory integration
+// Tests that the owner field is injected into collection configs.
+// ---------------------------------------------------------------------------
+describe('resourceOwnerMode - collection factory behaviour', () => {
+  it('Resources collection: owner field is injected when resourceOwnerMode is set', async () => {
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    const { resolveConfig } = await import('../src/defaults.js')
+    const resolved = resolveConfig({
+      resourceOwnerMode: { adminRoles: ['admin'], ownerField: 'owner' },
+      slugs: { customers: 'customers', resources: 'resources', services: 'services' },
+    })
+    const collection = createResourcesCollection(resolved)
+    const fieldNames = collection.fields
+      .filter((f): f is { name: string } => 'name' in f)
+      .map((f) => f.name)
+    expect(fieldNames).toContain('owner')
+  })
+
+  it('Resources collection: owner field is NOT added when resourceOwnerMode is absent', async () => {
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    const { resolveConfig } = await import('../src/defaults.js')
+    const resolved = resolveConfig({})
+    const collection = createResourcesCollection(resolved)
+    const fieldNames = collection.fields
+      .filter((f): f is { name: string } => 'name' in f)
+      .map((f) => f.name)
+    expect(fieldNames).not.toContain('owner')
+  })
+
+  it('Resources collection: custom ownerField name is used', async () => {
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    const { resolveConfig } = await import('../src/defaults.js')
+    const resolved = resolveConfig({
+      resourceOwnerMode: { ownerField: 'host' },
+    })
+    const collection = createResourcesCollection(resolved)
+    const fieldNames = collection.fields
+      .filter((f): f is { name: string } => 'name' in f)
+      .map((f) => f.name)
+    expect(fieldNames).toContain('host')
+    expect(fieldNames).not.toContain('owner')
+  })
+
+  it('Services collection: owner field is injected when ownedServices: true', async () => {
+    const { createServicesCollection } = await import('../src/collections/Services.js')
+    const { resolveConfig } = await import('../src/defaults.js')
+    const resolved = resolveConfig({
+      resourceOwnerMode: { adminRoles: ['admin'], ownedServices: true },
+    })
+    const collection = createServicesCollection(resolved)
+    const fieldNames = collection.fields
+      .filter((f): f is { name: string } => 'name' in f)
+      .map((f) => f.name)
+    expect(fieldNames).toContain('owner')
+  })
+
+  it('Services collection: owner field is NOT added when ownedServices is false (default)', async () => {
+    const { createServicesCollection } = await import('../src/collections/Services.js')
+    const { resolveConfig } = await import('../src/defaults.js')
+    const resolved = resolveConfig({
+      resourceOwnerMode: { adminRoles: ['admin'] },
+    })
+    const collection = createServicesCollection(resolved)
+    const fieldNames = collection.fields
+      .filter((f): f is { name: string } => 'name' in f)
+      .map((f) => f.name)
+    expect(fieldNames).not.toContain('owner')
+  })
+
+  it('resolveConfig: resourceOwnerMode defaults are applied', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const resolved = resolveConfig({ resourceOwnerMode: {} })
+    expect(resolved.resourceOwnerMode).toEqual({
+      adminRoles: [],
+      ownerField: 'owner',
+      ownedServices: false,
+    })
+  })
+
+  it('resolveConfig: resourceOwnerMode is undefined when not set', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const resolved = resolveConfig({})
+    expect(resolved.resourceOwnerMode).toBeUndefined()
+  })
+
+  it("app's access override takes precedence over resourceOwnerMode auto-wiring", async () => {
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    const { resolveConfig } = await import('../src/defaults.js')
+    const customReadFn = () => true as const
+    const resolved = resolveConfig({
+      access: { resources: { read: customReadFn } },
+      resourceOwnerMode: { adminRoles: ['admin'] },
+    })
+    const collection = createResourcesCollection(resolved)
+    // The custom access function should be used, not the auto-wired one
+    expect((collection.access as Record<string, unknown>).read).toBe(customReadFn)
+  })
+})

@@ -82,6 +82,23 @@ export type ReservationPluginHooks = {
   >
 }
 
+// --- Resource owner mode ---
+
+export type ResourceOwnerModeConfig = {
+  /** Roles that can see all records (default: check req.user.collection === adminCollection) */
+  adminRoles?: string[]
+  /** Field name for the owner relationship on Resources (default: 'owner') */
+  ownerField?: string
+  /** Whether Services also get an owner field (default: false — Services are platform-managed) */
+  ownedServices?: boolean
+}
+
+export type ResolvedResourceOwnerModeConfig = {
+  adminRoles: string[]
+  ownerField: string
+  ownedServices: boolean
+}
+
 // --- Plugin configuration ---
 
 export type ReservationPluginConfig = {
@@ -103,6 +120,8 @@ export type ReservationPluginConfig = {
   disabled?: boolean
   /** Plugin hooks for external integrations */
   hooks?: ReservationPluginHooks
+  /** Enable resource-owner multi-tenancy (opt-in) */
+  resourceOwnerMode?: ResourceOwnerModeConfig
   /** Override collection slugs */
   slugs?: {
     customers?: string
@@ -132,6 +151,7 @@ export type ResolvedReservationPluginConfig = {
   disabled: boolean
   hooks: ReservationPluginHooks
   localized: boolean
+  resourceOwnerMode: ResolvedResourceOwnerModeConfig | undefined
   slugs: {
     customers: string
     media: string

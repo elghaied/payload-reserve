@@ -8,6 +8,8 @@ import type {
 import type { PluginT } from '../translations/index.js'
 import type { ReservationPluginHooks, ResolvedReservationPluginConfig } from '../types.js'
 
+import { makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
+
 import { calculateEndTime } from '../hooks/reservations/calculateEndTime.js'
 import { checkIdempotency } from '../hooks/reservations/checkIdempotency.js'
 import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
@@ -52,10 +54,13 @@ export function createReservationsCollection(
   config: ResolvedReservationPluginConfig,
 ): CollectionConfig {
   const { statusMachine } = config
+  const rom = config.resourceOwnerMode
+  const access =
+    config.access.reservations ?? (rom ? makeReservationOwnerAccess(rom) : {})
 
   return {
     slug: config.slugs.reservations,
-    access: config.access.reservations ?? {},
+    access,
     admin: {
       components: {
         views: {

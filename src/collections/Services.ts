@@ -1,12 +1,46 @@
-import type { CollectionConfig, CollectionSlug } from 'payload'
+import type { CollectionConfig, CollectionSlug, Field } from 'payload'
 
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { makeServiceOwnerAccess } from '../utilities/ownerAccess.js'
+
 export function createServicesCollection(config: ResolvedReservationPluginConfig): CollectionConfig {
+  const rom = config.resourceOwnerMode
+  const ownedServices = rom?.ownedServices ?? false
+  const ownerField = rom?.ownerField ?? 'owner'
+
+  // Owner field on Services (only when ownedServices: true)
+  const ownerFieldDef: Field | null =
+    rom && ownedServices
+      ? {
+          name: ownerField,
+          type: 'relationship',
+          admin: {
+            position: 'sidebar',
+          },
+          hooks: {
+            beforeChange: [
+              ({ operation, req, value }) => {
+                if (operation === 'create' && req.user) return req.user.id
+                return value
+              },
+            ],
+          },
+          label: 'Owner',
+          relationTo: config.slugs.customers as unknown as CollectionSlug,
+          required: true,
+        }
+      : null
+
+  // Determine access: app override → owner-mode auto-wired → unrestricted
+  const access =
+    config.access.services ??
+    (rom && ownedServices ? makeServiceOwnerAccess(rom, ownerField) : {})
+
   return {
     slug: config.slugs.services,
-    access: config.access.services ?? {},
+    access,
     admin: {
       group: config.adminGroup,
       useAsTitle: 'name',
@@ -92,6 +126,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         defaultValue: true,
         label: ({ t }) => (t as PluginT)('reservation:fieldActive'),
       },
+      ...(ownerFieldDef ? [ownerFieldDef] : []),
     ],
     labels: {
       plural: ({ t }) => (t as PluginT)('reservation:collectionServices'),

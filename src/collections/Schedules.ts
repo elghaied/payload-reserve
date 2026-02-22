@@ -3,12 +3,18 @@ import type { CollectionConfig, CollectionSlug } from 'payload'
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { makeScheduleOwnerAccess } from '../utilities/ownerAccess.js'
+
 export function createSchedulesCollection(
   config: ResolvedReservationPluginConfig,
 ): CollectionConfig {
+  const rom = config.resourceOwnerMode
+  const access =
+    config.access.schedules ?? (rom ? makeScheduleOwnerAccess(rom) : {})
+
   return {
     slug: config.slugs.schedules,
-    access: config.access.schedules ?? {},
+    access,
     admin: {
       group: config.adminGroup,
       useAsTitle: 'name',
