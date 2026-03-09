@@ -1456,6 +1456,71 @@ describe('Reservation plugin - validateStatusTransition admin check', () => {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// Per-item buffer times (H1)
+// ---------------------------------------------------------------------------
+describe('Reservation plugin - per-item buffer times', () => {
+  test('multi-resource booking uses per-item service buffers for conflict detection', async () => {
+    // Service with no buffer
+    const noBufferSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'No Buffer Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 30 },
+    })
+    // Service with 60min bufferBefore
+    const bigBufferSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'Big Buffer Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 60, duration: 30 },
+    })
+    const resourceX = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Buffer Resource X', active: true, services: [noBufferSvc.id, bigBufferSvc.id] },
+    })
+    const resourceY = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Buffer Resource Y', active: true, services: [noBufferSvc.id, bigBufferSvc.id] },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: { email: 'buffer-test@example.com', firstName: 'Buffer', lastName: 'Test', password: 'testpass123' },
+    })
+
+    // Existing booking on Resource X at 10:00-10:30
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resourceX.id,
+        service: noBufferSvc.id,
+        startTime: '2025-11-01T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    // Multi-resource booking:
+    //   item[0]: Resource Y + noBufferSvc at 11:00 — no conflict (different resource)
+    //   item[1]: Resource X + bigBufferSvc at 10:30 — bufferBefore=60 makes effective start 09:30
+    //     so effective window 09:30-11:00 overlaps existing 10:00-10:30 → conflict
+    // BUG: if primary service (noBufferSvc, buffer=0) is used for all items,
+    //       item[1]'s effective window would be 10:30-11:00, NO overlap with 10:00-10:30
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          customer: customer.id,
+          items: [
+            { resource: resourceY.id, service: noBufferSvc.id, startTime: '2025-11-01T11:00:00.000Z' },
+            { resource: resourceX.id, service: bigBufferSvc.id, startTime: '2025-11-01T10:30:00.000Z' },
+          ],
+          resource: resourceY.id,
+          service: noBufferSvc.id,
+          startTime: '2025-11-01T11:00:00.000Z',
+          status: 'pending',
+        },
+      }),
+    ).rejects.toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Schedule time validation (H2+M3)
 // ---------------------------------------------------------------------------
 describe('Reservation plugin - schedule time validation', () => {
