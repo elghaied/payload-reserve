@@ -119,5 +119,7 @@
   "durationFlexible": "Flexible",
   "durationFullDay": "Full Day",
   "fieldItems": "Items",
-  "fieldGuestCount": "Guest Count"
+  "fieldGuestCount": "Guest Count",
+  "filterAllResources": "All Resources",
+  "filterByResource": "Filter by resource"
 }
