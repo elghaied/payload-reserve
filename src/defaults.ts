@@ -1,6 +1,32 @@
-import type { ReservationPluginConfig, ResolvedReservationPluginConfig } from './types.js'
+import type { ReservationPluginConfig, ResolvedReservationPluginConfig, StatusMachineConfig } from './types.js'
 
 import { DEFAULT_STATUS_MACHINE } from './types.js'
+
+function validateStatusMachine(sm: StatusMachineConfig): void {
+  if (!sm.statuses.includes(sm.defaultStatus)) {
+    throw new Error(`statusMachine.defaultStatus "${sm.defaultStatus}" is not in statuses array`)
+  }
+  for (const s of sm.blockingStatuses) {
+    if (!sm.statuses.includes(s)) {
+      throw new Error(`statusMachine.blockingStatuses contains "${s}" which is not in statuses array`)
+    }
+  }
+  for (const s of sm.terminalStatuses) {
+    if (!sm.statuses.includes(s)) {
+      throw new Error(`statusMachine.terminalStatuses contains "${s}" which is not in statuses array`)
+    }
+  }
+  for (const [from, targets] of Object.entries(sm.transitions)) {
+    if (!sm.statuses.includes(from)) {
+      throw new Error(`statusMachine.transitions has key "${from}" which is not in statuses array`)
+    }
+    for (const to of targets) {
+      if (!sm.statuses.includes(to)) {
+        throw new Error(`statusMachine.transitions["${from}"] targets "${to}" which is not in statuses array`)
+      }
+    }
+  }
+}
 
 export const DEFAULT_SLUGS = {
   customers: 'customers',
@@ -20,7 +46,7 @@ export function resolveConfig(
 ): ResolvedReservationPluginConfig {
   const userStatusMachine = pluginOptions.statusMachine
   const rom = pluginOptions.resourceOwnerMode
-  return {
+  const resolved: ResolvedReservationPluginConfig = {
     access: pluginOptions.access ?? {},
     adminGroup: pluginOptions.adminGroup ?? DEFAULT_ADMIN_GROUP,
     cancellationNoticePeriod:
@@ -58,4 +84,8 @@ export function resolveConfig(
       : { ...DEFAULT_STATUS_MACHINE },
     userCollection: pluginOptions.userCollection ?? undefined,
   }
+
+  validateStatusMachine(resolved.statusMachine)
+
+  return resolved
 }
