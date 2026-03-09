@@ -11,22 +11,32 @@ export const onStatusChange =
     const prev = previousDoc.status as string
     const next = doc.status as string
 
-    // Call generic afterStatusChange plugin hooks
     if (config.hooks?.afterStatusChange) {
       for (const hook of config.hooks.afterStatusChange) {
-        await hook({ doc: doc as Record<string, unknown>, newStatus: next, previousStatus: prev, req })
+        try {
+          await hook({ doc: doc as Record<string, unknown>, newStatus: next, previousStatus: prev, req })
+        } catch (err) {
+          req.payload.logger.error({ err, msg: `afterStatusChange hook failed for reservation ${doc.id}` })
+        }
       }
     }
 
-    // Call specific hooks based on transition
     if (next === 'confirmed' && config.hooks?.afterBookingConfirm) {
       for (const hook of config.hooks.afterBookingConfirm) {
-        await hook({ doc: doc as Record<string, unknown>, req })
+        try {
+          await hook({ doc: doc as Record<string, unknown>, req })
+        } catch (err) {
+          req.payload.logger.error({ err, msg: `afterBookingConfirm hook failed for reservation ${doc.id}` })
+        }
       }
     }
     if (next === 'cancelled' && config.hooks?.afterBookingCancel) {
       for (const hook of config.hooks.afterBookingCancel) {
-        await hook({ doc: doc as Record<string, unknown>, req })
+        try {
+          await hook({ doc: doc as Record<string, unknown>, req })
+        } catch (err) {
+          req.payload.logger.error({ err, msg: `afterBookingCancel hook failed for reservation ${doc.id}` })
+        }
       }
     }
 
