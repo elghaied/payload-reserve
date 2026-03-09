@@ -105,3 +105,29 @@ The `access` override in plugin config always takes precedence over the auto-wir
 | [Examples](https://github.com/elghaied/payload-reserve/blob/main/docs/examples.md) | Salon, hotel, restaurant, event venue, Stripe, email, multi-tenant (resource owner mode) |
 | [Advanced](https://github.com/elghaied/payload-reserve/blob/main/docs/advanced.md) | DB indexes, reconciliation job for race condition detection |
 | [Development](https://github.com/elghaied/payload-reserve/blob/main/docs/development.md) | Prerequisites, commands, project file tree |
+| [v1.2.0 Breaking Changes](https://github.com/elghaied/payload-reserve/blob/main/docs/BREAKING-CHANGES-v1.2.md) | Migration guide for upgrading to v1.2.0 |
+
+---
+
+## Contributing
+
+This project uses [Changesets](https://github.com/changesets/changesets) for versioning and changelogs.
+
+When making a change that should appear in the release notes, run:
+
+```bash
+pnpm changeset
+```
+
+This prompts for the semver bump type (patch/minor/major) and a summary. Commit the generated changeset file with your PR.
+
+**Releasing:**
+
+```bash
+pnpm changeset:version   # consume changesets, bump version, update CHANGELOG.md
+git add -A && git commit -m "release v<version>"
+git tag v<version>
+git push && git push --tags
+```
+
+The GitHub Action will create a release with the changelog content and publish to npm.
