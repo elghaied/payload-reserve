@@ -56,3 +56,5 @@ yarn-error.log*
 .claude/
 CLAUDE.md
 claude-instructions/
+docs/plans
+notes
