@@ -298,13 +298,17 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     [pendingReservations, matchesResourceFilter],
   )
 
-  // Clear selection when leaving pending view
+  // Clear selection when leaving pending view or changing resource filter
   useEffect(() => {
     if (viewMode !== 'pending') {
       setSelectedIds(new Set())
       setActionFeedback(null)
     }
   }, [viewMode])
+
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [selectedResourceId])
 
   // Auto-clear feedback toast
   useEffect(() => {
@@ -992,7 +996,9 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             >
               {label}
               {key === 'pending' && pendingCount > 0 && (
-                <span className={styles.pendingBadge}>{pendingCount}</span>
+                <span className={styles.pendingBadge}>
+                  {selectedResourceId ? filteredPendingReservations.length : pendingCount}
+                </span>
               )}
             </button>
           ))}
