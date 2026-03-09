@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+
+### Minor Changes
+
+- 397c765: Add resource filter dropdown to CalendarView allowing users to filter reservations by resource, with translation support and pending badge integration
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
