@@ -1456,6 +1456,69 @@ describe('Reservation plugin - validateStatusTransition admin check', () => {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// Schedule time validation (H2+M3)
+// ---------------------------------------------------------------------------
+describe('Reservation plugin - schedule time validation', () => {
+  let resourceId: string
+
+  beforeAll(async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Time Validate Service', active: true, duration: 30 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Time Validate Resource', active: true, services: [service.id] },
+    })
+    resourceId = resource.id
+  })
+
+  test('rejects schedule with invalid time format', async () => {
+    await expect(
+      payload.create({
+        collection: col('schedules'),
+        data: {
+          name: 'Bad Schedule',
+          active: true,
+          recurringSlots: [{ day: 'mon', endTime: '25:99', startTime: '09:00' }],
+          resource: resourceId,
+          scheduleType: 'recurring',
+        },
+      }),
+    ).rejects.toThrow()
+  })
+
+  test('rejects schedule where endTime is before startTime', async () => {
+    await expect(
+      payload.create({
+        collection: col('schedules'),
+        data: {
+          name: 'Backwards Schedule',
+          active: true,
+          recurringSlots: [{ day: 'mon', endTime: '08:00', startTime: '17:00' }],
+          resource: resourceId,
+          scheduleType: 'recurring',
+        },
+      }),
+    ).rejects.toThrow()
+  })
+
+  test('accepts schedule with valid time format', async () => {
+    const schedule = await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'Good Schedule',
+        active: true,
+        recurringSlots: [{ day: 'mon', endTime: '17:00', startTime: '09:00' }],
+        resource: resourceId,
+        scheduleType: 'recurring',
+      },
+    })
+    expect(schedule.name).toBe('Good Schedule')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Pure utility functions
 // ---------------------------------------------------------------------------
 describe('AvailabilityService - pure functions', () => {

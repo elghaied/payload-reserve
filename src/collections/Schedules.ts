@@ -1,9 +1,18 @@
 import type { CollectionConfig, CollectionSlug } from 'payload'
 
+import { ValidationError } from 'payload'
+
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { makeScheduleOwnerAccess } from '../utilities/ownerAccess.js'
+
+const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
+
+const validateTime = (value: null | string | undefined): string | true => {
+  if (!value) return true // required handles emptiness
+  return TIME_REGEX.test(value) || 'Invalid time format. Use HH:mm (e.g., 09:00, 17:30)'
+}
 
 export function createSchedulesCollection(
   config: ResolvedReservationPluginConfig,
@@ -18,6 +27,29 @@ export function createSchedulesCollection(
     admin: {
       group: config.adminGroup,
       useAsTitle: 'name',
+    },
+    hooks: {
+      beforeValidate: [
+        ({ data }) => {
+          const slots = (data?.recurringSlots as Array<{ endTime?: string; startTime?: string }>) ?? []
+          for (const slot of slots) {
+            if (slot.startTime && slot.endTime && slot.startTime >= slot.endTime) {
+              throw new ValidationError({
+                errors: [{ message: 'endTime must be after startTime', path: 'recurringSlots' }],
+              })
+            }
+          }
+          const manual = (data?.manualSlots as Array<{ endTime?: string; startTime?: string }>) ?? []
+          for (const slot of manual) {
+            if (slot.startTime && slot.endTime && slot.startTime >= slot.endTime) {
+              throw new ValidationError({
+                errors: [{ message: 'endTime must be after startTime', path: 'manualSlots' }],
+              })
+            }
+          }
+          return data
+        },
+      ],
     },
     fields: [
       {
@@ -79,6 +111,7 @@ export function createSchedulesCollection(
             },
             label: ({ t }) => (t as PluginT)('reservation:fieldStartTimeHHmm'),
             required: true,
+            validate: validateTime,
           },
           {
             name: 'endTime',
@@ -88,6 +121,7 @@ export function createSchedulesCollection(
             },
             label: ({ t }) => (t as PluginT)('reservation:fieldEndTimeHHmm'),
             required: true,
+            validate: validateTime,
           },
         ],
         label: ({ t }) => (t as PluginT)('reservation:fieldRecurringSlots'),
@@ -118,6 +152,7 @@ export function createSchedulesCollection(
             },
             label: ({ t }) => (t as PluginT)('reservation:fieldStartTimeHHmm'),
             required: true,
+            validate: validateTime,
           },
           {
             name: 'endTime',
@@ -127,6 +162,7 @@ export function createSchedulesCollection(
             },
             label: ({ t }) => (t as PluginT)('reservation:fieldEndTimeHHmm'),
             required: true,
+            validate: validateTime,
           },
         ],
         label: ({ t }) => (t as PluginT)('reservation:fieldManualSlots'),
