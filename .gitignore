@@ -49,6 +49,9 @@ yarn-error.log*
 /playwright/.cache/
 
 
+# worktrees
+.worktrees/
+
 # claude
 .claude/
 CLAUDE.md
