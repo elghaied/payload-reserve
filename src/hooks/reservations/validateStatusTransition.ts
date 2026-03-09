@@ -67,7 +67,7 @@ export const validateStatusTransition =
         if (newStatus === 'confirmed' && config.hooks?.beforeBookingConfirm) {
           for (const hook of config.hooks.beforeBookingConfirm) {
             await hook({
-              doc: originalDoc as Record<string, unknown>,
+              doc: { ...(originalDoc as Record<string, unknown>), ...(data as Record<string, unknown>) },
               newStatus,
               req,
             })
@@ -78,7 +78,7 @@ export const validateStatusTransition =
         if (newStatus === 'cancelled' && config.hooks?.beforeBookingCancel) {
           for (const hook of config.hooks.beforeBookingCancel) {
             await hook({
-              doc: originalDoc as Record<string, unknown>,
+              doc: { ...(originalDoc as Record<string, unknown>), ...(data as Record<string, unknown>) },
               reason: data?.cancellationReason as string | undefined,
               req,
             })
