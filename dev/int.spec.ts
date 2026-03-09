@@ -1084,8 +1084,9 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
       serviceSlug: 'services',
     })
 
-    // Schedule is 09:00–12:00 local, slots are 1h each → 3 slots
-    expect(slots.length).toBe(3)
+    // Schedule is 09:00–12:00 local, 1h duration, 15-min step → 9 slots
+    // (09:00, 09:15, 09:30, 09:45, 10:00, 10:15, 10:30, 10:45, 11:00)
+    expect(slots.length).toBe(9)
     expect(slots[0]).toHaveProperty('start')
     expect(slots[0]).toHaveProperty('end')
   })
@@ -1137,7 +1138,9 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
       serviceSlug: 'services',
     })
 
-    expect(remainingSlots.length).toBe(initialSlots.length - 1)
+    // With 15-min step, booking the first slot (09:00-10:00) blocks all
+    // overlapping candidates (09:00, 09:15, 09:30, 09:45) → 4 fewer slots
+    expect(remainingSlots.length).toBeLessThan(initialSlots.length)
     // The booked start time should no longer appear
     const remainingStarts = remainingSlots.map((s) => s.start.toISOString())
     expect(remainingStarts).not.toContain(firstSlotStart)
@@ -1517,6 +1520,90 @@ describe('Reservation plugin - per-item buffer times', () => {
         },
       }),
     ).rejects.toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Slot generation with buffers (H3)
+// ---------------------------------------------------------------------------
+describe('Reservation plugin - slot generation with buffers', () => {
+  test('getAvailableSlots finds slots at non-duration-aligned positions', async () => {
+    // 60-min service with 30-min bufferBefore
+    // With step=60 (current): candidates are 09:00, 10:00, 11:00, 12:00
+    //   10:00 fails because bufferBefore pushes effective start to 09:30 → overlaps existing 09:00-10:00
+    //   10:30 would succeed but is never generated!
+    // With step=15 (fix): candidates include 10:30 → found!
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Step Size Service', active: true, bufferTimeAfter: 0, bufferTimeBefore: 30, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Step Size Resource', active: true, services: [service.id] },
+    })
+    // Monday schedule 09:00-13:00 local
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'Step Size Schedule',
+        active: true,
+        recurringSlots: [{ day: 'mon', endTime: '13:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: { email: 'step-size@example.com', firstName: 'Step', lastName: 'Size', password: 'testpass123' },
+    })
+
+    const MONDAY_LOCAL = new Date(2030, 5, 17) // Mon Jun 17 2030 local
+    const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
+
+    // Get initial slots and book the first one (09:00-10:00)
+    const initialSlots = await getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: MONDAY_LOCAL,
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: service.id,
+      serviceSlug: 'services',
+    })
+
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: initialSlots[0].start.toISOString(),
+        status: 'pending',
+      },
+    })
+
+    // Re-query
+    const afterSlots = await getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: MONDAY_LOCAL,
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: service.id,
+      serviceSlug: 'services',
+    })
+
+    // With smaller step size, we should find 10:30 as the first available slot
+    // (10:00 is blocked by bufferBefore=30 overlapping with existing 09:00-10:00)
+    const afterStartMinutes = afterSlots.map((s) => s.start.getHours() * 60 + s.start.getMinutes())
+    const tenThirtyMinutes = 10 * 60 + 30
+    expect(afterStartMinutes).toContain(tenThirtyMinutes)
   })
 })
 

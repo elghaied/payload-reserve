@@ -264,6 +264,32 @@ export async function getAvailableSlots(params: {
 
   const availableSlots: Array<{ end: Date; start: Date }> = []
 
+  // For full-day services, offer the entire range as a single slot per range
+  if (durationType === 'full-day') {
+    for (const range of timeRanges) {
+      const result = await checkAvailability({
+        blockingStatuses,
+        bufferAfter: 0,
+        bufferBefore: 0,
+        endTime: range.end,
+        guestCount: guestCount ?? 1,
+        payload,
+        req,
+        reservationSlug,
+        resourceId,
+        resourceSlug,
+        startTime: range.start,
+      })
+      if (result.available) {
+        availableSlots.push({ end: range.end, start: range.start })
+      }
+    }
+    return availableSlots
+  }
+
+  // Step by a smaller increment to catch slots between buffer gaps
+  const stepSize = Math.min(effectiveDuration, 15)
+
   for (const range of timeRanges) {
     let candidateStart = new Date(range.start)
 
@@ -290,8 +316,7 @@ export async function getAvailableSlots(params: {
         availableSlots.push({ end: candidateEnd, start: new Date(candidateStart) })
       }
 
-      // Move to next slot (service duration as step)
-      candidateStart = addMinutes(candidateStart, effectiveDuration)
+      candidateStart = addMinutes(candidateStart, stepSize)
     }
   }
 
