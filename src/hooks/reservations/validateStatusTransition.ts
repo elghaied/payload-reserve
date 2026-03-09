@@ -16,10 +16,15 @@ export const validateStatusTransition =
     const { statusMachine } = config
 
     if (operation === 'create') {
-      const isAdmin = Boolean(req.user)
+      // context.allowConfirmedOnCreate is the escape hatch for payment hooks
+      // that need to create confirmed reservations programmatically
+      const hasContextBypass = Boolean(context?.allowConfirmedOnCreate)
+      // Admin = user from a non-customer collection (e.g., 'users' admin collection)
+      const isAdmin = Boolean(req.user) && req.user.collection !== config.slugs.customers
       const defaultStatus = statusMachine.defaultStatus
-      const allowedOnCreate: string[] = isAdmin
-        ? [defaultStatus, 'confirmed']
+      const nonDefaultStatuses = statusMachine.transitions[defaultStatus] ?? []
+      const allowedOnCreate: string[] = (isAdmin || hasContextBypass)
+        ? [defaultStatus, ...nonDefaultStatuses]
         : [defaultStatus]
 
       if (newStatus && !allowedOnCreate.includes(newStatus)) {
@@ -34,7 +39,6 @@ export const validateStatusTransition =
         })
       }
 
-      // Call beforeBookingCreate hooks (handled by plugin hooks wrapper)
       return data
     }
 
