@@ -21,9 +21,17 @@ export function createCheckAvailabilityEndpoint(
         )
       }
 
+      const parsedDate = new Date(date)
+      if (isNaN(parsedDate.getTime())) {
+        return Response.json(
+          { error: 'Invalid date format. Expected YYYY-MM-DD' },
+          { status: 400 },
+        )
+      }
+
       const slots = await getAvailableSlots({
         blockingStatuses: config.statusMachine.blockingStatuses,
-        date: new Date(date),
+        date: parsedDate,
         payload: req.payload,
         req,
         reservationSlug: config.slugs.reservations,
