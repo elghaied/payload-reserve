@@ -250,6 +250,94 @@ test('CalendarView shows multi-resource reservation with multiple resource names
   }
 })
 
+test('CalendarView resource filter dropdown filters events by resource', async ({ page }) => {
+  await loginAsAdmin(page)
+  await page.goto('/admin/collections/reservations')
+  await page.waitForSelector('text="Pending"', { timeout: 15_000 })
+
+  // 1. Verify the resource filter dropdown is visible
+  const resourceFilter = page.getByRole('combobox', { name: 'Filter by resource' })
+  await expect(resourceFilter).toBeVisible({ timeout: 10_000 })
+
+  // 2. Verify "All Resources" is the default selected option
+  await expect(resourceFilter).toHaveValue('')
+  const selectedText = await resourceFilter.locator('option:checked').textContent()
+  expect(selectedText).toContain('All Resources')
+
+  // 3. Verify resource names from seed data appear as options
+  const options = resourceFilter.locator('option')
+  const optionTexts = await options.allTextContents()
+  expect(optionTexts).toContain('Alice Johnson')
+  expect(optionTexts).toContain('Bob Smith')
+
+  // Switch to Day view for more reliable event visibility (month view may collapse events)
+  await page.getByRole('button', { name: 'Day' }).click()
+  await page.waitForTimeout(1_000)
+
+  // 4. With "All Resources" selected, events from both Alice and Bob should be visible
+  const allEvents = page.locator('[title*="Resource:"]')
+  const allCount = await allEvents.count()
+  expect(allCount).toBeGreaterThan(0)
+
+  // Collect all tooltip texts to verify both resources appear
+  const allTitles: string[] = []
+  for (let i = 0; i < allCount; i++) {
+    const title = await allEvents.nth(i).getAttribute('title')
+    if (title) {allTitles.push(title)}
+  }
+  const hasAlice = allTitles.some((t) => t.includes('Alice Johnson'))
+  const hasBob = allTitles.some((t) => t.includes('Bob Smith'))
+  expect(hasAlice).toBe(true)
+  expect(hasBob).toBe(true)
+
+  // 5. Select "Alice Johnson" from the dropdown
+  const aliceOption = await resourceFilter.locator('option', { hasText: 'Alice Johnson' }).getAttribute('value')
+  expect(aliceOption).toBeTruthy()
+  await resourceFilter.selectOption(aliceOption as string)
+  await page.waitForTimeout(500)
+
+  // 6. Verify only Alice Johnson events are visible (no Bob-only events)
+  const filteredEvents = page.locator('[title*="Resource:"]')
+  const filteredCount = await filteredEvents.count()
+  expect(filteredCount).toBeGreaterThan(0)
+
+  for (let i = 0; i < filteredCount; i++) {
+    const title = await filteredEvents.nth(i).getAttribute('title')
+    // Each visible event must mention Alice Johnson in its Resource line
+    expect(title).toContain('Alice Johnson')
+  }
+
+  // Verify no event with Bob Smith as sole resource is visible
+  const bobOnlyEvents = page.locator('[title*="Resource: Bob Smith\\n"]')
+  const bobOnlyCount = await bobOnlyEvents.count()
+  // Bob-only events (where Resource line is exactly "Resource: Bob Smith") should not appear
+  // (Multi-resource events showing "Resource: Alice Johnson, Bob Smith" are expected)
+  for (let i = 0; i < bobOnlyCount; i++) {
+    const title = await bobOnlyEvents.nth(i).getAttribute('title')
+    // If this event's Resource line doesn't include Alice, it shouldn't be visible
+    if (title && !title.includes('Alice Johnson')) {
+      expect(title).toContain('Alice Johnson')
+    }
+  }
+
+  // 7. Select "All Resources" again
+  await resourceFilter.selectOption('')
+  await page.waitForTimeout(500)
+
+  // 8. Verify events from both resources are visible again
+  const resetEvents = page.locator('[title*="Resource:"]')
+  const resetCount = await resetEvents.count()
+  expect(resetCount).toBeGreaterThan(0)
+
+  const resetTitles: string[] = []
+  for (let i = 0; i < resetCount; i++) {
+    const title = await resetEvents.nth(i).getAttribute('title')
+    if (title) {resetTitles.push(title)}
+  }
+  expect(resetTitles.some((t) => t.includes('Alice Johnson'))).toBe(true)
+  expect(resetTitles.some((t) => t.includes('Bob Smith'))).toBe(true)
+})
+
 // ---------------------------------------------------------------------------
 // AvailabilityOverview
 // ---------------------------------------------------------------------------
