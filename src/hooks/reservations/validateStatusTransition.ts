@@ -20,7 +20,7 @@ export const validateStatusTransition =
       // that need to create confirmed reservations programmatically
       const hasContextBypass = Boolean(context?.allowConfirmedOnCreate)
       // Admin = user from a non-customer collection (e.g., 'users' admin collection)
-      const isAdmin = Boolean(req.user) && req.user.collection !== config.slugs.customers
+      const isAdmin = req.user != null && req.user.collection !== config.slugs.customers
       const defaultStatus = statusMachine.defaultStatus
       const nonDefaultStatuses = statusMachine.transitions[defaultStatus] ?? []
       const allowedOnCreate: string[] = (isAdmin || hasContextBypass)
