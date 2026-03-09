@@ -53,6 +53,8 @@ hooks: {
 
 Fires before a reservation transitions to `confirmed`. Throw an error to block the transition.
 
+The `doc` contains the merged document (`{ ...originalDoc, ...incomingData }`), so fields like `status` reflect the **new** value being set.
+
 ```typescript
 type beforeBookingConfirm = Array<
   (args: {
@@ -82,6 +84,8 @@ hooks: {
 ## beforeBookingCancel
 
 Fires before a reservation transitions to `cancelled`. Throw an error to block the cancellation.
+
+The `doc` contains the merged document (`{ ...originalDoc, ...incomingData }`). The `reason` is passed as a separate parameter from the incoming cancellation data.
 
 ```typescript
 type beforeBookingCancel = Array<
@@ -133,7 +137,7 @@ hooks: {
 
 ## afterBookingConfirm
 
-Fires after a reservation transitions to `confirmed`.
+Fires after a reservation transitions to `confirmed`. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
 
 ```typescript
 type afterBookingConfirm = Array<
@@ -159,7 +163,7 @@ hooks: {
 
 ## afterBookingCancel
 
-Fires after a reservation transitions to `cancelled`.
+Fires after a reservation transitions to `cancelled`. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
 
 ```typescript
 type afterBookingCancel = Array<
@@ -185,7 +189,7 @@ hooks: {
 
 ## afterStatusChange
 
-Generic hook that fires on every status transition.
+Generic hook that fires on every status transition. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
 
 ```typescript
 type afterStatusChange = Array<

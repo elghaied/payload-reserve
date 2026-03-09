@@ -97,7 +97,7 @@ payloadReserve({
 | `slugs.reservations` | `string` | `'reservations'` | Reservations collection slug |
 | `slugs.customers` | `string` | `'customers'` | Customers collection slug |
 | `slugs.media` | `string` | `'media'` | Media collection slug (used by image fields) |
-| `statusMachine` | `Partial<StatusMachineConfig>` | Default 5-status machine | Custom status machine |
+| `statusMachine` | `Partial<StatusMachineConfig>` | Default 5-status machine | Custom status machine (validated at init) |
 | `hooks` | `ReservationPluginHooks` | `{}` | Plugin hook callbacks |
 | `extraReservationFields` | `Field[]` | `[]` | Extra Payload fields appended to the Reservations collection |
 

@@ -88,7 +88,7 @@ Defines when a resource is available. Supports **recurring** (weekly pattern) an
 | `exceptions` | Array | Dates the resource is unavailable (`date`, `reason`) |
 | `active` | Checkbox | Whether this schedule is in effect (default: true) |
 
-Times use `HH:mm` format (24-hour). Exception dates block out the entire day.
+Times use `HH:mm` format (24-hour, e.g., `09:00`, `17:30`). The format is validated — values like `9:00` (missing leading zero) or `09:00:00` (with seconds) are rejected. Within each slot, `endTime` must be after `startTime`. Exception dates block out the entire day.
 
 ```typescript
 await payload.create({

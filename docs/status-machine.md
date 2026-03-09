@@ -50,6 +50,8 @@ payloadReserve({
 - The `blockingStatuses` array determines which statuses occupy the slot in conflict detection
 - The resolved status machine is stored in `config.admin.custom.reservationStatusMachine` for admin component access
 
+**Config validation:** The status machine is validated at plugin initialization. Invalid configs — such as a `defaultStatus` not in `statuses`, `blockingStatuses` or `terminalStatuses` referencing unknown statuses, or transition keys/targets pointing to non-existent statuses — throw an error at startup rather than causing silent runtime failures.
+
 ## Business Logic Hooks
 
 Four `beforeChange` hooks run on the Reservations collection on every create and update:
@@ -57,7 +59,7 @@ Four `beforeChange` hooks run on the Reservations collection on every create and
 1. **`checkIdempotency`** — Rejects creates where `idempotencyKey` has already been used
 2. **`calculateEndTime`** — Computes `endTime` from `startTime + service.duration` (respects `durationType`)
 3. **`validateConflicts`** — Checks for overlapping reservations on the same resource using blocking statuses and buffer times
-4. **`validateStatusTransition`** — Enforces allowed transitions defined in the status machine; on create, enforces that new bookings start in `defaultStatus`
+4. **`validateStatusTransition`** — Enforces allowed transitions defined in the status machine; on create, enforces that new bookings start in `defaultStatus` (admin users can also use statuses reachable from `defaultStatus`; use `context.allowConfirmedOnCreate` for programmatic bypass)
 5. **`validateCancellation`** — When transitioning to `cancelled`, verifies the appointment is at least `cancellationNoticePeriod` hours away
 
 One `afterChange` hook also runs:

@@ -8,6 +8,8 @@ The plugin mounts five endpoints under `/api/reserve/`. These are Payload custom
 
 Returns available time slots for a resource and service on a given date. Slots are derived from the resource's active schedules for that date minus any overlapping reservations with blocking statuses.
 
+Returns `400` if `date` is missing or not a valid date format.
+
 **Query parameters:**
 
 | Parameter | Required | Description |
@@ -15,6 +17,7 @@ Returns available time slots for a resource and service on a given date. Slots a
 | `resource` | Yes | Resource ID |
 | `service` | Yes | Service ID |
 | `date` | Yes | Date in `YYYY-MM-DD` format |
+| `guestCount` | No | Number of guests (used for `per-guest` capacity filtering) |
 
 **Example request:**
 
@@ -122,7 +125,7 @@ const reservation = await res.json()
 
 ## POST /api/reserve/cancel
 
-Cancels a reservation. Requires an authenticated session (`req.user`).
+Cancels a reservation. Requires an authenticated session (`req.user`). Only the reservation's customer or an admin/staff user can cancel — non-owners receive `403 Forbidden`.
 
 **Request body:**
 
@@ -135,7 +138,7 @@ Cancels a reservation. Requires an authenticated session (`req.user`).
 
 **Response:** `200` with the updated reservation document.
 
-Returns `401` if not authenticated, `400` if `reservationId` is missing. The `validateCancellation` hook enforces the minimum notice period configured in `cancellationNoticePeriod`.
+Returns `401` if not authenticated, `403` if the authenticated user is not the reservation's customer or an admin, `400` if `reservationId` is missing. The `validateCancellation` hook enforces the minimum notice period configured in `cancellationNoticePeriod`.
 
 **Example fetch:**
 
@@ -152,7 +155,7 @@ const updated = await res.json()
 
 ## GET /api/reserve/customers
 
-Searches customers by name or email. Used internally by the admin CustomerField component but can be called from your frontend too.
+Searches customers by name or email. Used internally by the admin CustomerField component. Restricted to admin/staff users — customer-collection users receive `403 Forbidden`.
 
 **Query parameters:**
 
@@ -160,7 +163,7 @@ Searches customers by name or email. Used internally by the admin CustomerField 
 |-----------|----------|-------------|
 | `q` | Yes | Search string (matches name and email) |
 
-**Response:** Array of matching customer documents.
+**Response:** Array of matching customer documents. Returns `401` if not authenticated, `403` if the user belongs to the customers collection.
 
 ---
 

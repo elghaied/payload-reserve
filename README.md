@@ -12,7 +12,7 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **User Collection Extension** — Optionally extend your existing auth collection with booking fields; set `userCollection: undefined` (default) to use a standalone Customers collection
 - **Resource Owner Multi-Tenancy** — Opt-in `resourceOwnerMode` wires ownership access control so each resource owner (host) sees only their own listings and reservations
 - **Configurable Status Machine** — Define your own statuses, transitions, blocking states, and terminal states
-- **Double-Booking Prevention** — Server-side conflict detection with configurable buffer times; respects capacity modes
+- **Double-Booking Prevention** — Server-side conflict detection with per-item buffer times; respects capacity modes
 - **Auto End Time** — Calculates `endTime` from `startTime + service.duration` automatically
 - **Three Duration Types** — `fixed` (service duration), `flexible` (customer-specified end), and `full-day` bookings
 - **Multi-Resource Bookings** — Single reservation that spans multiple resources simultaneously via the `items` array
@@ -21,8 +21,8 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Extra Reservation Fields** — Inject custom fields into the Reservations collection via `extraReservationFields` without forking the plugin
 - **Cancellation Policy** — Configurable minimum notice period enforcement
 - **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems
-- **Availability Service** — Pure functions and DB helpers for slot generation and conflict checking
-- **Public REST API** — Five pre-built endpoints for availability, slot listing, booking, cancellation, and customer search
+- **Availability Service** — Pure functions and DB helpers for slot generation (15-min step) and conflict checking with guest-count-aware filtering
+- **Public REST API** — Five pre-built endpoints for availability, slot listing, booking, cancellation, and customer search — with ownership enforcement and input validation
 - **Calendar View** — Month/week/day calendar replacing the default reservations list view
 - **Dashboard Widget** — Server component showing today's booking stats
 - **Availability Overview** — Weekly grid of resource availability vs. booked slots
