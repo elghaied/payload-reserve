@@ -13,7 +13,7 @@ type ViewMode = 'day' | 'month' | 'pending' | 'week'
 type ReservationItem = {
   endTime?: string
   guestCount?: number
-  resource?: { name?: string } | string
+  resource?: { id?: string; name?: string } | string
   service?: { name?: string } | string
   startTime?: string
 }
@@ -23,10 +23,15 @@ type Reservation = {
   endTime?: string
   id: string
   items?: ReservationItem[]
-  resource?: { name?: string } | string
+  resource?: { id?: string; name?: string } | string
   service?: { name?: string } | string
   startTime: string
   status: string
+}
+
+type ResourceOption = {
+  id: string
+  name: string
 }
 
 // Built-in status → CSS class map (for known statuses; custom statuses use inline style)
@@ -127,6 +132,10 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const [drawerDocId, setDrawerDocId] = useState<null | string>(null)
   const [initialData, setInitialData] = useState<Record<string, unknown> | undefined>(undefined)
 
+  // Resource filter state
+  const [resources, setResources] = useState<ResourceOption[]>([])
+  const [selectedResourceId, setSelectedResourceId] = useState<string>('')
+
   // Pending tab state
   const [pendingReservations, setPendingReservations] = useState<Reservation[]>([])
   const [pendingCount, setPendingCount] = useState(0)
@@ -150,6 +159,29 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       openDrawer()
     }
   })
+
+  // Fetch active resources for filter dropdown
+  useEffect(() => {
+    const fetchResources = async () => {
+      try {
+        const resourceSlug = slugs?.resources ?? 'resources'
+        const params = new URLSearchParams({
+          depth: '0',
+          limit: '100',
+          sort: 'name',
+          'where[active][equals]': 'true',
+        })
+        const url = `${config.serverURL ?? ''}${config.routes.api}/${resourceSlug}?${params}`
+        const response = await fetch(url)
+        const result = await response.json()
+        const docs: Array<{ id: string; name?: string }> = result.docs ?? []
+        setResources(docs.map((d) => ({ id: d.id, name: d.name ?? '' })))
+      } catch {
+        setResources([])
+      }
+    }
+    void fetchResources()
+  }, [config.routes.api, config.serverURL, slugs?.resources])
 
   const { rangeEnd, rangeStart } = useMemo(() => {
     const start = new Date(currentDate)
@@ -236,13 +268,47 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     }
   }, [viewMode, fetchPendingReservations])
 
-  // Clear selection when leaving pending view
+  // Client-side resource filtering
+  const matchesResourceFilter = useCallback(
+    (r: Reservation): boolean => {
+      if (!selectedResourceId) {return true}
+      // Check top-level resource
+      const topId = typeof r.resource === 'string' ? r.resource : r.resource?.id
+      if (topId === selectedResourceId) {return true}
+      // Check items array for multi-resource bookings
+      if (r.items && r.items.length > 0) {
+        return r.items.some((item) => {
+          const itemId =
+            typeof item.resource === 'string' ? item.resource : item.resource?.id
+          return itemId === selectedResourceId
+        })
+      }
+      return false
+    },
+    [selectedResourceId],
+  )
+
+  const filteredReservations = useMemo(
+    () => reservations.filter(matchesResourceFilter),
+    [reservations, matchesResourceFilter],
+  )
+
+  const filteredPendingReservations = useMemo(
+    () => pendingReservations.filter(matchesResourceFilter),
+    [pendingReservations, matchesResourceFilter],
+  )
+
+  // Clear selection when leaving pending view or changing resource filter
   useEffect(() => {
     if (viewMode !== 'pending') {
       setSelectedIds(new Set())
       setActionFeedback(null)
     }
   }, [viewMode])
+
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [selectedResourceId])
 
   // Auto-clear feedback toast
   useEffect(() => {
@@ -572,7 +638,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           const dayStr = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`
           const isToday = dayStr === todayStr
           const isOtherMonth = day.getMonth() !== currentDate.getMonth()
-          const dayReservations = reservations.filter((r) => {
+          const dayReservations = filteredReservations.filter((r) => {
             const rDate = new Date(r.startTime)
             return (
               rDate.getFullYear() === day.getFullYear() &&
@@ -635,7 +701,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               {hour.toString().padStart(2, '0')}:00
             </div>
             {weekDays.map((day, di) => {
-              const cellReservations = reservations.filter((r) => {
+              const cellReservations = filteredReservations.filter((r) => {
                 const rDate = new Date(r.startTime)
                 return (
                   rDate.getFullYear() === day.getFullYear() &&
@@ -677,7 +743,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     return (
       <div className={styles.dayView}>
         {hours.map((hour) => {
-          const hourReservations = reservations.filter((r) => {
+          const hourReservations = filteredReservations.filter((r) => {
             const rDate = new Date(r.startTime)
             return (
               rDate.getFullYear() === currentDate.getFullYear() &&
@@ -716,19 +782,19 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   }
 
   const renderPendingView = () => {
-    if (pendingReservations.length === 0) {
+    if (filteredPendingReservations.length === 0) {
       return <div className={styles.pendingEmpty}>{t('reservation:pendingEmpty')}</div>
     }
 
     const allSelected =
-      pendingReservations.length > 0 &&
-      pendingReservations.every((r) => selectedIds.has(r.id))
+      filteredPendingReservations.length > 0 &&
+      filteredPendingReservations.every((r) => selectedIds.has(r.id))
 
     const toggleSelectAll = () => {
       if (allSelected) {
         setSelectedIds(new Set())
       } else {
-        setSelectedIds(new Set(pendingReservations.map((r) => r.id)))
+        setSelectedIds(new Set(filteredPendingReservations.map((r) => r.id)))
       }
     }
 
@@ -802,7 +868,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             </tr>
           </thead>
           <tbody>
-            {pendingReservations.map((r) => {
+            {filteredPendingReservations.map((r) => {
               const isConfirming = confirmingIds.has(r.id)
               // Show all resources from items array if present, else top-level resource
               const resourceDisplay =
@@ -930,13 +996,32 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             >
               {label}
               {key === 'pending' && pendingCount > 0 && (
-                <span className={styles.pendingBadge}>{pendingCount}</span>
+                <span className={styles.pendingBadge}>
+                  {selectedResourceId ? filteredPendingReservations.length : pendingCount}
+                </span>
               )}
             </button>
           ))}
         </div>
       </div>
       {viewMode !== 'pending' && renderStatusLegend()}
+      {resources.length > 1 && (
+        <div className={styles.filterBar}>
+          <select
+            aria-label={t('reservation:filterByResource')}
+            className={styles.resourceFilter}
+            onChange={(e) => setSelectedResourceId(e.target.value)}
+            value={selectedResourceId}
+          >
+            <option value="">{t('reservation:filterAllResources')}</option>
+            {resources.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {loading && viewMode !== 'pending' ? (
         <div className={styles.loading}>{t('reservation:calendarLoading')}</div>
       ) : (
