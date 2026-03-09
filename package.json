@@ -1,6 +1,6 @@
 {
   "name": "payload-reserve",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A Payload CMS 3.x plugin for reservation and booking management with conflict detection, status workflows, and calendar UI",
   "keywords": [
     "payload",
@@ -59,20 +59,23 @@
     "generate:types": "pnpm dev:generate-types",
     "lint": "eslint",
     "lint:fix": "eslint ./src --fix",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
     "test": "pnpm test:int && pnpm test:e2e",
     "test:e2e": "playwright test",
     "test:int": "vitest",
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.30.0",
     "@eslint/eslintrc": "^3.2.0",
     "@payloadcms/db-mongodb": "3.77.0",
     "@payloadcms/db-postgres": "3.77.0",
     "@payloadcms/db-sqlite": "3.77.0",
     "@payloadcms/eslint-config": "3.9.0",
-    "@payloadcms/translations": "3.77.0",
     "@payloadcms/next": "3.77.0",
     "@payloadcms/richtext-lexical": "3.77.0",
+    "@payloadcms/translations": "3.77.0",
     "@payloadcms/ui": "3.77.0",
     "@playwright/test": "1.56.1",
     "@swc-node/register": "1.10.9",

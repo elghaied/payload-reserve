@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-03-09
+
+### Breaking changes
+
+- **Cancel endpoint enforces ownership** — only the reservation's customer or admin/staff can cancel. Non-owners receive 403.
+- **Customer search restricted to admin/staff** — `GET /api/reserve/customers` returns 403 for customer-collection users.
+- **`beforeBookingConfirm`/`beforeBookingCancel` hooks receive merged doc** — hooks now see `{ ...originalDoc, ...data }` instead of just `originalDoc`.
+- **After-status-change hooks no longer throw** — errors are caught and logged via `req.payload.logger.error`.
+- **Conflict error paths changed for multi-resource bookings** — errors use `items.N.startTime` instead of `startTime`.
+- **Incomplete multi-resource items throw instead of being silently dropped** — items missing `resource` or `startTime` throw a `ValidationError`.
+- **Slot generation returns more slots** — step size changed to `Math.min(serviceDuration, 15)` minutes.
+
+### Fixed
+
+- Fix admin detection to work with non-default admin collection slugs.
+- Pass `guestCount` through to slot availability checks for correct `per-guest` capacity filtering.
+- Full-day services now return proper single slots per schedule range.
+- Invalid dates on `/api/reserve/availability` return 400 instead of silently failing.
+- Schedule time fields validate `HH:mm` format and enforce `endTime > startTime`.
+- Duplicate `(resource, startTime)` pairs in multi-resource bookings are rejected.
+- Status machine config is validated at init time — invalid configs throw immediately.
+- Per-item buffer time resolution — each item's own service determines its buffer times.
+
 ## [1.1.0] - 2026-02-22
 
 ### Added
