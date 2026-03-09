@@ -26,6 +26,11 @@ export function createCustomerSearchEndpoint(
         return Response.json({ message: 'Unauthorized' }, { status: 401 })
       }
 
+      // Only allow staff/admin users (non-customer collection) to search customers
+      if (req.user.collection === config.slugs.customers) {
+        return Response.json({ message: 'Forbidden' }, { status: 403 })
+      }
+
       const url = new URL(req.url!)
       const search = url.searchParams.get('search') ?? ''
       const limit = Math.min(Number(url.searchParams.get('limit') ?? '10'), 50)
