@@ -190,6 +190,7 @@ export async function checkAvailability(params: {
 export async function getAvailableSlots(params: {
   blockingStatuses: string[]
   date: Date
+  guestCount?: number
   payload: Payload
   req: PayloadRequest
   reservationSlug: string
@@ -202,6 +203,7 @@ export async function getAvailableSlots(params: {
   const {
     blockingStatuses,
     date,
+    guestCount,
     payload,
     req,
     reservationSlug,
@@ -275,7 +277,7 @@ export async function getAvailableSlots(params: {
         bufferAfter,
         bufferBefore,
         endTime: candidateEnd,
-        guestCount: 1,
+        guestCount: guestCount ?? 1,
         payload,
         req,
         reservationSlug,

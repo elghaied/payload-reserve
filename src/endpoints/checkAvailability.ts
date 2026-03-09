@@ -29,9 +29,12 @@ export function createCheckAvailabilityEndpoint(
         )
       }
 
+      const guestCount = Math.max(Number(url.searchParams.get('guestCount') ?? '1'), 1)
+
       const slots = await getAvailableSlots({
         blockingStatuses: config.statusMachine.blockingStatuses,
         date: parsedDate,
+        guestCount,
         payload: req.payload,
         req,
         reservationSlug: config.slugs.reservations,
