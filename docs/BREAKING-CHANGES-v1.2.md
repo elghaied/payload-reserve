@@ -1,147 +1,101 @@
-# Breaking Changes — v1.2.0
+# v1.2.0 — Release Notes
 
-This release fixes security vulnerabilities, data integrity issues, and correctness bugs. Several changes alter existing behavior and may require updates to your code.
+This release fixes security vulnerabilities, data integrity issues, and correctness bugs across the plugin.
 
 ---
 
-## Security (action required if affected)
+## Breaking changes
+
+These changes **will break existing behavior** and may require code updates before upgrading.
 
 ### Cancel endpoint now enforces ownership
 
-**Previously:** Any authenticated user could cancel any reservation via `POST /api/reserve/cancel`.
+Any authenticated user could previously cancel any reservation via `POST /api/reserve/cancel`. Now only the reservation's customer or an admin/staff user can cancel — non-owners receive `403 Forbidden`.
 
-**Now:** Only the reservation's customer or an admin/staff user can cancel. Non-owners receive a `403 Forbidden`.
-
-**Action:** If you have backend code that cancels reservations on behalf of other users (e.g., a support dashboard hitting the HTTP endpoint), ensure those requests use an admin user. Alternatively, use the Payload Local API with `context.skipReservationHooks` to bypass the check.
+**Update required if:** You have backend code that cancels reservations on behalf of other users (e.g., a support dashboard hitting the HTTP endpoint). Ensure those requests use an admin user, or use the Payload Local API with `context.skipReservationHooks`.
 
 ### Customer search restricted to admin/staff
 
-**Previously:** Any authenticated user (including customers) could call `GET /api/reserve/customers`.
+`GET /api/reserve/customers` now returns `403 Forbidden` for customer-collection users.
 
-**Now:** Customer-collection users receive `403 Forbidden`. Only admin/staff users can search customers.
+**Update required if:** Your customer-facing frontend calls this endpoint directly. Proxy it through a server-side route with admin credentials, or build a custom endpoint.
 
-**Action:** If your customer-facing frontend uses this endpoint (e.g., for autocomplete), you'll need to proxy it through a server-side route that uses an admin credential, or build a custom endpoint.
+### `beforeBookingConfirm` / `beforeBookingCancel` hooks receive merged doc
 
-### Confirmed-on-create restricted to admin users
+These hooks previously received only `originalDoc` (the pre-update document). They now receive `{ ...originalDoc, ...data }` — the document merged with incoming changes, so fields like `status` reflect the **new** value.
 
-**Previously:** The `isAdmin` check compared `req.user?.collection` against a hardcoded `'users'` string, which failed if your admin collection had a different slug.
-
-**Now:** Admin is defined as any authenticated user whose collection is **not** the customers collection (`req.user.collection !== config.slugs.customers`). This correctly identifies admin users regardless of your admin collection's slug.
-
-**Action:** If you relied on customer users being able to create reservations with non-default statuses (due to the broken check), this is no longer possible. Use `context.allowConfirmedOnCreate` as an escape hatch for programmatic creation.
-
----
-
-## Behavior changes
-
-### Slot generation returns more slots (smaller step size)
-
-**Previously:** Slot candidates were generated at intervals equal to the service duration (e.g., every 60 minutes for a 60-min service).
-
-**Now:** Step size is `Math.min(serviceDuration, 15)` minutes, so a 60-min service generates candidates every 15 minutes (9:00, 9:15, 9:30, ...).
-
-**Action:** If you assert on the number of returned slots (e.g., in tests), update your expectations. If you display slots in a UI, you'll now see more options. The slots are still correctly filtered by availability — only the candidate generation changed.
-
-### guestCount now affects slot availability
-
-**Previously:** `GET /api/reserve/slots` ignored the `guestCount` query parameter — all slots were checked assuming 1 guest.
-
-**Now:** `guestCount` is passed through to `checkAvailability`, so resources using `per-guest` capacity mode will correctly exclude slots that lack sufficient guest capacity.
-
-**Action:** If you have resources with `capacityMode: 'per-guest'`, you may see fewer available slots when requesting for groups. This is the correct behavior.
-
-### Full-day services return single slots per schedule range
-
-**Previously:** Full-day services went through the time-slicing loop, potentially returning no slots or incorrectly sized slots.
-
-**Now:** Full-day services (`durationType: 'full-day'`) return one slot per schedule range covering the entire day.
-
-**Action:** If you have full-day services, verify the returned slots match your expectations.
-
-### Invalid dates return 400 instead of silently failing
-
-**Previously:** `GET /api/reserve/availability?date=not-a-date` would proceed with an invalid Date object, returning unpredictable results.
-
-**Now:** Returns `400 Bad Request` with `{ message: 'Invalid date format' }`.
-
-**Action:** Ensure your frontend sends valid ISO date strings.
-
----
-
-## Hook behavior changes
-
-### `beforeBookingConfirm` / `beforeBookingCancel` receive merged doc
-
-**Previously:** These hooks received only `originalDoc` (the pre-update document).
-
-**Now:** They receive `{ ...originalDoc, ...data }` — the document merged with incoming changes.
-
-**Action:** If your hooks inspect the doc for the current status or other changing fields, they now see the **new** values. If you need the previous values, note that `previousStatus` is still passed separately to `beforeBookingConfirm`. For `beforeBookingCancel`, the `reason` field is passed as a separate parameter.
+**Update required if:** Your hook implementations read fields from the doc and expect pre-update values. `previousStatus` is still passed separately to `beforeBookingConfirm`. For `beforeBookingCancel`, `reason` remains a separate parameter.
 
 ### After-status-change hooks no longer throw
 
-**Previously:** If `afterStatusChange`, `afterBookingConfirm`, or `afterBookingCancel` hooks threw an error, the exception propagated up and could fail the entire request (even though the DB write already succeeded).
+Errors in `afterStatusChange`, `afterBookingConfirm`, and `afterBookingCancel` hooks are now caught and logged via `req.payload.logger.error` instead of propagating up.
 
-**Now:** Errors in after-hooks are caught and logged via `req.payload.logger.error`. The response still succeeds.
+**Update required if:** You relied on after-hook errors causing the API response to fail (e.g., to detect notification failures). Move critical logic to `beforeBookingConfirm`/`beforeBookingCancel` if it must fail atomically with the status change.
 
-**Action:** If you relied on after-hook errors causing the API response to fail (e.g., to signal a notification failure), you'll need to handle errors differently. Consider using `beforeBookingConfirm`/`beforeBookingCancel` for operations that must succeed or fail atomically with the status change.
+### Conflict error paths changed for multi-resource bookings
 
----
+Conflict detection errors now use `items.N.startTime` instead of `startTime` when the reservation has multiple items.
 
-## Validation changes (may reject previously accepted data)
-
-### Schedule time fields validate HH:mm format
-
-**Previously:** Schedule `startTime`/`endTime` text fields accepted any string.
-
-**Now:** Must match `HH:mm` format (e.g., `09:00`, `17:30`). Additionally, `endTime` must be after `startTime` within each slot.
-
-**Action:** If you have existing schedules with non-standard time formats (e.g., `9:00` without leading zero, or `09:00:00` with seconds), they'll fail validation on next edit. Fix them in the database or update via script before upgrading.
+**Update required if:** Your client-side code parses error paths from conflict `ValidationError` responses.
 
 ### Incomplete multi-resource items now throw instead of being silently dropped
 
-**Previously:** Items in a multi-resource booking that were missing `resource` or `startTime` were silently filtered out.
+Items missing `resource` or `startTime` previously got silently filtered out. They now throw a `ValidationError` identifying the incomplete item (e.g., `items.1.resource`).
 
-**Now:** A `ValidationError` is thrown identifying which item is incomplete (e.g., `items.1.resource`).
+**Update required if:** You programmatically create multi-resource bookings and rely on silent filtering of optional/incomplete items. Clean up item arrays before submission.
 
-**Action:** If you programmatically create multi-resource bookings and relied on silent filtering (e.g., passing optional items), you must now either omit incomplete items before submission or ensure all items have `resource` and `startTime`.
+### Slot generation returns more slots
 
-### Duplicate resource+time pairs in multi-resource bookings are rejected
+Step size changed from service-duration-aligned (e.g., every 60 min) to `Math.min(serviceDuration, 15)` minutes. A 60-min service now generates candidates at 9:00, 9:15, 9:30, etc.
 
-**Previously:** You could submit multiple items targeting the same resource at the same startTime within one booking.
-
-**Now:** Duplicate `(resource, startTime)` pairs throw a `ValidationError`.
-
-**Action:** If you have code that builds item arrays, ensure no duplicates. This was almost certainly a bug in calling code, not intentional behavior.
-
-### Invalid status machine configs fail at init time
-
-**Previously:** A misconfigured `statusMachine` (e.g., `defaultStatus` not in `statuses`, or transition targets referencing non-existent statuses) was accepted silently and could cause runtime errors.
-
-**Now:** `resolveConfig()` validates the status machine and throws at plugin initialization if the config is invalid.
-
-**Action:** If your app starts successfully today, this won't affect you — it only catches configs that were already broken. If it does throw on startup, fix the status machine config.
+**Update required if:** You assert on the exact number of returned slots in tests, or your UI assumes a specific slot count.
 
 ---
 
-## Per-item buffer time resolution
+## Improvements (non-breaking)
 
-**Previously:** `validateConflicts` used the parent reservation's service to determine buffer times, applying the same `bufferBefore`/`bufferAfter` to all items.
+These changes fix bugs or add validation but shouldn't require code changes for existing integrations.
 
-**Now:** Each item's own service is fetched to determine its specific buffer times. Conflict errors also include the item index (e.g., `items.2.startTime`) for multi-resource bookings.
+### Admin detection fix
 
-**Action:** If you have multi-resource bookings where different items reference services with different buffer times, conflict detection is now more accurate. Error message paths changed from `startTime` to `items.N.startTime` for multi-resource bookings — update any client-side error handling that matches on the path.
+The `isAdmin` check previously compared against a hardcoded `'users'` string, which failed for non-default admin collection slugs. It now correctly identifies admin as any user whose collection is not the customers collection. If you use the default `'users'` admin collection, nothing changes.
+
+### guestCount now affects slot availability
+
+`GET /api/reserve/slots` previously ignored the `guestCount` query parameter. It's now passed through to `checkAvailability`, so `per-guest` capacity mode resources correctly filter slots. If you don't use `per-guest` capacity mode, nothing changes.
+
+### Full-day services return proper slots
+
+Full-day services (`durationType: 'full-day'`) now return one slot per schedule range covering the entire day, instead of going through the time-slicing loop which could return no slots or incorrectly sized ones.
+
+### Invalid dates return 400
+
+`GET /api/reserve/availability` now returns `400 Bad Request` for unparseable date values instead of proceeding with an invalid Date object.
+
+### Schedule time format validation
+
+Schedule `startTime`/`endTime` fields now validate `HH:mm` format (e.g., `09:00`, `17:30`) and enforce `endTime > startTime`. Existing valid schedules are unaffected — this only triggers on create/edit.
+
+### Duplicate resource+time detection
+
+Submitting multiple items with the same `(resource, startTime)` pair in a single booking now throws a `ValidationError`. This catches what was almost certainly a bug in calling code.
+
+### Status machine config validation
+
+`resolveConfig()` now validates the status machine at init time — checking that `defaultStatus`, `blockingStatuses`, `terminalStatuses`, and all transition keys/targets reference valid statuses. If your app starts today, this won't affect you.
+
+### Per-item buffer time resolution
+
+`validateConflicts` now fetches each item's own service for buffer times instead of using the parent service uniformly. Conflict detection is more accurate for multi-resource bookings with mixed services.
 
 ---
 
 ## Migration checklist
 
-- [ ] Review any code calling `POST /api/reserve/cancel` — ensure it uses the reservation owner or admin credentials
-- [ ] Review any customer-facing code calling `GET /api/reserve/customers` — move to server-side proxy if needed
-- [ ] Check `beforeBookingConfirm`/`beforeBookingCancel` hook implementations for doc field assumptions
-- [ ] Check `afterStatusChange`/`afterBookingConfirm`/`afterBookingCancel` hooks — errors are now swallowed (logged only)
-- [ ] Update slot count assertions in tests
-- [ ] Verify existing schedule data uses `HH:mm` format
-- [ ] Review multi-resource booking creation code for incomplete items or duplicates
-- [ ] Verify `statusMachine` config if using custom status workflows
-- [ ] Update client-side error handling for new conflict error paths (`items.N.startTime`)
+- [ ] Review code calling `POST /api/reserve/cancel` — must be owner or admin
+- [ ] Review customer-facing code calling `GET /api/reserve/customers` — now admin-only
+- [ ] Check `beforeBookingConfirm`/`beforeBookingCancel` hooks — doc now has new values merged in
+- [ ] Check `afterStatusChange`/`afterBookingConfirm`/`afterBookingCancel` hooks — errors are logged, not thrown
+- [ ] Update client-side error path matching for conflict errors (`items.N.startTime`)
+- [ ] Clean up multi-resource booking code — no more silent filtering of incomplete items
+- [ ] Update slot count assertions in tests if any
