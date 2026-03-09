@@ -7,10 +7,10 @@ import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { makeScheduleOwnerAccess } from '../utilities/ownerAccess.js'
 
-const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
+const TIME_REGEX = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
 const validateTime = (value: null | string | undefined): string | true => {
-  if (!value) return true // required handles emptiness
+  if (!value) { return true } // required handles emptiness
   return TIME_REGEX.test(value) || 'Invalid time format. Use HH:mm (e.g., 09:00, 17:30)'
 }
 
@@ -27,29 +27,6 @@ export function createSchedulesCollection(
     admin: {
       group: config.adminGroup,
       useAsTitle: 'name',
-    },
-    hooks: {
-      beforeValidate: [
-        ({ data }) => {
-          const slots = (data?.recurringSlots as Array<{ endTime?: string; startTime?: string }>) ?? []
-          for (const slot of slots) {
-            if (slot.startTime && slot.endTime && slot.startTime >= slot.endTime) {
-              throw new ValidationError({
-                errors: [{ message: 'endTime must be after startTime', path: 'recurringSlots' }],
-              })
-            }
-          }
-          const manual = (data?.manualSlots as Array<{ endTime?: string; startTime?: string }>) ?? []
-          for (const slot of manual) {
-            if (slot.startTime && slot.endTime && slot.startTime >= slot.endTime) {
-              throw new ValidationError({
-                errors: [{ message: 'endTime must be after startTime', path: 'manualSlots' }],
-              })
-            }
-          }
-          return data
-        },
-      ],
     },
     fields: [
       {
@@ -200,6 +177,29 @@ export function createSchedulesCollection(
         label: ({ t }) => (t as PluginT)('reservation:fieldActive'),
       },
     ],
+    hooks: {
+      beforeValidate: [
+        ({ data }) => {
+          const slots = (data?.recurringSlots as Array<{ endTime?: string; startTime?: string }>) ?? []
+          for (const slot of slots) {
+            if (slot.startTime && slot.endTime && slot.startTime >= slot.endTime) {
+              throw new ValidationError({
+                errors: [{ message: 'endTime must be after startTime', path: 'recurringSlots' }],
+              })
+            }
+          }
+          const manual = (data?.manualSlots as Array<{ endTime?: string; startTime?: string }>) ?? []
+          for (const slot of manual) {
+            if (slot.startTime && slot.endTime && slot.startTime >= slot.endTime) {
+              throw new ValidationError({
+                errors: [{ message: 'endTime must be after startTime', path: 'manualSlots' }],
+              })
+            }
+          }
+          return data
+        },
+      ],
+    },
     labels: {
       plural: ({ t }) => (t as PluginT)('reservation:collectionSchedules'),
       singular: ({ t }) => (t as PluginT)('reservation:collectionSchedules'),
