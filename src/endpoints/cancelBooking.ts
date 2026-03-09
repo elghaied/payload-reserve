@@ -19,6 +19,26 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         return Response.json({ message: 'reservationId is required' }, { status: 400 })
       }
 
+      // Fetch the reservation to check ownership
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const existing = await (req.payload.findByID as any)({
+        id: reservationId,
+        collection: config.slugs.reservations,
+        depth: 0,
+        req,
+      })
+
+      // Check ownership: customer must match req.user
+      const customerId =
+        typeof existing.customer === 'object' ? existing.customer?.id : existing.customer
+      const isOwner = customerId === req.user.id
+      // Admin = user from non-customer collection
+      const isAdmin = req.user.collection !== config.slugs.customers
+
+      if (!isOwner && !isAdmin) {
+        return Response.json({ message: 'Forbidden' }, { status: 403 })
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const reservation = await (req.payload.update as any)({
         id: reservationId,
