@@ -1,20 +1,25 @@
 ---
 name: payload-reserve
 description: >
-  Integration guide for the payload-reserve plugin — a reservation and booking system for Payload CMS 3.x.
-  Use when a user is installing, configuring, or extending the plugin in their Payload project.
-  Covers all plugin options, collection schemas, the configurable status machine, the public REST API,
-  plugin hook callbacks (email, Stripe, etc.), duration types, multi-resource bookings, capacity modes,
-  and real-world examples (salon, hotel, restaurant, event venue, multi-tenant, Stripe payment gate).
-  Triggers on: "payload-reserve", "payloadReserve", "reservation plugin", "booking plugin",
-  "how do I add reservations to Payload", "booking system payload", "availability endpoint".
+  Expert guide for the payload-reserve plugin — a reservation and booking system for Payload CMS 3.x.
+  Use when working with: reservation systems, booking systems, appointment scheduling, calendar views,
+  availability checks, conflict detection, double-booking prevention, status workflows
+  (pending/confirmed/completed/cancelled/no-show), buffer times, cancellation policies, schedule management,
+  service/resource configuration, customer management, walk-in bookings, resource owner multi-tenancy,
+  extra reservation fields, admin UI components (calendar, dashboard widget, availability grid),
+  CalendarView resource filter, or integrating payments (Stripe) and notifications with a Payload CMS
+  reservation plugin. Triggers on: "payload-reserve", "payloadReserve", "reservation plugin",
+  "booking plugin", "appointment plugin", "schedule plugin", "availability overview", "calendar view",
+  "reservation conflict", "double booking", "booking status", "cancellation policy",
+  "resource owner", "resourceOwnerMode", "multi-tenant reservations", "extra reservation fields".
 ---
 
 # payload-reserve
 
 A full-featured reservation/booking plugin for Payload CMS 3.x. Adds scheduling with conflict
-detection, a configurable status machine, multi-resource bookings, capacity tracking, 5 public
-REST endpoints, and admin UI components (calendar view, dashboard widget, availability grid).
+detection, a configurable status machine, multi-resource bookings, capacity tracking, resource
+owner multi-tenancy, extra reservation fields, 5 public REST endpoints, and admin UI components
+(calendar view with resource filter, dashboard widget, availability grid). Supports localization.
 
 ## Install
 
@@ -24,7 +29,7 @@ pnpm add payload-reserve
 npm install payload-reserve
 ```
 
-Peer dependency: `payload ^3.37.0`
+Peer dependencies: `payload ^3.79.0`, `@payloadcms/ui ^3.79.0`, `@payloadcms/translations ^3.79.0`
 
 ## Quick Start
 
@@ -58,6 +63,23 @@ payloadReserve({
 })
 ```
 
+## Resource Owner Multi-Tenancy
+
+Opt-in mode for Airbnb-style platforms where each user manages their own resources.
+
+```typescript
+payloadReserve({
+  userCollection: 'users',
+  resourceOwnerMode: {
+    adminRoles: ['admin'],
+    ownerField: 'owner',
+    ownedServices: false,
+  },
+})
+```
+
+Auto-wires ownership access control on Resources, Schedules, and Reservations. Set `ownedServices: true` to also scope Services. The `access` override in plugin config always takes precedence.
+
 ## Common Config Options
 
 ```typescript
@@ -67,6 +89,12 @@ payloadReserve({
   cancellationNoticePeriod: 24,     // minimum hours notice to cancel
   userCollection: 'users',          // extend existing auth collection
   disabled: false,                  // set true to disable plugin
+  extraReservationFields: [],       // extra Payload fields appended to Reservations
+  resourceOwnerMode: {              // opt-in multi-tenant owner mode
+    adminRoles: ['admin'],
+    ownerField: 'owner',
+    ownedServices: false,
+  },
 })
 ```
 
@@ -83,10 +111,12 @@ Load the relevant file when the user's question is about that topic:
 
 | Topic | File |
 |-------|------|
-| All plugin options, slugs, access, full config example | `references/configuration.md` |
+| All plugin options, slugs, access, resourceOwnerMode, full config example | `references/configuration.md` |
 | Collection schemas (fields, types, examples) | `references/collections.md` |
 | Status machine config, custom statuses, transitions | `references/status-machine.md` |
 | Duration types, multi-resource bookings, capacity modes | `references/booking-features.md` |
 | Plugin hook callbacks (afterBookingCreate, afterStatusChange, etc.) | `references/hooks-api.md` |
 | REST API endpoints (params, responses, fetch examples) | `references/rest-api.md` |
-| Real-world examples: salon, hotel, restaurant, Stripe, email, multi-tenant | `references/examples.md` |
+| Admin UI: CalendarView, dashboard widget, availability overview | `references/admin-ui.md` |
+| Real-world examples: salon, hotel, restaurant, Stripe, email, resource owner multi-tenant | `references/examples.md` |
+| DB indexes, reconciliation job, performance tuning | `references/advanced.md` |

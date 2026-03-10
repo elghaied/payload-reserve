@@ -15,6 +15,7 @@ Available time slots for a resource and service on a given date, derived from th
 | `resource` | Yes | Resource ID |
 | `service` | Yes | Service ID |
 | `date` | Yes | `YYYY-MM-DD` format |
+| `guestCount` | No | Number of guests (for `per-guest` capacity filtering) |
 
 **Response:**
 
@@ -113,7 +114,7 @@ Cancels a reservation by ID. Requires authenticated session (`req.user`). Enforc
 }
 ```
 
-**Response:** `200` with updated reservation. Returns `401` if not authenticated, `400` if `reservationId` missing.
+**Response:** `200` with updated reservation. Returns `401` if not authenticated, `403` if the authenticated user is not the reservation's customer or an admin, `400` if `reservationId` missing.
 
 ```typescript
 const res = await fetch('/api/reserve/cancel', {
@@ -128,7 +129,7 @@ const updated = await res.json()
 
 ## GET /api/reserve/customers
 
-Searches customers by name or email. Used by admin UI but callable from frontend.
+Searches customers by name or email. Restricted to admin/staff users — customer-collection users receive `403 Forbidden`.
 
 **Query parameters:**
 
@@ -136,4 +137,4 @@ Searches customers by name or email. Used by admin UI but callable from frontend
 |-----------|----------|-------------|
 | `q` | Yes | Search string (matches name and email) |
 
-**Response:** Array of matching customer documents.
+**Response:** Array of matching customer documents. Returns `401` if not authenticated, `403` if the user belongs to the customers collection.

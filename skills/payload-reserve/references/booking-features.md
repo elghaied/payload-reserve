@@ -84,6 +84,11 @@ await payload.create({
 
 **Inheritance:** Items missing `startTime`, `endTime`, `service`, or `guestCount` inherit the parent's values.
 
+**Validation:**
+- Every item must have a `resource` and `startTime` (its own or inherited). Missing fields throw a `ValidationError` identifying which item (e.g., `items.1.resource`).
+- Duplicate `(resource, startTime)` pairs within the same booking are rejected.
+- Conflict errors include the item index (e.g., `items.2.startTime`).
+
 **Conflict detection** runs independently for each resource in `items` plus the primary.
 
 ---

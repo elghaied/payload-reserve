@@ -203,3 +203,22 @@ payloadReserve({
   },
 })
 ```
+
+---
+
+### Resource Owner Multi-Tenant (Airbnb-style)
+
+Each user manages their own resources and sees only their own reservations. No manual access wiring needed.
+
+```typescript
+payloadReserve({
+  userCollection: 'users',
+  resourceOwnerMode: {
+    adminRoles: ['admin'],
+    ownerField: 'owner',
+    ownedServices: false,
+  },
+})
+```
+
+Resources get an `owner` field auto-populated on create. Owners see only their own resources, schedules, and reservations. Users with an `admin` role see everything. Set `ownedServices: true` if each owner also manages their own service catalogue.

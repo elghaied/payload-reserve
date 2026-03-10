@@ -10,7 +10,7 @@ pnpm add payload-reserve
 npm install payload-reserve
 ```
 
-**Peer dependency:** `payload ^3.37.0`
+**Peer dependencies:** `payload ^3.79.0`, `@payloadcms/ui ^3.79.0`, `@payloadcms/translations ^3.79.0`
 
 ## Quick Start
 

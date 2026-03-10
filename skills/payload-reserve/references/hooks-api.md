@@ -8,6 +8,8 @@ import type { ReservationPluginHooks } from 'payload-reserve'
 payloadReserve({ hooks: { /* ... */ } })
 ```
 
+> **Escape hatch:** All plugin hooks respect `context.skipReservationHooks`. When you call `payload.update()` or `payload.create()` with `context: { skipReservationHooks: true }`, none of these callbacks fire — including the `afterChange` hooks that trigger `afterBookingCancel`, `afterBookingConfirm`, and `afterStatusChange`. Use this when your code handles the side-effect (email, payment) itself and must not double-fire.
+
 ---
 
 ## beforeBookingCreate
@@ -42,6 +44,8 @@ hooks: {
 
 Fires before a reservation transitions to `confirmed`. Throw to block the transition.
 
+The `doc` contains the merged document (`{ ...originalDoc, ...incomingData }`), so fields like `status` reflect the **new** value being set.
+
 ```typescript
 type beforeBookingConfirm = Array<
   (args: { doc: Record<string, unknown>; newStatus: string; req: PayloadRequest }) =>
@@ -65,6 +69,8 @@ hooks: {
 ## beforeBookingCancel
 
 Fires before a reservation transitions to `cancelled`. Throw to block.
+
+The `doc` contains the merged document (`{ ...originalDoc, ...incomingData }`). The `reason` is passed as a separate parameter from the incoming cancellation data.
 
 ```typescript
 type beforeBookingCancel = Array<
@@ -110,7 +116,7 @@ hooks: {
 
 ## afterBookingConfirm
 
-Fires after a reservation transitions to `confirmed`.
+Fires after a reservation transitions to `confirmed`. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
 
 ```typescript
 type afterBookingConfirm = Array<
@@ -133,7 +139,7 @@ hooks: {
 
 ## afterBookingCancel
 
-Fires after a reservation transitions to `cancelled`.
+Fires after a reservation transitions to `cancelled`. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
 
 ```typescript
 type afterBookingCancel = Array<
@@ -156,7 +162,7 @@ hooks: {
 
 ## afterStatusChange
 
-Generic hook that fires on every status transition.
+Generic hook that fires on every status transition. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
 
 ```typescript
 type afterStatusChange = Array<

@@ -58,6 +58,18 @@ payloadReserve({
       },
     ],
   },
+
+  // Extra fields appended to the Reservations collection
+  extraReservationFields: [
+    { name: 'paymentReminderSent', type: 'checkbox', defaultValue: false },
+  ],
+
+  // Opt-in resource owner multi-tenancy
+  resourceOwnerMode: {
+    adminRoles: ['admin'],
+    ownerField: 'owner',
+    ownedServices: false,
+  },
 })
 ```
 
@@ -78,6 +90,11 @@ payloadReserve({
 | `slugs.media` | `string` | `'media'` | Media collection slug |
 | `statusMachine` | `Partial<StatusMachineConfig>` | Default 5-status machine | Custom status machine |
 | `hooks` | `ReservationPluginHooks` | `{}` | Plugin hook callbacks |
+| `extraReservationFields` | `Field[]` | `[]` | Extra Payload fields appended to Reservations |
+| `resourceOwnerMode` | `ResourceOwnerModeConfig` | `undefined` | Opt-in multi-tenant owner mode |
+| `resourceOwnerMode.adminRoles` | `string[]` | `[]` | Roles that bypass owner filters |
+| `resourceOwnerMode.ownerField` | `string` | `'owner'` | Field name for owner relationship |
+| `resourceOwnerMode.ownedServices` | `boolean` | `false` | Whether Services also get owner scoping |
 
 ## userCollection Notes
 
@@ -90,3 +107,32 @@ payloadReserve({
 
 Access functions follow Payload's standard access control signature `({ req }) => boolean | Where`.
 You can return a `Where` clause to scope access (useful for multi-tenant setups).
+
+## resourceOwnerMode Notes
+
+Opt-in feature for Airbnb-style platforms where each user manages their own resources.
+
+When enabled (`resourceOwnerMode: { ... }`):
+
+| Collection | Behaviour |
+|------------|-----------|
+| Resources | Adds an `owner` relationship field (auto-populated on create); owners read/update/delete only their own |
+| Schedules | Owners read/update/delete only schedules whose resource they own (via `resource.owner`) |
+| Reservations | Owners can read reservations for their resources; mutations are admin-only |
+| Services | Unchanged by default; set `ownedServices: true` to apply the same owner pattern |
+
+- `adminRoles` — roles that bypass all owner filters (see all records); if empty, no role-based bypass
+- `ownerField` — field name added to Resources (default: `'owner'`)
+- `ownedServices` — set `true` to also scope Services by owner
+- The `access` override in plugin config always takes precedence over auto-wired functions
+
+```typescript
+payloadReserve({
+  userCollection: 'users',
+  resourceOwnerMode: {
+    adminRoles: ['admin'],
+    ownerField: 'owner',
+    ownedServices: false,
+  },
+})
+```
