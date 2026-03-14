@@ -74,10 +74,11 @@ jobs:
           version="${TAG_NAME#v}"
 
           # Extract the section for this version from CHANGELOG.md
+          # Handles both bracketed (## [1.2.0]) and unbracketed (## 1.2.0) formats
           body=$(awk -v ver="$version" '
-            /^## \[/ {
+            /^## / {
               if (found) exit
-              if (index($0, "[" ver "]")) { found=1; next }
+              if (index($0, "[" ver "]") || index($0, " " ver)) { found=1; next }
             }
             found { print }
           ' CHANGELOG.md)
