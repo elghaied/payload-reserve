@@ -128,7 +128,7 @@ export const payloadReserve =
     }
     config.admin.dashboard.widgets.push({
       slug: 'reservation-todays-reservations',
-      ComponentPath: 'payload-reserve/rsc#DashboardWidgetServer',
+      Component: 'payload-reserve/rsc#DashboardWidgetServer',
       label: 'Today\'s Reservations',
       maxWidth: 'large',
       minWidth: 'medium',
