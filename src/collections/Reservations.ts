@@ -14,6 +14,7 @@ import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
 import { validateStatusTransition } from '../hooks/reservations/validateStatusTransition.js'
+import { statusToI18nKey } from '../utilities/i18nUtils.js'
 import { makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
 
 function createPluginHooksBeforeCreate(
@@ -130,7 +131,7 @@ export function createReservationsCollection(
         label: ({ t }) => (t as PluginT)('reservation:fieldStatus'),
         options: statusMachine.statuses.map((s) => ({
           label: ({ t }) => {
-            const key = `reservation:status${s.charAt(0).toUpperCase() + s.slice(1)}`
+            const key = statusToI18nKey(s)
             const translated = (t as PluginT)(key)
             return translated !== key ? translated : s.charAt(0).toUpperCase() + s.slice(1)
           },

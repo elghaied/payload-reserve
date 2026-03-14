@@ -6,6 +6,7 @@ import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } fr
 
 import type { PluginT } from '../../translations/index.js'
 
+import { statusToI18nKey } from '../../utilities/i18nUtils.js'
 import styles from './CalendarView.module.css'
 
 type ViewMode = 'day' | 'month' | 'pending' | 'week'
@@ -117,7 +118,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     const labels: Record<string, string> = {}
     for (const s of statuses) {
       // Attempt to look up a translation key, e.g. reservation:statusPending
-      const key = `reservation:status${s.charAt(0).toUpperCase() + s.slice(1).replace(/-./g, (m) => m[1].toUpperCase())}`
+      const key = statusToI18nKey(s)
       const translated = t(key)
       // If translation returns the key itself, it's missing — fall back to capitalized status name
       labels[s] = translated !== key ? translated : s.charAt(0).toUpperCase() + s.slice(1)
