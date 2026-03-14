@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] - 2026-03-14
+
+### Fixed
+
+- Fix hyphenated status names (e.g. "no-show") not resolving to correct i18n translation keys. Extracted shared `statusToI18nKey` utility used by both Reservations collection and CalendarView.
+- Fix changelog extraction in GitHub Actions release workflow to handle both bracketed and unbracketed version headers.
+
 ## [1.3.0] - 2026-03-10
 
 ### Minor Changes
