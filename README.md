@@ -1,8 +1,14 @@
 # payload-reserve
 
+[![npm version](https://img.shields.io/npm/v/payload-reserve.svg)](https://www.npmjs.com/package/payload-reserve)
+[![npm downloads](https://img.shields.io/npm/dm/payload-reserve.svg)](https://www.npmjs.com/package/payload-reserve)
+[![license](https://img.shields.io/npm/l/payload-reserve.svg)](./LICENSE)
+
 A full-featured reservation and booking plugin for Payload CMS 3.x. Adds a scheduling system with conflict detection, a configurable status machine, multi-resource bookings, capacity and inventory tracking, a public REST API, and admin UI components.
 
 Designed for salons, clinics, hotels, restaurants, event venues, and any business that needs appointment scheduling managed through Payload's admin panel.
+
+📦 **npm:** https://www.npmjs.com/package/payload-reserve
 
 ---
 
