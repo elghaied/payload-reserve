@@ -118,13 +118,14 @@ A dedicated auth collection with `auth: true` and `access.admin: () => false`. C
 
 ### User Collection Mode (`userCollection` set)
 
-No new collection is created. The plugin injects `phone`, `notes`, and a `bookings` join field into your existing auth collection (deduplication prevents double-injection).
+No new collection is created. The plugin injects `name`, `phone`, `notes`, and a `bookings` join field into your existing auth collection (deduplication prevents double-injection — existing fields with matching names win).
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `email` | Email | Customer email (from Payload auth) |
 | `firstName` | Text | First name (standalone mode only) |
 | `lastName` | Text | Last name (standalone mode only) |
+| `name` | Text | Customer name (max 200 chars, required); enables `admin.useAsTitle: 'name'` |
 | `phone` | Text | Phone number (max 50 chars) |
 | `notes` | Textarea | Internal admin notes |
 | `bookings` | Join | Virtual — all reservations for this customer |

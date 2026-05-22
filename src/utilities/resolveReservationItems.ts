@@ -3,8 +3,8 @@ import { ValidationError } from 'payload'
 export type ResolvedItem = {
   endTime: string
   guestCount: number
-  resource: string
-  service?: string
+  resource: number | string
+  service?: number | string
   startTime: string
 }
 
@@ -28,10 +28,10 @@ export function resolveReservationItems(data: Record<string, unknown>): Resolved
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
-      const resource = extractId(item.resource) || extractId(data.resource) || ''
+      const resource = extractId(item.resource) ?? extractId(data.resource)
       const startTime = (item.startTime as string) ?? (data.startTime as string)
 
-      if (!resource) {
+      if (resource === undefined || resource === '') {
         throw new ValidationError({
           errors: [
             {
@@ -70,7 +70,7 @@ export function resolveReservationItems(data: Record<string, unknown>): Resolved
         endTime: (item.endTime as string) ?? (data.endTime as string),
         guestCount: (item.guestCount as number) ?? (data.guestCount as number) ?? 1,
         resource,
-        service: extractId(item.service) || extractId(data.service) || undefined,
+        service: extractId(item.service) ?? extractId(data.service),
         startTime,
       })
     }
@@ -83,23 +83,37 @@ export function resolveReservationItems(data: Record<string, unknown>): Resolved
     return []
   }
 
+  const resource = extractId(data.resource)
+  if (resource === undefined || resource === '') {
+    return []
+  }
+
   return [
     {
       endTime: data.endTime as string,
       guestCount: (data.guestCount as number) ?? 1,
-      resource: extractId(data.resource) || '',
-      service: extractId(data.service) || undefined,
+      resource,
+      service: extractId(data.service),
       startTime: data.startTime as string,
     },
   ]
 }
 
-function extractId(value: unknown): string | undefined {
+// Exported for unit testing. Returns the underlying id value from a relationship
+// field which Payload represents as either the raw id (string for Mongo, number
+// for Postgres) or a populated document `{ id, ... }`.
+//
+// Note: `0` is a valid numeric Postgres id but rare; we still return it rather
+// than treat it as missing.
+export function extractId(value: unknown): number | string | undefined {
   if (typeof value === 'string' && value) {
     return value
   }
+  if (typeof value === 'number') {
+    return value
+  }
   if (value && typeof value === 'object' && 'id' in value) {
-    return (value as { id: string }).id
+    return (value as { id: number | string }).id
   }
   return undefined
 }

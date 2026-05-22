@@ -38,8 +38,8 @@ export function buildOverlapQuery(params: {
   blockingStatuses: string[]
   effectiveEnd: Date
   effectiveStart: Date
-  excludeReservationId?: string
-  resourceId: string
+  excludeReservationId?: number | string
+  resourceId: number | string
 }): Where {
   const { blockingStatuses, effectiveEnd, effectiveStart, excludeReservationId, resourceId } =
     params
@@ -90,12 +90,12 @@ export async function checkAvailability(params: {
   bufferAfter: number
   bufferBefore: number
   endTime: Date
-  excludeReservationId?: string
+  excludeReservationId?: number | string
   guestCount: number
   payload: Payload
   req: PayloadRequest
   reservationSlug: string
-  resourceId: string
+  resourceId: number | string
   resourceSlug: string
   startTime: Date
 }): Promise<{
@@ -194,10 +194,10 @@ export async function getAvailableSlots(params: {
   payload: Payload
   req: PayloadRequest
   reservationSlug: string
-  resourceId: string
+  resourceId: number | string
   resourceSlug: string
   scheduleSlug: string
-  serviceId: string
+  serviceId: number | string
   serviceSlug: string
 }): Promise<Array<{ end: Date; start: Date }>> {
   const {

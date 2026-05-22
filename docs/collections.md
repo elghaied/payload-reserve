@@ -126,9 +126,9 @@ A dedicated auth collection with `auth: true` for customer JWT login. Has `acces
 
 ### User Collection Mode (`userCollection` set)
 
-The plugin injects `phone`, `notes`, and a `bookings` join field into your existing auth collection. No new collection is created. The resolved `slugs.customers` points at the user collection so all downstream code uses the correct slug.
+The plugin injects `name`, `phone`, `notes`, and a `bookings` join field into your existing auth collection. No new collection is created. The resolved `slugs.customers` points at the user collection so all downstream code uses the correct slug.
 
-Field deduplication prevents double-injection — the plugin checks `'name' in field` before injecting.
+Field deduplication prevents double-injection — the plugin checks each field's `name` before injecting, so if your collection already defines `name` (or any of the others) the existing field config wins.
 
 ### Fields
 
@@ -137,6 +137,7 @@ Field deduplication prevents double-injection — the plugin checks `'name' in f
 | `email` | Email | Customer email (from Payload auth) |
 | `firstName` | Text | First name (standalone mode only) |
 | `lastName` | Text | Last name (standalone mode only) |
+| `name` | Text | Customer name (max 200 chars, required). Injected into the user collection so `admin.useAsTitle: 'name'` works out of the box |
 | `phone` | Text | Phone number (max 50 chars) |
 | `notes` | Textarea | Internal notes visible only to admins |
 | `bookings` | Join | Virtual field — all reservations for this customer |

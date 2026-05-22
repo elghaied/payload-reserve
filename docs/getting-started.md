@@ -65,7 +65,7 @@ payloadReserve({
 })
 ```
 
-When `userCollection` is set, the plugin injects `phone`, `notes`, and a `bookings` join field into your existing collection rather than creating a separate Customers collection. See [Collections → Customers](./collections.md#customers) for details.
+When `userCollection` is set, the plugin injects `name`, `phone`, `notes`, and a `bookings` join field into your existing collection rather than creating a separate Customers collection. Existing fields with the same name are preserved (the plugin only injects what's missing). See [Collections → Customers](./collections.md#customers) for details.
 
 ---
 

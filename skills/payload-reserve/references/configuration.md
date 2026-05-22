@@ -98,7 +98,7 @@ payloadReserve({
 
 ## userCollection Notes
 
-- When set: injects `phone`, `notes`, and `bookings` join into that collection; no standalone Customers collection is created
+- When set: injects `name`, `phone`, `notes`, and `bookings` join into that collection; no standalone Customers collection is created. Existing fields with matching names are preserved.
 - When unset (default): creates a standalone `customers` auth collection
 - The named collection must already exist in your Payload config before the plugin runs
 - `slugs.customers` is automatically remapped to the user collection slug

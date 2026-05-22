@@ -59,7 +59,7 @@ export default buildConfig({
 
 ```typescript
 payloadReserve({
-  userCollection: 'users', // injects phone, notes, bookings join into your existing collection
+  userCollection: 'users', // injects name, phone, notes, bookings join into your existing collection
 })
 ```
 

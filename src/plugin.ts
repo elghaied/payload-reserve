@@ -49,8 +49,16 @@ export const payloadReserve =
             .filter(Boolean),
         )
 
-        // Fields to inject if not already present
+        // Fields to inject if not already present. `name` is added so that
+        // admin.useAsTitle: 'name' works out of the box on the extended user
+        // collection (matches the v1.0.0 behaviour documented in README/SKILL).
         const fieldsToAdd: Field[] = [
+          {
+            name: 'name',
+            type: 'text',
+            maxLength: 200,
+            required: true,
+          },
           {
             name: 'phone',
             type: 'text',

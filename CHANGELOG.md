@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-05-22
+
+### Fixed
+
+- **Postgres reservations now create successfully.** The internal `extractId` helper in `resolveReservationItems.ts` did not handle numeric IDs, so on the Postgres adapter every reservation create failed: `extractId(42)` returned `undefined`, causing `validateConflicts` to call `findByID({ id: '' })` and throw `NotFound` before any conflict check could run. Adds a numeric branch to `extractId`, and widens `ResolvedItem.resource` / `ResolvedItem.service` plus the `resourceId` / `excludeReservationId` / `serviceId` parameters in `AvailabilityService` to `number | string`. MongoDB behaviour is unchanged.
+
+### Changed
+
+- **Restored the documented `name` field on the extended user collection.** README, SKILL, and the v1.0.0 release notes all describe `userCollection`-mode as injecting `name`, `phone`, `notes`, and `bookings`, but the field injection in `plugin.ts` only added the last three. A downstream project that set `admin.useAsTitle: 'name'` on its extended user collection was blocked because no `name` field existed. The plugin now injects `name` (text, max 200, required) along with the other three. Collections that already define their own `name` field are unaffected — field deduplication preserves the original definition.
+
+  Treated as a minor (rather than patch) bump because this restores documented behaviour by introducing a new required field on `userCollection`-extended collections that did not previously define their own `name`.
+
 ## [1.3.2] - 2026-03-14
 
 ### Fixed
