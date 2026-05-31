@@ -23,6 +23,7 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Three Duration Types** — `fixed` (service duration), `flexible` (customer-specified end), and `full-day` bookings
 - **Multi-Resource Bookings** — Single reservation that spans multiple resources simultaneously via the `items` array
 - **Capacity and Inventory** — `quantity > 1` allows multiple concurrent bookings per resource; `capacityMode` (`per-reservation` | `per-guest`) controls how capacity is counted
+- **Guest Bookings** — Account-less reservations with inline contact details (name + email/phone); `allowGuestBooking` plugin option and per-service `inherit`/`enabled`/`disabled` override; guests receive a `cancellationToken` via the `afterBookingCreate` hook for cancel-link delivery
 - **Idempotency** — Optional `idempotencyKey` prevents duplicate submissions
 - **Extra Reservation Fields** — Inject custom fields into the Reservations collection via `extraReservationFields` without forking the plugin
 - **Cancellation Policy** — Configurable minimum notice period enforcement
@@ -91,6 +92,82 @@ payloadReserve({
 | Services | Unchanged by default; set `ownedServices: true` to apply the same owner pattern |
 
 The `access` override in plugin config always takes precedence over the auto-wired functions, so you can fine-tune any collection without losing the rest.
+
+---
+
+## Guest Bookings
+
+Enable `allowGuestBooking` to accept reservations from users who don't have a customer account. Guests provide inline contact details (name + email or phone) instead of linking to a customer record.
+
+```typescript
+payloadReserve({
+  allowGuestBooking: true,   // enable guest bookings globally (default: false)
+})
+```
+
+### Per-service override
+
+Each Service has its own `allowGuestBooking` select field that overrides the plugin-level default:
+
+| Value | Behaviour |
+|-------|-----------|
+| `inherit` | Use the plugin-level `allowGuestBooking` value *(default)* |
+| `enabled` | Allow guest bookings for this service regardless of the global setting |
+| `disabled` | Require a customer account for this service regardless of the global setting |
+
+### Customer vs. guest
+
+The `customer` relationship field on Reservations is now **optional**. A reservation must have **either** a `customer` **or** a `guest` block — not both, not neither.
+
+The `guest` block requires `name` and at least one of `email` or `phone`:
+
+```typescript
+// POST /api/reserve/book
+{
+  "serviceId": "...",
+  "resourceId": "...",
+  "startTime": "2026-06-01T10:00:00.000Z",
+  "guest": {
+    "name": "Jane Smith",
+    "email": "jane@example.com"   // or "phone": "+1-555-0100"
+  }
+}
+```
+
+### Cancellation token
+
+When a guest booking is created the plugin generates a `cancellationToken` (random UUID). It is **not** returned in the `/api/reserve/book` HTTP response. It is exposed server-side via the `afterBookingCreate` plugin hook so the host project can deliver a cancel link by email or an SMS code:
+
+```typescript
+payloadReserve({
+  allowGuestBooking: true,
+  hooks: {
+    afterBookingCreate: [
+      async ({ doc, req }) => {
+        if (doc.guest && doc.cancellationToken) {
+          // Send the token however you like — the plugin sends nothing itself
+          await sendEmail({
+            to: doc.guest.email,
+            cancelUrl: `https://example.com/cancel?reservationId=${doc.id}&token=${doc.cancellationToken}`,
+          })
+        }
+      },
+    ],
+  },
+})
+```
+
+To cancel with the token, POST to `/api/reserve/cancel` without authentication:
+
+```typescript
+// POST /api/reserve/cancel
+{
+  "reservationId": "...",
+  "token": "<cancellationToken>"
+}
+```
+
+Authenticated owner/admin cancellation (without a token) is unchanged.
 
 ---
 
