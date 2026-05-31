@@ -71,6 +71,8 @@ export interface Config {
     users: User;
     posts: Post;
     media: Media;
+    'cancel-otps': CancelOtp;
+    'sms-logs': SmsLog;
     services: Service;
     resources: Resource;
     schedules: Schedule;
@@ -90,6 +92,8 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    'cancel-otps': CancelOtpsSelect<false> | CancelOtpsSelect<true>;
+    'sms-logs': SmsLogsSelect<false> | SmsLogsSelect<true>;
     services: ServicesSelect<false> | ServicesSelect<true>;
     resources: ResourcesSelect<false> | ResourcesSelect<true>;
     schedules: SchedulesSelect<false> | SchedulesSelect<true>;
@@ -108,6 +112,7 @@ export interface Config {
   globalsSelect: {};
   locale: null;
   widgets: {
+    'sms-recent-logs': SmsRecentLogsWidget;
     'reservation-todays-reservations': ReservationTodaysReservationsWidget;
     collections: CollectionsWidget;
   };
@@ -204,6 +209,42 @@ export interface Media {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cancel-otps".
+ */
+export interface CancelOtp {
+  id: string;
+  reservation?: string | null;
+  code?: string | null;
+  expiresAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sms-logs".
+ */
+export interface SmsLog {
+  id: string;
+  to: string;
+  from: string;
+  body: string;
+  provider: string;
+  status: 'queued' | 'sent' | 'delivered' | 'failed' | 'unknown';
+  providerMessageId?: string | null;
+  cost?: {
+    amount?: string | null;
+    currency?: string | null;
+  };
+  error?: string | null;
+  errorCode?: string | null;
+  sentAt: string;
+  deliveredAt?: string | null;
+  failedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -392,6 +433,14 @@ export interface PayloadLockedDocument {
         value: string | Media;
       } | null)
     | ({
+        relationTo: 'cancel-otps';
+        value: string | CancelOtp;
+      } | null)
+    | ({
+        relationTo: 'sms-logs';
+        value: string | SmsLog;
+      } | null)
+    | ({
         relationTo: 'services';
         value: string | Service;
       } | null)
@@ -509,6 +558,42 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cancel-otps_select".
+ */
+export interface CancelOtpsSelect<T extends boolean = true> {
+  reservation?: T;
+  code?: T;
+  expiresAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sms-logs_select".
+ */
+export interface SmsLogsSelect<T extends boolean = true> {
+  to?: T;
+  from?: T;
+  body?: T;
+  provider?: T;
+  status?: T;
+  providerMessageId?: T;
+  cost?:
+    | T
+    | {
+        amount?: T;
+        currency?: T;
+      };
+  error?: T;
+  errorCode?: T;
+  sentAt?: T;
+  deliveredAt?: T;
+  failedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -681,6 +766,16 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sms-recent-logs_widget".
+ */
+export interface SmsRecentLogsWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'small' | 'medium';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

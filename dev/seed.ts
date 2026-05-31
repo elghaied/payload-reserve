@@ -365,10 +365,34 @@ export const seed = async (payload: Payload) => {
     },
   })
 
+  // ---- GUEST RESERVATIONS (account-less; for testing email + OTP cancellation) ----
+  // Scheduled next week so they're outside the 24h cancellation notice window.
+  const guestSlot = (hour: number) =>
+    new Date(nextWeek.getFullYear(), nextWeek.getMonth(), nextWeek.getDate(), hour, 0).toISOString()
+
+  // Guest with EMAIL → afterBookingCreate emails a cancel link (see dev console).
+  await create('reservations', {
+    guest: { name: 'Guest Emailer', email: 'guest.email@example.com' },
+    resource: bob.id,
+    service: consultation.id,
+    startTime: guestSlot(15),
+  })
+
+  // Guest with PHONE → cancel via OTP:
+  //   POST /api/dev/request-cancel-otp { reservationId }  → code logged to console
+  //   POST /api/dev/confirm-cancel-otp { reservationId, code }
+  await create('reservations', {
+    guest: { name: 'Guest Caller', phone: '+15551230000' },
+    resource: bob.id,
+    service: consultation.id,
+    startTime: guestSlot(16),
+  })
+
   payload.logger.info(`
     ✅ Seed complete!
        Admin:     ${devUser.email} / ${devUser.password}
        Customers: jane@example.com / customer123
                   john@example.com / customer123
+       Guest bookings seeded (next week): email + phone, for cancel testing
   `)
 }
