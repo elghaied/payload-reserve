@@ -3,6 +3,7 @@ import type { Endpoint } from 'payload'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { getAvailableSlots } from '../services/AvailabilityService.js'
+import { extractId, mergeResourceIds } from '../utilities/resolveRequiredResources.js'
 
 export function createCheckAvailabilityEndpoint(
   config: ResolvedReservationPluginConfig,
@@ -31,6 +32,22 @@ export function createCheckAvailabilityEndpoint(
 
       const guestCount = Math.max(Number(url.searchParams.get('guestCount') ?? '1'), 1)
 
+      // Resolve required resource set: caller resource(s) ∪ service.requiredResources
+      const explicit = url.searchParams.get('resources')
+      const callerIds = explicit ? explicit.split(',').map((s) => s.trim()).filter(Boolean) : [resource]
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const svcDoc = await (req.payload.findByID as any)({
+        id: service,
+        collection: config.slugs.services,
+        depth: 0,
+        req,
+      })
+      const requiredIds = ((svcDoc?.requiredResources as unknown[]) ?? [])
+        .map((r) => extractId(r))
+        .filter((r): r is number | string => r !== undefined)
+      const resourceIds = mergeResourceIds(callerIds, requiredIds)
+
       const slots = await getAvailableSlots({
         blockingStatuses: config.statusMachine.blockingStatuses,
         date: parsedDate,
@@ -38,7 +55,7 @@ export function createCheckAvailabilityEndpoint(
         payload: req.payload,
         req,
         reservationSlug: config.slugs.reservations,
-        resourceId: resource,
+        resourceIds,
         resourceSlug: config.slugs.resources,
         scheduleSlug: config.slugs.schedules,
         serviceId: service,

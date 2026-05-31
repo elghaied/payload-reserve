@@ -2251,8 +2251,8 @@ describe('Reservation plugin - requiredResources auto-expansion', () => {
 
     // Clear items and update; the hook must NOT re-add them on update.
     const updated = await payload.update({
-      collection: col('reservations'),
       id: created.id,
+      collection: col('reservations'),
       data: { items: [] },
     })
     expect(((updated as { items?: unknown[] }).items ?? []).length).toBe(0)
@@ -2343,5 +2343,94 @@ describe('Reservation plugin - multi-resource slot discovery', () => {
     // With stepSize=15 and 60-min slots: 09:00, 09:15, 09:30, 09:45 all overlap → 4 fewer slots.
     expect(after.some((s) => s.start.getTime() === target.start.getTime())).toBe(false)
     expect(after.length).toBeLessThan(before.length)
+  })
+})
+
+describe('Reservation plugin - slots endpoint resource resolution', () => {
+  it('unions service.requiredResources so a full pool removes a slot', async () => {
+    const { createGetSlotsEndpoint } = await import('../src/endpoints/getSlots.js')
+    const { resolveConfig } = await import('../src/defaults.js')
+    const resolved = resolveConfig({})
+
+    const allDaySlots = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({
+      day,
+      endTime: '12:00',
+      startTime: '09:00',
+    }))
+
+    const chairSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'EP chair svc', active: true, duration: 60 },
+    })
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'EP Chair', active: true, quantity: 1, services: [chairSvc.id] },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: {
+        name: 'EP Haircut',
+        active: true,
+        bufferTimeAfter: 0,
+        bufferTimeBefore: 0,
+        duration: 60,
+        durationType: 'fixed',
+        requiredResources: [chair.id],
+      },
+    })
+    const stylist = await payload.create({
+      collection: col('resources'),
+      data: { name: 'EP Stylist', active: true, services: [svc.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'EP Stylist Schedule',
+        active: true,
+        recurringSlots: allDaySlots,
+        resource: stylist.id,
+        scheduleType: 'recurring',
+      },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'ep@example.com', firstName: 'Ep', lastName: 'Test', password: 'testpass123' },
+    })
+
+    const endpoint = createGetSlotsEndpoint(resolved)
+    const makeReq = (qs: string) =>
+      ({ payload, url: `http://localhost/api/reserve/slots?${qs}` }) as unknown as Parameters<
+        typeof endpoint.handler
+      >[0]
+    const date = '2033-04-04'
+
+    // Caller passes ONLY the stylist + service; endpoint must add the chair pool.
+    const res1 = await endpoint.handler(makeReq(`date=${date}&service=${svc.id}&resource=${stylist.id}`))
+    const body1 = await res1.json()
+    expect(body1.slots.length).toBeGreaterThan(0)
+
+    // Occupy the chair (quantity 1) at the first returned slot.
+    // Must provide endTime explicitly because skipReservationHooks bypasses calculateEndTime.
+    const occupyStart = new Date(body1.slots[0].start)
+    const occupyEnd = new Date(occupyStart.getTime() + 60 * 60_000)
+    await payload.create({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        customer: cust.id,
+        endTime: occupyEnd.toISOString(),
+        resource: chair.id,
+        service: svc.id,
+        startTime: occupyStart.toISOString(),
+        status: 'confirmed',
+      },
+    })
+
+    const res2 = await endpoint.handler(makeReq(`date=${date}&service=${svc.id}&resource=${stylist.id}`))
+    const body2 = await res2.json()
+    // Fewer slots proves the endpoint resolved + capacity-checked the chair pool.
+    // A 60-min booking at the first slot blocks all 15-min step slots that overlap it.
+    expect(body2.slots.length).toBeLessThan(body1.slots.length)
+    expect(body2.slots.some((s: { start: string }) => s.start === body1.slots[0].start)).toBe(false)
   })
 })
