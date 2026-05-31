@@ -2161,3 +2161,20 @@ describe('Reservation plugin - requiredResources field', () => {
     expect((svc as { requiredResources?: unknown[] }).requiredResources).toHaveLength(1)
   })
 })
+
+describe('mergeResourceIds', () => {
+  it('dedupes primary and required ids preserving order', async () => {
+    const { mergeResourceIds } = await import('../src/utilities/resolveRequiredResources.js')
+    expect(mergeResourceIds(['a'], ['b', 'a'])).toEqual(['a', 'b'])
+  })
+
+  it('drops empty/undefined values', async () => {
+    const { mergeResourceIds } = await import('../src/utilities/resolveRequiredResources.js')
+    expect(mergeResourceIds(['a', ''], [undefined as unknown as string, 'c'])).toEqual(['a', 'c'])
+  })
+
+  it('treats numeric and string ids as distinct only by string value', async () => {
+    const { mergeResourceIds } = await import('../src/utilities/resolveRequiredResources.js')
+    expect(mergeResourceIds([1], [1, 2])).toEqual([1, 2])
+  })
+})
