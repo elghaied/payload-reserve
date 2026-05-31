@@ -118,9 +118,8 @@ export function createReservationsCollection(
           },
           {
             name: 'email',
-            type: 'text',
+            type: 'email',
             label: 'Guest email',
-            maxLength: 200,
           },
           {
             name: 'phone',
