@@ -3,7 +3,7 @@ import type { Payload, PayloadRequest, Where } from 'payload'
 import type { CapacityMode, DurationType, StatusMachineConfig } from '../types.js'
 
 import { resolveScheduleForDate } from '../utilities/scheduleUtils.js'
-import { addMinutes, computeBlockedWindow } from '../utilities/slotUtils.js'
+import { addMinutes, computeBlockedWindow, intersectIntervals } from '../utilities/slotUtils.js'
 
 // --- Pure functions (no DB) ---
 
@@ -199,7 +199,8 @@ export async function getAvailableSlots(params: {
   payload: Payload
   req: PayloadRequest
   reservationSlug: string
-  resourceId: number | string
+  resourceId?: number | string
+  resourceIds?: Array<number | string>
   resourceSlug: string
   scheduleSlug: string
   serviceId: number | string
@@ -213,13 +214,25 @@ export async function getAvailableSlots(params: {
     req,
     reservationSlug,
     resourceId,
+    resourceIds,
     resourceSlug,
     scheduleSlug,
     serviceId,
     serviceSlug,
   } = params
 
-  // 1. Fetch service for duration + buffer times
+  // Resolve the set of resources to intersect (single-resource callers still work)
+  const ids =
+    resourceIds && resourceIds.length > 0
+      ? resourceIds
+      : resourceId !== undefined
+        ? [resourceId]
+        : []
+  if (ids.length === 0) {
+    return []
+  }
+
+  // 1. Service for duration + buffer times (from the primary service)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = await (payload.findByID as any)({
     id: serviceId,
@@ -232,33 +245,51 @@ export async function getAvailableSlots(params: {
   const bufferAfter = (service.bufferTimeAfter as number) ?? 0
   const durationType = ((service.durationType as string) ?? 'fixed') as DurationType
 
-  // 2. Fetch resource's schedules for the date
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { docs: schedules } = await (payload.find as any)({
-    collection: scheduleSlug,
-    depth: 0,
-    limit: 100,
-    req,
-    where: {
-      and: [{ resource: { equals: resourceId } }, { active: { equals: true } }],
-    },
-  })
-
-  // 3. Resolve schedules to time ranges for the date
-  const timeRanges: Array<{ end: Date; start: Date }> = []
-  for (const schedule of schedules) {
-    const ranges = resolveScheduleForDate(
-      schedule as unknown as Parameters<typeof resolveScheduleForDate>[0],
-      date,
-    )
-    timeRanges.push(...ranges)
+  // 2. Per resource: fetch schedules and resolve to windows. A resource with >=1
+  //    schedule is "schedule-bearing" and constrains time; a resource with zero
+  //    schedules is capacity-only and contributes no time windows.
+  const scheduleBearingWindowLists: Array<Array<{ end: Date; start: Date }>> = []
+  for (const rid of ids) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { docs: schedules } = await (payload.find as any)({
+      collection: scheduleSlug,
+      depth: 0,
+      limit: 100,
+      req,
+      where: {
+        and: [{ resource: { equals: rid } }, { active: { equals: true } }],
+      },
+    })
+    if (!schedules || schedules.length === 0) {
+      continue
+    }
+    const windows: Array<{ end: Date; start: Date }> = []
+    for (const schedule of schedules) {
+      windows.push(
+        ...resolveScheduleForDate(
+          schedule as unknown as Parameters<typeof resolveScheduleForDate>[0],
+          date,
+        ),
+      )
+    }
+    scheduleBearingWindowLists.push(windows)
   }
 
+  // No resource constrains time → no basis for generating slots
+  if (scheduleBearingWindowLists.length === 0) {
+    return []
+  }
+
+  // 3. Intersect all schedule-bearing window lists
+  let timeRanges = scheduleBearingWindowLists[0]
+  for (let i = 1; i < scheduleBearingWindowLists.length; i++) {
+    timeRanges = intersectIntervals(timeRanges, scheduleBearingWindowLists[i])
+  }
   if (timeRanges.length === 0) {
     return []
   }
 
-  // 4. Generate candidate slots from schedule ranges
+  // 4. Candidate slot sizing
   const { endTime: slotEndOffset } = computeEndTime({
     durationType,
     serviceDuration: duration,
@@ -267,32 +298,46 @@ export async function getAvailableSlots(params: {
   const slotDuration = Math.round(slotEndOffset.getTime() / 60_000)
   const effectiveDuration = durationType === 'fixed' ? duration : slotDuration
 
-  const availableSlots: Array<{ end: Date; start: Date }> = []
-
-  // For full-day services, offer the entire range as a single slot per range
-  if (durationType === 'full-day') {
-    for (const range of timeRanges) {
+  // Helper: a window is available only if EVERY required resource is free
+  const allAvailable = async (
+    start: Date,
+    end: Date,
+    bBefore: number,
+    bAfter: number,
+  ): Promise<boolean> => {
+    for (const rid of ids) {
       const result = await checkAvailability({
         blockingStatuses,
-        bufferAfter: 0,
-        bufferBefore: 0,
-        endTime: range.end,
+        bufferAfter: bAfter,
+        bufferBefore: bBefore,
+        endTime: end,
         guestCount: guestCount ?? 1,
         payload,
         req,
         reservationSlug,
-        resourceId,
+        resourceId: rid,
         resourceSlug,
-        startTime: range.start,
+        startTime: start,
       })
-      if (result.available) {
+      if (!result.available) {
+        return false
+      }
+    }
+    return true
+  }
+
+  const availableSlots: Array<{ end: Date; start: Date }> = []
+
+  // Full-day: offer each range as a single slot if all resources are free
+  if (durationType === 'full-day') {
+    for (const range of timeRanges) {
+      if (await allAvailable(range.start, range.end, 0, 0)) {
         availableSlots.push({ end: range.end, start: range.start })
       }
     }
     return availableSlots
   }
 
-  // Step by a smaller increment to catch slots between buffer gaps
   const stepSize = Math.min(effectiveDuration, 15)
 
   for (const range of timeRanges) {
@@ -300,24 +345,11 @@ export async function getAvailableSlots(params: {
 
     while (true) {
       const candidateEnd = addMinutes(candidateStart, effectiveDuration)
-      if (candidateEnd > range.end) {break}
+      if (candidateEnd > range.end) {
+        break
+      }
 
-      // 5. Check availability for each candidate slot
-      const result = await checkAvailability({
-        blockingStatuses,
-        bufferAfter,
-        bufferBefore,
-        endTime: candidateEnd,
-        guestCount: guestCount ?? 1,
-        payload,
-        req,
-        reservationSlug,
-        resourceId,
-        resourceSlug,
-        startTime: candidateStart,
-      })
-
-      if (result.available) {
+      if (await allAvailable(candidateStart, candidateEnd, bufferBefore, bufferAfter)) {
         availableSlots.push({ end: candidateEnd, start: new Date(candidateStart) })
       }
 

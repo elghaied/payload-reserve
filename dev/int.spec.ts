@@ -2260,3 +2260,88 @@ describe('Reservation plugin - requiredResources auto-expansion', () => {
     expect(createdItemCount).toBeGreaterThan(0)
   })
 })
+
+describe('Reservation plugin - multi-resource slot discovery', () => {
+  let svcId: string
+  let stylistId: string
+  let chairId: string
+  let custId: string
+  const DAY = new Date(2033, 3, 4) // local midnight, arbitrary weekday
+
+  // Seed all weekdays so the resolved window is the same regardless of which
+  // weekday this date lands on in the host timezone.
+  const allDaySlots = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({
+    day,
+    endTime: '12:00',
+    startTime: '09:00',
+  }))
+
+  beforeAll(async () => {
+    const chairSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'MS chair svc', active: true, duration: 60 },
+    })
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'MS Chair', active: true, quantity: 1, services: [chairSvc.id] },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'MS Haircut', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60, durationType: 'fixed', requiredResources: [chair.id] },
+    })
+    const stylist = await payload.create({
+      collection: col('resources'),
+      data: { name: 'MS Stylist', active: true, services: [svc.id] },
+    })
+    // Stylist has a schedule (constrains time); chair has NO schedule (capacity-only).
+    await payload.create({
+      collection: col('schedules'),
+      data: { name: 'MS Stylist Schedule', active: true, recurringSlots: allDaySlots, resource: stylist.id, scheduleType: 'recurring' },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'ms@example.com', firstName: 'Ms', lastName: 'Test', password: 'testpass123' },
+    })
+    svcId = svc.id
+    stylistId = stylist.id
+    chairId = chair.id
+    custId = cust.id
+  })
+
+  const callSlots = async () => {
+    const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
+    return getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: DAY,
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceIds: [stylistId, chairId],
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: svcId,
+      serviceSlug: 'services',
+    })
+  }
+
+  it('returns slots where both stylist and chair are free', async () => {
+    const slots = await callSlots()
+    // 09:00–12:00 window, 60-min fixed service, stepSize = min(60,15) = 15 min
+    // → slots at 09:00, 09:15, 09:30, ..., 11:00 = 9 candidate slots, chair free.
+    expect(slots.length).toBe(9)
+  })
+
+  it('drops a slot when the shared chair pool is fully booked at that time', async () => {
+    const before = await callSlots()
+    const target = before[0] // occupy the chair (quantity 1) at this slot's start
+    await payload.create({
+      collection: col('reservations'),
+      data: { customer: custId, resource: chairId, service: svcId, startTime: target.start.toISOString(), status: 'pending' },
+    })
+    const after = await callSlots()
+    // The booking at target.start blocks any candidate whose window overlaps the booked 09:00–10:00 range.
+    // With stepSize=15 and 60-min slots: 09:00, 09:15, 09:30, 09:45 all overlap → 4 fewer slots.
+    expect(after.some((s) => s.start.getTime() === target.start.getTime())).toBe(false)
+    expect(after.length).toBeLessThan(before.length)
+  })
+})
