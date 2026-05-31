@@ -96,6 +96,10 @@ const buildConfigWithMemoryDB = async () => {
           // eslint-disable-next-line no-console
           console.log(`[sms-mock] SMS to ${result.to}: ${result.body}`)
         },
+        // The dashboard widget is an RSC that imports '@payload-config', which the
+        // dev app's bundler can't resolve from node_modules. Disable it — the
+        // sms-logs collection + the onSend console log give enough visibility.
+        widgets: false,
       }),
       payloadReserve({
         allowGuestBooking: true,
