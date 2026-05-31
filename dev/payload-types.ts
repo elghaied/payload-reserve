@@ -219,6 +219,10 @@ export interface Service {
   price?: number | null;
   bufferTimeBefore?: number | null;
   bufferTimeAfter?: number | null;
+  /**
+   * Additional resource pools every booking of this service occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full.
+   */
+  requiredResources?: (string | Resource)[] | null;
   active?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -511,6 +515,7 @@ export interface ServicesSelect<T extends boolean = true> {
   price?: T;
   bufferTimeBefore?: T;
   bufferTimeAfter?: T;
+  requiredResources?: T;
   active?: T;
   updatedAt?: T;
   createdAt?: T;

@@ -2132,3 +2132,32 @@ describe('Reservation plugin - resourceType field', () => {
     expect((r as { resourceType?: string }).resourceType).toBe('staff')
   })
 })
+
+describe('Reservation plugin - requiredResources field', () => {
+  it('services collection has a hasMany requiredResources relationship', () => {
+    const cfg = payload.config.collections.find((c) => c.slug === 'services')
+    const field = cfg!.fields.find((f) => 'name' in f && f.name === 'requiredResources') as
+      | { hasMany?: boolean; relationTo?: string; type?: string }
+      | undefined
+    expect(field).toBeDefined()
+    expect(field!.type).toBe('relationship')
+    expect(field!.hasMany).toBe(true)
+    expect(field!.relationTo).toBe('resources')
+  })
+
+  it('can set requiredResources on a service', async () => {
+    const pool = await payload.create({
+      collection: col('services'),
+      data: { name: 'RR pool svc', active: true, duration: 30 },
+    })
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RR Chair', active: true, services: [pool.id] },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'RR Haircut', active: true, duration: 60, requiredResources: [chair.id] },
+    })
+    expect((svc as { requiredResources?: unknown[] }).requiredResources).toHaveLength(1)
+  })
+})
