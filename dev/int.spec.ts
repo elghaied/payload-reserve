@@ -2178,3 +2178,67 @@ describe('mergeResourceIds', () => {
     expect(mergeResourceIds([1], [1, 2])).toEqual([1, 2])
   })
 })
+
+describe('Reservation plugin - requiredResources auto-expansion', () => {
+  let svcId: string
+  let stylistId: string
+  let chairId: string
+  let custId: string
+  const T1 = '2032-05-04T09:00:00.000Z'
+  const T2 = '2032-05-04T11:00:00.000Z'
+
+  beforeAll(async () => {
+    const chairSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'AX chair svc', active: true, duration: 60 },
+    })
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'AX Chair Pool', active: true, quantity: 1, services: [chairSvc.id] },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'AX Haircut', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60, requiredResources: [chair.id] },
+    })
+    const stylist = await payload.create({
+      collection: col('resources'),
+      data: { name: 'AX Stylist', active: true, services: [svc.id] },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'ax@example.com', firstName: 'Ax', lastName: 'Test', password: 'testpass123' },
+    })
+    svcId = svc.id
+    stylistId = stylist.id
+    chairId = chair.id
+    custId = cust.id
+  })
+
+  it('auto-creates an items[] entry for the required chair pool', async () => {
+    const res = await payload.create({
+      collection: col('reservations'),
+      data: { customer: custId, resource: stylistId, service: svcId, startTime: T1, status: 'pending' },
+    })
+    const items = (res as { items?: Array<{ resource: unknown }> }).items ?? []
+    const ids = items.map((i) => (typeof i.resource === 'object' ? (i.resource as { id: string }).id : i.resource))
+    expect(ids).toContain(stylistId)
+    expect(ids).toContain(chairId)
+  })
+
+  it('rejects a second booking when the required pool is full', async () => {
+    await payload.create({
+      collection: col('reservations'),
+      data: { customer: custId, resource: stylistId, service: svcId, startTime: T2, status: 'pending' },
+    })
+    const stylist2 = await payload.create({
+      collection: col('resources'),
+      data: { name: 'AX Stylist 2', active: true, services: [svcId] },
+    })
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: { customer: custId, resource: stylist2.id, service: svcId, startTime: T2, status: 'pending' },
+      }),
+    ).rejects.toThrow()
+  })
+})
