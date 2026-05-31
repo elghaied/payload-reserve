@@ -7,8 +7,10 @@ type Resource = { id: string; name: string; services?: ({ id: string } | string)
 
 const card: React.CSSProperties = {
   background: '#fff',
-  border: '1px solid #e3e6ea',
+  borderColor: '#e3e6ea',
   borderRadius: 10,
+  borderStyle: 'solid',
+  borderWidth: 1,
   marginBottom: 20,
   padding: 24,
 }

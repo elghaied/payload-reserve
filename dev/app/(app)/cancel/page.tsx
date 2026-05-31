@@ -4,8 +4,10 @@ import React, { useEffect, useState } from 'react'
 
 const card: React.CSSProperties = {
   background: '#fff',
-  border: '1px solid #e3e6ea',
+  borderColor: '#e3e6ea',
   borderRadius: 10,
+  borderStyle: 'solid',
+  borderWidth: 1,
   padding: 24,
 }
 const button: React.CSSProperties = {
