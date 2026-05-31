@@ -124,8 +124,8 @@ The `guest` block requires `name` and at least one of `email` or `phone`:
 ```typescript
 // POST /api/reserve/book
 {
-  "serviceId": "...",
-  "resourceId": "...",
+  "service": "...",
+  "resource": "...",
   "startTime": "2026-06-01T10:00:00.000Z",
   "guest": {
     "name": "Jane Smith",
