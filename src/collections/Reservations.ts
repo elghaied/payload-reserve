@@ -13,6 +13,7 @@ import { checkIdempotency } from '../hooks/reservations/checkIdempotency.js'
 import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
+import { validateGuestBooking } from '../hooks/reservations/validateGuestBooking.js'
 import { validateStatusTransition } from '../hooks/reservations/validateStatusTransition.js'
 import { statusToI18nKey } from '../utilities/i18nUtils.js'
 import { makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
@@ -256,6 +257,7 @@ export function createReservationsCollection(
       beforeChange: [
         createPluginHooksBeforeCreate(config.hooks),
         checkIdempotency(config),
+        validateGuestBooking(config),
         calculateEndTime(config),
         validateConflicts(config),
         validateStatusTransition(config),

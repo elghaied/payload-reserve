@@ -5,6 +5,7 @@ import { getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, test } from 'vitest'
 
 import { resolveConfig } from '../src/defaults.js'
+import { validateGuestBooking } from '../src/hooks/reservations/validateGuestBooking.js'
 import { resolveGuestBookingAllowed } from '../src/utilities/guestBooking.js'
 
 let payload: Payload
@@ -2053,5 +2054,95 @@ describe('Guest bookings - config', () => {
     expect(resolveGuestBookingAllowed({ allowGuestBooking: null }, true)).toBe(true)
     expect(resolveGuestBookingAllowed({}, true)).toBe(true)
     expect(resolveGuestBookingAllowed(undefined, false)).toBe(false)
+  })
+})
+
+describe('Guest bookings - validation hook', () => {
+  const future = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
+
+  async function makeServiceAndResource(guestSetting: string) {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: `GB Service ${guestSetting}`, active: true, allowGuestBooking: guestSetting, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: `GB Resource ${guestSetting}`, active: true, services: [service.id] },
+    })
+    return { resource, service }
+  }
+
+  it('guest booking succeeds when the service enables it; token is generated', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    const res = await payload.create({
+      collection: col('reservations'),
+      data: {
+        guest: { name: 'Jane Doe', email: 'jane@example.com' },
+        resource: resource.id,
+        service: service.id,
+        startTime: future(72),
+      },
+    })
+    expect(res.id).toBeDefined()
+    expect(typeof (res as Record<string, unknown>).cancellationToken).toBe('string')
+  })
+
+  it('guest booking is rejected when the service disables it', async () => {
+    const { resource, service } = await makeServiceAndResource('disabled')
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          guest: { name: 'Jane Doe', email: 'jane@example.com' },
+          resource: resource.id,
+          service: service.id,
+          startTime: future(72),
+        },
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('booking with neither customer nor guest is rejected', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: { resource: resource.id, service: service.id, startTime: future(72) },
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('guest requires name and at least one contact method', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          guest: { name: 'No Contact' },
+          resource: resource.id,
+          service: service.id,
+          startTime: future(72),
+        },
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('admin bypasses the per-service gate for guest bookings', async () => {
+    const { resource, service } = await makeServiceAndResource('disabled')
+    const hook = validateGuestBooking(resolveConfig({}))
+    const data: Record<string, unknown> = {
+      guest: { email: 'admin-guest@example.com', name: 'Walk In' },
+      resource: resource.id,
+      service: service.id,
+      startTime: future(72),
+    }
+    const result = await hook({
+      context: {},
+      data,
+      operation: 'create',
+      req: { payload, t: (k: string) => k, user: { collection: 'users', id: 1 } },
+    } as unknown as Parameters<ReturnType<typeof validateGuestBooking>>[0])
+    expect(result).toBe(data)
+    expect(typeof data.cancellationToken).toBe('string')
   })
 })
