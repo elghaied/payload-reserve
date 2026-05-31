@@ -16,5 +16,7 @@ export type {
   StatusMachineConfig,
 } from './types.js'
 export { DEFAULT_STATUS_MACHINE, VALID_STATUS_TRANSITIONS } from './types.js'
+export { mergeResourceIds } from './utilities/resolveRequiredResources.js'
 export type { ResolvedItem } from './utilities/resolveReservationItems.js'
 export { resolveReservationItems } from './utilities/resolveReservationItems.js'
+export { intersectIntervals } from './utilities/slotUtils.js'
