@@ -1,5 +1,7 @@
 import type { Endpoint } from 'payload'
 
+import { randomInt } from 'node:crypto'
+
 /**
  * Dev-only demonstration of SMS/OTP guest cancellation.
  *
@@ -46,7 +48,10 @@ const requestCancelOtp: Endpoint = {
       )
     }
 
-    const code = String(Math.floor(100000 + Math.random() * 900000))
+    // Use a CSPRNG, not Math.random(), for the code. In production also track
+    // failed attempts on the record and invalidate after ~5 tries to defeat
+    // brute force of the 6-digit space (kept out of this dev demo for brevity).
+    const code = String(randomInt(100000, 1000000))
     const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
