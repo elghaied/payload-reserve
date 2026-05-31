@@ -5,6 +5,7 @@ import { getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, test } from 'vitest'
 
 import { resolveConfig } from '../src/defaults.js'
+import { createCancelBookingEndpoint } from '../src/endpoints/cancelBooking.js'
 import { createBookingEndpoint } from '../src/endpoints/createBooking.js'
 import { validateGuestBooking } from '../src/hooks/reservations/validateGuestBooking.js'
 import { resolveGuestBookingAllowed } from '../src/utilities/guestBooking.js'
@@ -2179,5 +2180,74 @@ describe('Guest bookings - book endpoint', () => {
 
     expect(json.id).toBeDefined()
     expect(json.cancellationToken).toBeUndefined()
+  })
+})
+
+describe('Guest bookings - cancel endpoint', () => {
+  const future = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
+
+  async function createGuestReservation() {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Cancel GB Service', active: true, allowGuestBooking: 'enabled', duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Cancel GB Resource', active: true, services: [service.id] },
+    })
+    // Far-future start so the cancellation notice period does not block it.
+    return payload.create({
+      collection: col('reservations'),
+      data: {
+        guest: { name: 'Cancel Guest', email: 'cancel@example.com' },
+        resource: resource.id,
+        service: service.id,
+        startTime: future(24 * 30),
+      },
+    })
+  }
+
+  it('a valid token cancels a guest reservation', async () => {
+    const reservation = await createGuestReservation()
+    const token = (reservation as Record<string, unknown>).cancellationToken as string
+    const ep = createCancelBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () => Promise.resolve({ reservationId: reservation.id, token }),
+      payload,
+      t: (k: string) => k,
+      user: undefined,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    const json = (await resp.json()) as Record<string, unknown>
+    expect(json.status).toBe('cancelled')
+  })
+
+  it('a wrong token is rejected with 403', async () => {
+    const reservation = await createGuestReservation()
+    const ep = createCancelBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () => Promise.resolve({ reservationId: reservation.id, token: 'wrong-token' }),
+      payload,
+      t: (k: string) => k,
+      user: undefined,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    expect(resp.status).toBe(403)
+  })
+
+  it('a missing token (and no user) is rejected with 403', async () => {
+    const reservation = await createGuestReservation()
+    const ep = createCancelBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () => Promise.resolve({ reservationId: reservation.id }),
+      payload,
+      t: (k: string) => k,
+      user: undefined,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    expect(resp.status).toBe(403)
   })
 })
