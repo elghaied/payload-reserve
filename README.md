@@ -115,6 +115,8 @@ Each Service has its own `allowGuestBooking` select field that overrides the plu
 | `enabled` | Allow guest bookings for this service regardless of the global setting |
 | `disabled` | Require a customer account for this service regardless of the global setting |
 
+> **Note:** For multi-resource bookings (the `items` array), the guest-booking gate is evaluated against the reservation's top-level `service`. Per-item service overrides are not individually enforced.
+
 ### Customer vs. guest
 
 The `customer` relationship field on Reservations is now **optional**. A reservation must have **either** a `customer` **or** a `guest` block — not both, not neither.

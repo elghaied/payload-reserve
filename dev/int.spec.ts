@@ -2147,6 +2147,45 @@ describe('Guest bookings - validation hook', () => {
     expect(result).toBe(data)
     expect(typeof data.cancellationToken).toBe('string')
   })
+
+  it('a customer booking does not receive a cancellation token', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: { email: `cust-${Date.now()}@example.com`, firstName: 'Cust', lastName: 'Omer', password: 'password123' },
+    })
+    const res = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: future(72),
+      },
+    })
+    expect(res.id).toBeDefined()
+    expect((res as Record<string, unknown>).cancellationToken).toBeFalsy()
+  })
+
+  it('a booking with both a customer and a guest block is rejected', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: { email: `both-${Date.now()}@example.com`, firstName: 'Both', lastName: 'User', password: 'password123' },
+    })
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          customer: customer.id,
+          guest: { name: 'Ghost', email: 'ghost@example.com' },
+          resource: resource.id,
+          service: service.id,
+          startTime: future(72),
+        },
+      }),
+    ).rejects.toThrow()
+  })
 })
 
 describe('Guest bookings - book endpoint', () => {
@@ -2249,5 +2288,22 @@ describe('Guest bookings - cancel endpoint', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resp = await ep.handler(req as any)
     expect(resp.status).toBe(403)
+  })
+
+  it('does not return the cancellationToken in the cancel response', async () => {
+    const reservation = await createGuestReservation()
+    const token = (reservation as Record<string, unknown>).cancellationToken as string
+    const ep = createCancelBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () => Promise.resolve({ reservationId: reservation.id, token }),
+      payload,
+      t: (k: string) => k,
+      user: undefined,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    const json = (await resp.json()) as Record<string, unknown>
+    expect(json.status).toBe('cancelled')
+    expect(json.cancellationToken).toBeUndefined()
   })
 })

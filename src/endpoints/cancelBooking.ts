@@ -57,7 +57,12 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         req,
       })
 
-      return Response.json(reservation)
+      // Strip the cancellation token from the response, consistent with the book
+      // endpoint — it must never be echoed back over HTTP.
+      const { cancellationToken: _cancellationToken, ...safeReservation } =
+        reservation as Record<string, unknown>
+
+      return Response.json(safeReservation)
     },
     method: 'post',
     path: '/reserve/cancel',
