@@ -117,19 +117,30 @@ const buildConfigWithMemoryDB = async () => {
               // eslint-disable-next-line no-console
               console.log(`[reservation-plugin] Booking created: ${String(doc.id)}`)
             },
-            // Email cancellation: when a guest books with an email, send a cancel
-            // link. The test email adapter logs it to the console.
+            // Email cancellation: when a guest books with an email, send a
+            // clickable cancel link. The test email adapter logs the email, and
+            // we also log the bare URL on its own line for easy copy/paste.
             async ({ doc, req }) => {
               try {
-                const guest = doc.guest as { email?: string } | undefined
+                const guest = doc.guest as { email?: string; name?: string } | undefined
                 const token = doc.cancellationToken as string | undefined
                 if (guest?.email && token) {
-                  const cancelBody = JSON.stringify({ reservationId: doc.id, token })
+                  const host = req.headers?.get?.('host') ?? 'localhost:3000'
+                  const proto = req.headers?.get?.('x-forwarded-proto') ?? 'http'
+                  const cancelUrl = `${proto}://${host}/cancel?reservationId=${String(doc.id)}&token=${token}`
                   await req.payload.sendEmail({
-                    html: `<p>Thanks for booking. To cancel, POST this to <code>/api/reserve/cancel</code>:</p><pre>${cancelBody}</pre>`,
+                    html: [
+                      `<div style="font-family:system-ui,sans-serif;font-size:15px;color:#111">`,
+                      `<h2 style="margin:0 0 8px">Your booking is confirmed</h2>`,
+                      `<p>Hi ${guest.name ?? 'there'}, thanks for booking.</p>`,
+                      `<p>Changed your mind? <a href="${cancelUrl}">Cancel your booking</a>.</p>`,
+                      `</div>`,
+                    ].join(''),
                     subject: 'Your booking — cancel any time',
                     to: guest.email,
                   })
+                  // eslint-disable-next-line no-console
+                  console.log(`[guest cancel link] ${cancelUrl}`)
                 }
               } catch (err) {
                 req.payload.logger.warn({ err, msg: '[dev] guest cancel email failed' })
