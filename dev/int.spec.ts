@@ -2109,3 +2109,26 @@ describe('intersectIntervals', () => {
     expect(out).toEqual([])
   })
 })
+
+describe('Reservation plugin - resourceType field', () => {
+  it('resources collection has a resourceType field defaulting to equipment', () => {
+    const cfg = payload.config.collections.find((c) => c.slug === 'resources')
+    const field = cfg!.fields.find((f) => 'name' in f && f.name === 'resourceType') as
+      | { defaultValue?: string; options?: unknown[] }
+      | undefined
+    expect(field).toBeDefined()
+    expect(field!.defaultValue).toBe('equipment')
+  })
+
+  it('can create a resource with resourceType staff', async () => {
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'RT Svc', active: true, duration: 30 },
+    })
+    const r = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Stylist RT', active: true, resourceType: 'staff', services: [svc.id] },
+    })
+    expect((r as { resourceType?: string }).resourceType).toBe('staff')
+  })
+})

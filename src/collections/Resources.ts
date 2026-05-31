@@ -121,6 +121,20 @@ export function createResourcesCollection(
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldTimezone'),
       },
+      {
+        name: 'resourceType',
+        type: 'select',
+        admin: {
+          position: 'sidebar',
+        },
+        defaultValue: 'equipment',
+        label: 'Resource type',
+        options: [
+          { label: 'Staff', value: 'staff' },
+          { label: 'Equipment', value: 'equipment' },
+          { label: 'Room', value: 'room' },
+        ],
+      },
       ...(ownerFieldDef ? [ownerFieldDef] : []),
     ],
     labels: {

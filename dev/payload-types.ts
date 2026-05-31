@@ -107,6 +107,10 @@ export interface Config {
   globals: {};
   globalsSelect: {};
   locale: null;
+  widgets: {
+    'reservation-todays-reservations': ReservationTodaysReservationsWidget;
+    collections: CollectionsWidget;
+  };
   user: User | Customer;
   jobs: {
     tasks: unknown;
@@ -233,6 +237,7 @@ export interface Resource {
   quantity: number;
   capacityMode?: ('per-reservation' | 'per-guest') | null;
   timezone?: string | null;
+  resourceType?: ('staff' | 'equipment' | 'room') | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -523,6 +528,7 @@ export interface ResourcesSelect<T extends boolean = true> {
   quantity?: T;
   capacityMode?: T;
   timezone?: T;
+  resourceType?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -655,6 +661,26 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reservation-todays-reservations_widget".
+ */
+export interface ReservationTodaysReservationsWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collections_widget".
+ */
+export interface CollectionsWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
