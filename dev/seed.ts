@@ -16,12 +16,58 @@ export const seed = async (payload: Payload) => {
     })
   }
 
-  // Skip if reservation data already seeded
+  // ---- GUEST BOOKING DEMO (idempotent) ----
+  // Minimal service + resource + schedule for the public /book page. Runs even
+  // when the rest of the seed is skipped, so /book always has something to book.
+  const tourName = 'Studio Tour'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { totalDocs: tourExists } = await (payload.count as any)({
+    collection: 'services',
+    where: { name: { equals: tourName } },
+  })
+  if (!tourExists) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tour = await (payload.create as any)({
+      collection: 'services',
+      data: {
+        name: tourName,
+        active: true,
+        allowGuestBooking: 'enabled',
+        description: 'Guided studio tour — book without an account',
+        duration: 30,
+        durationType: 'fixed',
+        price: 0,
+      },
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const studio = await (payload.create as any)({
+      collection: 'resources',
+      data: { name: 'Main Studio', active: true, services: [tour.id] },
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (payload.create as any)({
+      collection: 'schedules',
+      data: {
+        name: 'Main Studio - Open Hours',
+        active: true,
+        recurringSlots: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({
+          day,
+          endTime: '20:00',
+          startTime: '08:00',
+        })),
+        resource: studio.id,
+        scheduleType: 'recurring',
+      },
+    })
+    payload.logger.info('Seeded guest-booking demo: "Studio Tour" @ "Main Studio" → visit /book')
+  }
+
+  // Skip the rest if reservation data already seeded
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { totalDocs: existingServices } = await (payload.count as any)({
     collection: 'services',
   })
-  if (existingServices > 0) { return }
+  if (existingServices > 1) { return }
 
   // ---- SERVICES ----
 

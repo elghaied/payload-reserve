@@ -102,6 +102,12 @@ const buildConfigWithMemoryDB = async () => {
         widgets: false,
       }),
       payloadReserve({
+        // Dev: let the public /book page read services/resources without auth.
+        access: {
+          resources: { read: () => true },
+          schedules: { read: () => true },
+          services: { read: () => true },
+        },
         allowGuestBooking: true,
         cancellationNoticePeriod: 24,
         defaultBufferTime: 10,
