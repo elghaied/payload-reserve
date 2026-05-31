@@ -59,6 +59,12 @@ export default function BookPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState<null | string>(null)
+  // OTP cancellation (shown after booking with a phone)
+  const [otpPhase, setOtpPhase] = useState<
+    'cancelled' | 'confirming' | 'error' | 'idle' | 'requesting' | 'sent'
+  >('idle')
+  const [otpCode, setOtpCode] = useState('')
+  const [otpMsg, setOtpMsg] = useState('')
 
   useEffect(() => {
     void (async () => {
@@ -115,11 +121,59 @@ export default function BookPage() {
         setError(json?.errors?.[0]?.message ?? json?.message ?? 'Booking failed')
       } else {
         setResult(json)
+        setOtpPhase('idle')
+        setOtpCode('')
+        setOtpMsg('')
       }
     } catch {
       setError('Network error submitting the booking.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const requestOtp = async () => {
+    setOtpPhase('requesting')
+    setOtpMsg('')
+    try {
+      const resp = await fetch('/api/dev/request-cancel-otp', {
+        body: JSON.stringify({ reservationId: result.id }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      })
+      const json = await resp.json()
+      if (resp.ok) {
+        setOtpPhase('sent')
+        setOtpMsg('Code sent — check the dev console for the "[sms-mock]" line.')
+      } else {
+        setOtpPhase('error')
+        setOtpMsg(json?.message ?? 'Failed to send code')
+      }
+    } catch {
+      setOtpPhase('error')
+      setOtpMsg('Network error requesting the code.')
+    }
+  }
+
+  const confirmOtp = async () => {
+    setOtpPhase('confirming')
+    try {
+      const resp = await fetch('/api/dev/confirm-cancel-otp', {
+        body: JSON.stringify({ code: otpCode, reservationId: result.id }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      })
+      const json = await resp.json()
+      if (resp.ok) {
+        setOtpPhase('cancelled')
+        setOtpMsg(`Booking is now "${json.status ?? 'cancelled'}".`)
+      } else {
+        setOtpPhase('sent')
+        setOtpMsg(json?.message ?? 'Invalid or expired code — try again.')
+      }
+    } catch {
+      setOtpPhase('sent')
+      setOtpMsg('Network error confirming the code.')
     }
   }
 
@@ -215,11 +269,58 @@ export default function BookPage() {
         <div style={{ ...card, borderColor: '#a7d8b0' }}>
           <strong>Booked!</strong> Reservation <code>{result.id}</code> — status{' '}
           <code>{result.status}</code>.
-          <p style={{ color: '#52606d', fontSize: 13, marginBottom: 0 }}>
-            To cancel: if you gave an email, a cancel link was logged to the dev console. If you gave
-            a phone, POST <code>{'{ reservationId }'}</code> to{' '}
-            <code>/api/dev/request-cancel-otp</code> then confirm with the SMS code.
-          </p>
+
+          {email ? (
+            <p style={{ color: '#52606d', fontSize: 13, marginBottom: 0 }}>
+              A cancel link was logged to the dev console (and the email).
+            </p>
+          ) : null}
+
+          {phone ? (
+            <div style={{ borderTop: '1px solid #e3e6ea', marginTop: 14, paddingTop: 14 }}>
+              <strong style={{ fontSize: 14 }}>Cancel via SMS code</strong>
+              {otpPhase === 'cancelled' ? (
+                <p style={{ color: '#117a37', marginBottom: 0 }}>{otpMsg}</p>
+              ) : (
+                <>
+                  {otpPhase === 'idle' || otpPhase === 'requesting' ? (
+                    <div style={{ marginTop: 8 }}>
+                      <button
+                        disabled={otpPhase === 'requesting'}
+                        onClick={requestOtp}
+                        style={{ ...button, background: '#0f766e', opacity: otpPhase === 'requesting' ? 0.6 : 1 }}
+                        type="button"
+                      >
+                        {otpPhase === 'requesting' ? 'Sending…' : 'Send SMS code'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 8 }}>
+                      <input
+                        aria-label="SMS code"
+                        inputMode="numeric"
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        placeholder="6-digit code from the console"
+                        style={input}
+                        value={otpCode}
+                      />
+                      <button
+                        disabled={otpPhase === 'confirming' || otpCode.length < 6}
+                        onClick={confirmOtp}
+                        style={{ ...button, background: '#dc2626', opacity: otpPhase === 'confirming' ? 0.6 : 1 }}
+                        type="button"
+                      >
+                        {otpPhase === 'confirming' ? 'Cancelling…' : 'Confirm cancellation'}
+                      </button>
+                    </div>
+                  )}
+                  {otpMsg ? (
+                    <p style={{ color: '#52606d', fontSize: 13, marginBottom: 0 }}>{otpMsg}</p>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </main>
