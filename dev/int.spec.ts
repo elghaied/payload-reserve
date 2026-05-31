@@ -1286,6 +1286,64 @@ describe('Reservation plugin - multi-resource bookings (items array)', () => {
   })
 })
 
+describe('Reservation plugin - occupancy counting for items-held resources', () => {
+  let svcId: string
+  let primaryId: string
+  let poolId: string
+  let custId: string
+  const T = '2031-03-04T09:00:00.000Z'
+
+  beforeAll(async () => {
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'Occupancy Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60 },
+    })
+    const primary = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Occupancy Primary', active: true, services: [svc.id] },
+    })
+    const pool = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Occupancy Pool', active: true, quantity: 1, services: [svc.id] },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'occ@example.com', firstName: 'Occ', lastName: 'Test', password: 'testpass123' },
+    })
+    svcId = svc.id
+    primaryId = primary.id
+    poolId = pool.id
+    custId = cust.id
+  })
+
+  it('rejects a standalone booking on a resource already held only in another booking\'s items[]', async () => {
+    // Booking 1 holds poolId ONLY inside items[]; top-level resource is primaryId.
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: custId,
+        items: [
+          { resource: primaryId, service: svcId, startTime: T },
+          { resource: poolId, service: svcId, startTime: T },
+        ],
+        resource: primaryId,
+        service: svcId,
+        startTime: T,
+        status: 'pending',
+      },
+    })
+
+    // Booking 2 books poolId standalone at the same time. poolId quantity is 1,
+    // so this MUST be rejected once items[] occupancy is counted.
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: { customer: custId, resource: poolId, service: svcId, startTime: T, status: 'pending' },
+      }),
+    ).rejects.toThrow()
+  })
+})
+
 // ---------------------------------------------------------------------------
 // skipReservationHooks escape hatch
 // ---------------------------------------------------------------------------

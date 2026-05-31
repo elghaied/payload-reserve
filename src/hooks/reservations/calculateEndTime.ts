@@ -54,7 +54,10 @@ export const calculateEndTime =
         data.endTime = result.endTime.toISOString()
       }
     } else {
-      // Multi-resource: compute endTime per item
+      // Multi-resource: compute endTime per item, then set a top-level endTime
+      // that spans all items so conflict detection (which queries top-level
+      // startTime/endTime) can see this reservation.
+      let latestEnd: Date | undefined
       for (const item of data.items as Array<Record<string, unknown>>) {
         if (!item.startTime) {continue}
 
@@ -85,6 +88,15 @@ export const calculateEndTime =
           })
           item.endTime = result.endTime.toISOString()
         }
+
+        if (item.endTime) {
+          const end = new Date(item.endTime as string)
+          if (!latestEnd || end > latestEnd) {latestEnd = end}
+        }
+      }
+
+      if (latestEnd) {
+        data.endTime = latestEnd.toISOString()
       }
     }
 
