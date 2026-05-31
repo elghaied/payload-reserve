@@ -1757,6 +1757,23 @@ describe('AvailabilityService - pure functions', () => {
     const conditions = (where as { and: unknown[] }).and
     expect(conditions.length).toBeGreaterThanOrEqual(4)
   })
+
+  it('buildOverlapQuery: matches a resource in either top-level or items', async () => {
+    const { buildOverlapQuery } = await import('../src/services/AvailabilityService.js')
+    const where = buildOverlapQuery({
+      blockingStatuses: ['pending', 'confirmed'],
+      effectiveEnd: new Date('2030-01-01T10:00:00.000Z'),
+      effectiveStart: new Date('2030-01-01T09:00:00.000Z'),
+      resourceId: 'res-123',
+    })
+    const conditions = (where as { and: Array<Record<string, unknown>> }).and
+    const orClause = conditions.find((c) => 'or' in c) as { or: unknown[] } | undefined
+    expect(orClause).toBeDefined()
+    expect(orClause!.or).toEqual([
+      { resource: { equals: 'res-123' } },
+      { 'items.resource': { equals: 'res-123' } },
+    ])
+  })
 })
 
 // ---------------------------------------------------------------------------

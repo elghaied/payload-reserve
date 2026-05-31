@@ -45,10 +45,15 @@ export function buildOverlapQuery(params: {
     params
 
   const conditions: Where[] = [
-    { resource: { equals: resourceId } },
     { status: { in: blockingStatuses } },
     { startTime: { less_than: effectiveEnd.toISOString() } },
     { endTime: { greater_than: effectiveStart.toISOString() } },
+    {
+      or: [
+        { resource: { equals: resourceId } },
+        { 'items.resource': { equals: resourceId } },
+      ],
+    },
   ]
 
   if (excludeReservationId) {
