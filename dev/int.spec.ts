@@ -5,6 +5,7 @@ import { getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, test } from 'vitest'
 
 import { resolveConfig } from '../src/defaults.js'
+import { createBookingEndpoint } from '../src/endpoints/createBooking.js'
 import { validateGuestBooking } from '../src/hooks/reservations/validateGuestBooking.js'
 import { resolveGuestBookingAllowed } from '../src/utilities/guestBooking.js'
 
@@ -2144,5 +2145,39 @@ describe('Guest bookings - validation hook', () => {
     } as unknown as Parameters<ReturnType<typeof validateGuestBooking>>[0])
     expect(result).toBe(data)
     expect(typeof data.cancellationToken).toBe('string')
+  })
+})
+
+describe('Guest bookings - book endpoint', () => {
+  const future = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
+
+  it('book endpoint does not return the cancellationToken', async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Endpoint GB Service', active: true, allowGuestBooking: 'enabled', duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Endpoint GB Resource', active: true, services: [service.id] },
+    })
+
+    const ep = createBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () =>
+        Promise.resolve({
+          guest: { name: 'Endpoint Guest', phone: '+15551230000' },
+          resource: resource.id,
+          service: service.id,
+          startTime: future(96),
+        }),
+      payload,
+      t: (k: string) => k,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    const json = (await resp.json()) as Record<string, unknown>
+
+    expect(json.id).toBeDefined()
+    expect(json.cancellationToken).toBeUndefined()
   })
 })

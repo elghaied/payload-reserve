@@ -24,7 +24,12 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
         req,
       })
 
-      return Response.json(reservation, { status: 201 })
+      // Never expose the cancellation token in the HTTP response — it is delivered
+      // to the guest by the host project via the afterBookingCreate hook.
+      const { cancellationToken: _cancellationToken, ...safeReservation } =
+        reservation as Record<string, unknown>
+
+      return Response.json(safeReservation, { status: 201 })
     },
     method: 'post',
     path: '/reserve/book',
