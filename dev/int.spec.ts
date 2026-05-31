@@ -2004,6 +2004,39 @@ describe('resourceOwnerMode - collection factory behaviour', () => {
   })
 })
 
+describe('Guest bookings - fields', () => {
+  const findField = (slug: string, name: string) => {
+    const collection = payload.config.collections.find((c) => c.slug === slug)
+    return collection!.fields.find((f) => 'name' in f && f.name === name) as
+      | ({ name: string } & Record<string, unknown>)
+      | undefined
+  }
+
+  it('reservations customer field is optional', () => {
+    const field = findField('reservations', 'customer')
+    expect(field).toBeDefined()
+    expect(field!.required).toBeFalsy()
+  })
+
+  it('reservations has a guest group field', () => {
+    const field = findField('reservations', 'guest')
+    expect(field).toBeDefined()
+    expect(field!.type).toBe('group')
+  })
+
+  it('reservations has a cancellationToken field', () => {
+    const field = findField('reservations', 'cancellationToken')
+    expect(field).toBeDefined()
+    expect(field!.type).toBe('text')
+  })
+
+  it('services has an allowGuestBooking select field', () => {
+    const field = findField('services', 'allowGuestBooking')
+    expect(field).toBeDefined()
+    expect(field!.type).toBe('select')
+  })
+})
+
 describe('Guest bookings - config', () => {
   it('allowGuestBooking resolves to false by default', () => {
     expect(resolveConfig({}).allowGuestBooking).toBe(false)

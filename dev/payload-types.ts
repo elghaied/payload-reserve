@@ -107,6 +107,10 @@ export interface Config {
   globals: {};
   globalsSelect: {};
   locale: null;
+  widgets: {
+    'reservation-todays-reservations': ReservationTodaysReservationsWidget;
+    collections: CollectionsWidget;
+  };
   user: User | Customer;
   jobs: {
     tasks: unknown;
@@ -215,6 +219,10 @@ export interface Service {
   price?: number | null;
   bufferTimeBefore?: number | null;
   bufferTimeAfter?: number | null;
+  /**
+   * Allow bookings without a customer account. "Inherit" uses the plugin-level default.
+   */
+  allowGuestBooking?: ('inherit' | 'enabled' | 'disabled') | null;
   active?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -280,7 +288,16 @@ export interface Reservation {
   id: string;
   service: string | Service;
   resource: string | Resource;
-  customer: string | Customer;
+  customer?: (string | null) | Customer;
+  /**
+   * Contact details for a booking made without a customer account. Leave empty when a customer is set.
+   */
+  guest?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+  cancellationToken?: string | null;
   startTime: string;
   endTime?: string | null;
   status?: ('pending' | 'confirmed' | 'completed' | 'cancelled' | 'no-show') | null;
@@ -506,6 +523,7 @@ export interface ServicesSelect<T extends boolean = true> {
   price?: T;
   bufferTimeBefore?: T;
   bufferTimeAfter?: T;
+  allowGuestBooking?: T;
   active?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -569,6 +587,14 @@ export interface ReservationsSelect<T extends boolean = true> {
   service?: T;
   resource?: T;
   customer?: T;
+  guest?:
+    | T
+    | {
+        name?: T;
+        email?: T;
+        phone?: T;
+      };
+  cancellationToken?: T;
   startTime?: T;
   endTime?: T;
   status?: T;
@@ -655,6 +681,26 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reservation-todays-reservations_widget".
+ */
+export interface ReservationTodaysReservationsWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collections_widget".
+ */
+export interface CollectionsWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

@@ -100,7 +100,48 @@ export function createReservationsCollection(
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldCustomer'),
         relationTo: config.slugs.customers as unknown as CollectionSlug,
-        required: true,
+        required: false,
+      },
+      {
+        name: 'guest',
+        type: 'group',
+        admin: {
+          description:
+            'Contact details for a booking made without a customer account. Leave empty when a customer is set.',
+        },
+        fields: [
+          {
+            name: 'name',
+            type: 'text',
+            label: 'Guest name',
+            maxLength: 200,
+          },
+          {
+            name: 'email',
+            type: 'text',
+            label: 'Guest email',
+            maxLength: 200,
+          },
+          {
+            name: 'phone',
+            type: 'text',
+            label: 'Guest phone',
+            maxLength: 50,
+          },
+        ],
+        label: 'Guest',
+      },
+      {
+        name: 'cancellationToken',
+        type: 'text',
+        access: {
+          read: ({ req }) =>
+            Boolean(req.user) && req.user!.collection !== config.slugs.customers,
+        },
+        admin: {
+          hidden: true,
+        },
+        index: true,
       },
       {
         name: 'startTime',

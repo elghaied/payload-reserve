@@ -118,6 +118,21 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         min: 0,
       },
       {
+        name: 'allowGuestBooking',
+        type: 'select',
+        admin: {
+          description:
+            'Allow bookings without a customer account. "Inherit" uses the plugin-level default.',
+        },
+        defaultValue: 'inherit',
+        label: 'Guest booking',
+        options: [
+          { label: 'Inherit plugin default', value: 'inherit' },
+          { label: 'Enabled', value: 'enabled' },
+          { label: 'Disabled', value: 'disabled' },
+        ],
+      },
+      {
         name: 'active',
         type: 'checkbox',
         admin: {
