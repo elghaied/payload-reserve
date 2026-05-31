@@ -2075,3 +2075,37 @@ describe('resourceOwnerMode - collection factory behaviour', () => {
     expect((collection.access as Record<string, unknown>).read).toBe(customReadFn)
   })
 })
+
+describe('intersectIntervals', () => {
+  const iv = (s: string, e: string) => ({ end: new Date(e), start: new Date(s) })
+
+  it('returns overlap of two single intervals', async () => {
+    const { intersectIntervals } = await import('../src/utilities/slotUtils.js')
+    const out = intersectIntervals(
+      [iv('2030-01-01T09:00:00Z', '2030-01-01T12:00:00Z')],
+      [iv('2030-01-01T10:00:00Z', '2030-01-01T17:00:00Z')],
+    )
+    expect(out).toEqual([iv('2030-01-01T10:00:00Z', '2030-01-01T12:00:00Z')])
+  })
+
+  it('handles split shifts (multiple intervals per side)', async () => {
+    const { intersectIntervals } = await import('../src/utilities/slotUtils.js')
+    const out = intersectIntervals(
+      [iv('2030-01-01T09:00:00Z', '2030-01-01T12:00:00Z'), iv('2030-01-01T13:00:00Z', '2030-01-01T17:00:00Z')],
+      [iv('2030-01-01T10:00:00Z', '2030-01-01T18:00:00Z')],
+    )
+    expect(out).toEqual([
+      iv('2030-01-01T10:00:00Z', '2030-01-01T12:00:00Z'),
+      iv('2030-01-01T13:00:00Z', '2030-01-01T17:00:00Z'),
+    ])
+  })
+
+  it('returns empty when there is no overlap', async () => {
+    const { intersectIntervals } = await import('../src/utilities/slotUtils.js')
+    const out = intersectIntervals(
+      [iv('2030-01-01T09:00:00Z', '2030-01-01T10:00:00Z')],
+      [iv('2030-01-01T11:00:00Z', '2030-01-01T12:00:00Z')],
+    )
+    expect(out).toEqual([])
+  })
+})
