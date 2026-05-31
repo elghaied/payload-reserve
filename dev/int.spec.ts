@@ -2241,4 +2241,22 @@ describe('Reservation plugin - requiredResources auto-expansion', () => {
       }),
     ).rejects.toThrow()
   })
+
+  it('does not re-expand items on update (create-only)', async () => {
+    const created = await payload.create({
+      collection: col('reservations'),
+      data: { customer: custId, resource: stylistId, service: svcId, startTime: '2032-05-04T13:00:00.000Z', status: 'pending' },
+    })
+    const createdItemCount = ((created as { items?: unknown[] }).items ?? []).length
+
+    // Clear items and update; the hook must NOT re-add them on update.
+    const updated = await payload.update({
+      collection: col('reservations'),
+      id: created.id,
+      data: { items: [] },
+    })
+    expect(((updated as { items?: unknown[] }).items ?? []).length).toBe(0)
+    // Sanity: create DID expand (so the test is meaningful)
+    expect(createdItemCount).toBeGreaterThan(0)
+  })
 })

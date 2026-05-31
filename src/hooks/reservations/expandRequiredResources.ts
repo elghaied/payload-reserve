@@ -12,8 +12,9 @@ import { extractId } from '../../utilities/resolveRequiredResources.js'
  */
 export const expandRequiredResources =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
-  async ({ context, data, req }) => {
+  async ({ context, data, operation, req }) => {
     if (context?.skipReservationHooks) {return data}
+    if (operation !== 'create') {return data}
 
     const serviceId = extractId(data?.service)
     if (!serviceId || !data?.startTime) {return data}
