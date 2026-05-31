@@ -75,6 +75,9 @@ export const validateGuestBooking =
         typeof data.service === 'object'
           ? (data.service as { id?: string } | null)?.id
           : data.service
+      // `service` is a required field on the collection, so Payload's field
+      // validation (which runs before this beforeChange hook) guarantees it is
+      // present for any booking that reaches here. The guard is purely defensive.
       if (serviceId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const service = await (req.payload.findByID as any)({
