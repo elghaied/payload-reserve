@@ -2131,7 +2131,7 @@ describe('Guest bookings - validation hook', () => {
     const { resource, service } = await makeServiceAndResource('disabled')
     const hook = validateGuestBooking(resolveConfig({}))
     const data: Record<string, unknown> = {
-      guest: { email: 'admin-guest@example.com', name: 'Walk In' },
+      guest: { name: 'Walk In', email: 'admin-guest@example.com' },
       resource: resource.id,
       service: service.id,
       startTime: future(72),
@@ -2140,7 +2140,7 @@ describe('Guest bookings - validation hook', () => {
       context: {},
       data,
       operation: 'create',
-      req: { payload, t: (k: string) => k, user: { collection: 'users', id: 1 } },
+      req: { payload, t: (k: string) => k, user: { id: 1, collection: 'users' } },
     } as unknown as Parameters<ReturnType<typeof validateGuestBooking>>[0])
     expect(result).toBe(data)
     expect(typeof data.cancellationToken).toBe('string')
