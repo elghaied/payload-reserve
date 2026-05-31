@@ -50,6 +50,10 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
           cancellationReason: reason,
           status: 'cancelled',
         },
+        // Authorization (owner / admin / matching token) is already enforced above.
+        // overrideAccess lets the write proceed for anonymous guest cancellations,
+        // and avoids a spurious 500 when resourceOwnerMode restricts update access.
+        overrideAccess: true,
         req,
       })
 
