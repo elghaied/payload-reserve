@@ -2434,3 +2434,63 @@ describe('Reservation plugin - slots endpoint resource resolution', () => {
     expect(body2.slots.some((s: { start: string }) => s.start === body1.slots[0].start)).toBe(false)
   })
 })
+
+describe('Reservation plugin - multi-resource startTime span', () => {
+  let svcId: string
+  let primaryId: string
+  let earlyId: string
+  let custId: string
+  // Booking 1: top-level startTime 10:00, but an item holds `early` resource at 08:00-09:00.
+  const PRIMARY_START = '2034-02-06T10:00:00.000Z'
+  const EARLY_START = '2034-02-06T08:00:00.000Z'
+
+  beforeAll(async () => {
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'Span Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60 },
+    })
+    const primary = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Span Primary', active: true, services: [svc.id] },
+    })
+    const early = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Span Early Pool', active: true, quantity: 1, services: [svc.id] },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'span@example.com', firstName: 'Span', lastName: 'Test', password: 'testpass123' },
+    })
+    svcId = svc.id
+    primaryId = primary.id
+    earlyId = early.id
+    custId = cust.id
+  })
+
+  it('counts an items[] resource that starts before the top-level startTime', async () => {
+    // Booking 1: top-level startTime 10:00; items hold `early` at 08:00-09:00 and primary at 10:00.
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: custId,
+        items: [
+          { resource: primaryId, service: svcId, startTime: PRIMARY_START },
+          { resource: earlyId, service: svcId, startTime: EARLY_START },
+        ],
+        resource: primaryId,
+        service: svcId,
+        startTime: PRIMARY_START,
+        status: 'pending',
+      },
+    })
+
+    // Booking 2: standalone on `early` (quantity 1) at 08:00. The early pool is already
+    // occupied 08:00-09:00 by Booking 1's item, so this MUST be rejected.
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: { customer: custId, resource: earlyId, service: svcId, startTime: EARLY_START, status: 'pending' },
+      }),
+    ).rejects.toThrow()
+  })
+})

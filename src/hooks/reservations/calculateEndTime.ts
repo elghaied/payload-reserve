@@ -57,6 +57,7 @@ export const calculateEndTime =
       // Multi-resource: compute endTime per item, then set a top-level endTime
       // that spans all items so conflict detection (which queries top-level
       // startTime/endTime) can see this reservation.
+      let earliestStart: Date | undefined
       let latestEnd: Date | undefined
       for (const item of data.items as Array<Record<string, unknown>>) {
         if (!item.startTime) {continue}
@@ -89,10 +90,17 @@ export const calculateEndTime =
           item.endTime = result.endTime.toISOString()
         }
 
+        const start = new Date(item.startTime as string)
+        if (!earliestStart || start < earliestStart) {earliestStart = start}
+
         if (item.endTime) {
           const end = new Date(item.endTime as string)
           if (!latestEnd || end > latestEnd) {latestEnd = end}
         }
+      }
+
+      if (earliestStart) {
+        data.startTime = earliestStart.toISOString()
       }
 
       if (latestEnd) {
