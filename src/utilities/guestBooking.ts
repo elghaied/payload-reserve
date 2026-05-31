@@ -7,7 +7,7 @@ export type GuestBookingSetting = 'disabled' | 'enabled' | 'inherit'
  * the plugin-level default.
  */
 export function resolveGuestBookingAllowed(
-  service: { allowGuestBooking?: null | string } | null | undefined,
+  service: { allowGuestBooking?: GuestBookingSetting | null } | null | undefined,
   pluginDefault: boolean,
 ): boolean {
   const value = service?.allowGuestBooking

@@ -2005,18 +2005,19 @@ describe('resourceOwnerMode - collection factory behaviour', () => {
 })
 
 describe('Guest bookings - config', () => {
-  test('allowGuestBooking resolves to false by default', () => {
+  it('allowGuestBooking resolves to false by default', () => {
     expect(resolveConfig({}).allowGuestBooking).toBe(false)
   })
 
-  test('allowGuestBooking can be enabled at the plugin level', () => {
+  it('allowGuestBooking can be enabled at the plugin level', () => {
     expect(resolveConfig({ allowGuestBooking: true }).allowGuestBooking).toBe(true)
   })
 
-  test('resolveGuestBookingAllowed honors service override, else plugin default', () => {
+  it('resolveGuestBookingAllowed honors service override, else plugin default', () => {
     expect(resolveGuestBookingAllowed({ allowGuestBooking: 'enabled' }, false)).toBe(true)
     expect(resolveGuestBookingAllowed({ allowGuestBooking: 'disabled' }, true)).toBe(false)
     expect(resolveGuestBookingAllowed({ allowGuestBooking: 'inherit' }, true)).toBe(true)
+    expect(resolveGuestBookingAllowed({ allowGuestBooking: null }, true)).toBe(true)
     expect(resolveGuestBookingAllowed({}, true)).toBe(true)
     expect(resolveGuestBookingAllowed(undefined, false)).toBe(false)
   })
