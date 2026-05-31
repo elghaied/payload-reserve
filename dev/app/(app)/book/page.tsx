@@ -36,8 +36,9 @@ const button: React.CSSProperties = {
 }
 
 function defaultStart(): string {
-  // tomorrow at 10:00, formatted for <input type="datetime-local">
-  const d = new Date(Date.now() + 24 * 3600_000)
+  // two days out at 10:00 (clears the 24h cancellation-notice window),
+  // formatted for <input type="datetime-local">
+  const d = new Date(Date.now() + 48 * 3600_000)
   d.setHours(10, 0, 0, 0)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
@@ -281,43 +282,48 @@ export default function BookPage() {
               <strong style={{ fontSize: 14 }}>Cancel via SMS code</strong>
               {otpPhase === 'cancelled' ? (
                 <p style={{ color: '#117a37', marginBottom: 0 }}>{otpMsg}</p>
+              ) : otpPhase === 'idle' ? (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    onClick={requestOtp}
+                    style={{ ...button, background: '#0f766e' }}
+                    type="button"
+                  >
+                    Send SMS code
+                  </button>
+                </div>
               ) : (
-                <>
-                  {otpPhase === 'idle' || otpPhase === 'requesting' ? (
-                    <div style={{ marginTop: 8 }}>
-                      <button
-                        disabled={otpPhase === 'requesting'}
-                        onClick={requestOtp}
-                        style={{ ...button, background: '#0f766e', opacity: otpPhase === 'requesting' ? 0.6 : 1 }}
-                        type="button"
-                      >
-                        {otpPhase === 'requesting' ? 'Sending…' : 'Send SMS code'}
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: 8 }}>
-                      <input
-                        aria-label="SMS code"
-                        inputMode="numeric"
-                        onChange={(e) => setOtpCode(e.target.value)}
-                        placeholder="6-digit code from the console"
-                        style={input}
-                        value={otpCode}
-                      />
-                      <button
-                        disabled={otpPhase === 'confirming' || otpCode.length < 6}
-                        onClick={confirmOtp}
-                        style={{ ...button, background: '#dc2626', opacity: otpPhase === 'confirming' ? 0.6 : 1 }}
-                        type="button"
-                      >
-                        {otpPhase === 'confirming' ? 'Cancelling…' : 'Confirm cancellation'}
-                      </button>
-                    </div>
-                  )}
+                <div style={{ marginTop: 8 }}>
+                  <input
+                    aria-label="SMS code"
+                    inputMode="numeric"
+                    onChange={(e) => setOtpCode(e.target.value)}
+                    placeholder="6-digit code from the console"
+                    style={input}
+                    value={otpCode}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      disabled={otpCode.length < 6 || otpPhase === 'confirming'}
+                      onClick={confirmOtp}
+                      style={{ ...button, background: '#dc2626', opacity: otpPhase === 'confirming' ? 0.6 : 1 }}
+                      type="button"
+                    >
+                      {otpPhase === 'confirming' ? 'Cancelling…' : 'Confirm cancellation'}
+                    </button>
+                    <button
+                      disabled={otpPhase === 'requesting'}
+                      onClick={requestOtp}
+                      style={{ ...button, background: '#e5e7eb', color: '#111', opacity: otpPhase === 'requesting' ? 0.6 : 1 }}
+                      type="button"
+                    >
+                      {otpPhase === 'requesting' ? 'Sending…' : 'Resend code'}
+                    </button>
+                  </div>
                   {otpMsg ? (
                     <p style={{ color: '#52606d', fontSize: 13, marginBottom: 0 }}>{otpMsg}</p>
                   ) : null}
-                </>
+                </div>
               )}
             </div>
           ) : null}

@@ -8,12 +8,16 @@ import { randomInt } from 'node:crypto'
  * The reservation plugin generates a `cancellationToken` for guest bookings and
  * exposes it server-side (never over HTTP). Here the dev app keeps that token
  * server-side, hands the guest a short OTP over SMS (via the SMS plugin's mock
- * adapter), and only after the OTP is verified does it redeem the real token
- * against the plugin's public `/api/reserve/cancel` endpoint.
+ * adapter), and only after the OTP is verified does it cancel the booking.
  *
  * Two endpoints:
  *   POST /api/dev/request-cancel-otp  { reservationId }          → sends a code
  *   POST /api/dev/confirm-cancel-otp  { reservationId, code }    → cancels
+ *
+ * Note: these operations intentionally do NOT pass `req` to payload.create/
+ * update/find. Custom endpoints don't auto-commit the request transaction, so a
+ * write tied to `req` would silently roll back. Running them standalone (with
+ * overrideAccess) makes each write commit on its own.
  */
 
 const OTP_TTL_MS = 10 * 60_000
@@ -37,7 +41,6 @@ const requestCancelOtp: Endpoint = {
       collection: 'reservations',
       depth: 0,
       overrideAccess: true,
-      req,
     })
 
     const phone = (reservation?.guest as { phone?: string } | undefined)?.phone
@@ -60,7 +63,6 @@ const requestCancelOtp: Endpoint = {
       depth: 0,
       limit: 1,
       overrideAccess: true,
-      req,
       where: { reservation: { equals: reservationId } },
     })
 
@@ -71,7 +73,6 @@ const requestCancelOtp: Endpoint = {
         collection: 'cancel-otps',
         data: { code, expiresAt },
         overrideAccess: true,
-        req,
       })
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,7 +80,6 @@ const requestCancelOtp: Endpoint = {
         collection: 'cancel-otps',
         data: { code, expiresAt, reservation: reservationId as string },
         overrideAccess: true,
-        req,
       })
     }
 
@@ -110,13 +110,15 @@ const confirmCancelOtp: Endpoint = {
       depth: 0,
       limit: 1,
       overrideAccess: true,
-      req,
       where: { reservation: { equals: reservationId } },
     })
     const record = found.docs?.[0]
 
-    if (!record || record.code !== code || new Date(record.expiresAt as string) < new Date()) {
-      return Response.json({ message: 'Invalid or expired code' }, { status: 400 })
+    if (!record || record.code !== code) {
+      return Response.json({ message: 'Invalid code' }, { status: 400 })
+    }
+    if (new Date(record.expiresAt as string) < new Date()) {
+      return Response.json({ message: 'Code expired — request a new one' }, { status: 400 })
     }
 
     // OTP verified → the server has authenticated the guest, so cancel directly.
@@ -132,7 +134,6 @@ const confirmCancelOtp: Endpoint = {
         collection: 'reservations',
         data: { cancellationReason: 'Cancelled by guest via SMS OTP', status: 'cancelled' },
         overrideAccess: true,
-        req,
       })
       result = { id: cancelled.id, message: 'Cancelled', status: cancelled.status }
     } catch (err) {
@@ -145,7 +146,6 @@ const confirmCancelOtp: Endpoint = {
       id: record.id,
       collection: 'cancel-otps',
       overrideAccess: true,
-      req,
     }).catch(() => undefined)
 
     return Response.json(result, { status })
