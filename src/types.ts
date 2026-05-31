@@ -112,6 +112,8 @@ export type ReservationPluginConfig = {
   }
   /** Admin group name for all reservation collections */
   adminGroup?: string
+  /** Allow bookings without a customer account by default (per-service override available) */
+  allowGuestBooking?: boolean
   /** Hours of notice required before cancellation */
   cancellationNoticePeriod?: number
   /** Default buffer time in minutes between reservations */
@@ -148,6 +150,7 @@ export type ResolvedReservationPluginConfig = {
     services?: CollectionConfig['access']
   }
   adminGroup: string
+  allowGuestBooking: boolean
   cancellationNoticePeriod: number
   defaultBufferTime: number
   disabled: boolean

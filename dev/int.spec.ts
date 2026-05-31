@@ -4,6 +4,9 @@ import config from '@payload-config'
 import { getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, test } from 'vitest'
 
+import { resolveConfig } from '../src/defaults.js'
+import { resolveGuestBookingAllowed } from '../src/utilities/guestBooking.js'
+
 let payload: Payload
 
 afterAll(async () => {
@@ -1998,5 +2001,23 @@ describe('resourceOwnerMode - collection factory behaviour', () => {
     const collection = createResourcesCollection(resolved)
     // The custom access function should be used, not the auto-wired one
     expect((collection.access as Record<string, unknown>).read).toBe(customReadFn)
+  })
+})
+
+describe('Guest bookings - config', () => {
+  test('allowGuestBooking resolves to false by default', () => {
+    expect(resolveConfig({}).allowGuestBooking).toBe(false)
+  })
+
+  test('allowGuestBooking can be enabled at the plugin level', () => {
+    expect(resolveConfig({ allowGuestBooking: true }).allowGuestBooking).toBe(true)
+  })
+
+  test('resolveGuestBookingAllowed honors service override, else plugin default', () => {
+    expect(resolveGuestBookingAllowed({ allowGuestBooking: 'enabled' }, false)).toBe(true)
+    expect(resolveGuestBookingAllowed({ allowGuestBooking: 'disabled' }, true)).toBe(false)
+    expect(resolveGuestBookingAllowed({ allowGuestBooking: 'inherit' }, true)).toBe(true)
+    expect(resolveGuestBookingAllowed({}, true)).toBe(true)
+    expect(resolveGuestBookingAllowed(undefined, false)).toBe(false)
   })
 })
