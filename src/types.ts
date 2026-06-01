@@ -99,6 +99,36 @@ export type ResolvedResourceOwnerModeConfig = {
   ownerField: string
 }
 
+// --- Staff provisioning ---
+
+export type StaffProvisioningConfig = {
+  /** Stamp tenant / custom fields onto the provisioned Resource before create. */
+  beforeCreate?: (args: {
+    data: Record<string, unknown>
+    req: PayloadRequest
+    user: Record<string, unknown>
+  }) => Promise<Record<string, unknown>> | Record<string, unknown>
+  /** User field copied into Resource `name` (default 'name', falls back to email). */
+  nameFrom?: string
+  /** resourceType to stamp (default 'staff'). Must be a valid resourceType. */
+  resourceType?: string
+  /** Field on the user holding the role (default 'role'). */
+  roleField?: string
+  /** Role value(s) marking a user as staff. Required, non-empty. */
+  staffRoles: string[]
+  /** Auth collection holding staff users. Defaults to top-level `userCollection`. */
+  userCollection?: string
+}
+
+export type ResolvedStaffProvisioningConfig = {
+  beforeCreate?: StaffProvisioningConfig['beforeCreate']
+  nameFrom: string
+  resourceType: string
+  roleField: string
+  staffRoles: string[]
+  userCollection: string
+}
+
 // --- Plugin configuration ---
 
 export type ReservationPluginConfig = {
@@ -122,8 +152,12 @@ export type ReservationPluginConfig = {
   extraReservationFields?: Field[]
   /** Plugin hooks for external integrations */
   hooks?: ReservationPluginHooks
+  /** Configurable leave/exception type vocabulary (default: vacation/sick/personal/closure/other) */
+  leaveTypes?: string[]
   /** Enable resource-owner multi-tenancy (opt-in) */
   resourceOwnerMode?: ResourceOwnerModeConfig
+  /** Configurable resourceType vocabulary (default: staff/equipment/room) */
+  resourceTypes?: string[]
   /** Override collection slugs */
   slugs?: {
     customers?: string
@@ -133,6 +167,8 @@ export type ReservationPluginConfig = {
     schedules?: string
     services?: string
   }
+  /** Auto-provision a Resource from staff-role users (opt-in; requires resourceOwnerMode) */
+  staffProvisioning?: StaffProvisioningConfig
   /** Configurable status machine (defaults to current behavior) */
   statusMachine?: Partial<StatusMachineConfig>
   /** Which existing auth collection to extend with customer fields */
@@ -153,8 +189,10 @@ export type ResolvedReservationPluginConfig = {
   disabled: boolean
   extraReservationFields: Field[]
   hooks: ReservationPluginHooks
+  leaveTypes: string[]
   localized: boolean
   resourceOwnerMode: ResolvedResourceOwnerModeConfig | undefined
+  resourceTypes: string[]
   slugs: {
     customers: string
     media: string
@@ -163,6 +201,7 @@ export type ResolvedReservationPluginConfig = {
     schedules: string
     services: string
   }
+  staffProvisioning: ResolvedStaffProvisioningConfig | undefined
   statusMachine: StatusMachineConfig
   userCollection: string | undefined
 }

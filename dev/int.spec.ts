@@ -2494,3 +2494,54 @@ describe('Reservation plugin - multi-resource startTime span', () => {
     ).rejects.toThrow()
   })
 })
+
+describe('staffProvisioning + vocab config', () => {
+  it('resolveConfig applies vocab defaults', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const r = resolveConfig({})
+    expect(r.resourceTypes).toEqual(['staff', 'equipment', 'room'])
+    expect(r.leaveTypes).toEqual(['vacation', 'sick', 'personal', 'closure', 'other'])
+    expect(r.staffProvisioning).toBeUndefined()
+  })
+
+  it('resolveConfig resolves staffProvisioning defaults', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const r = resolveConfig({
+      resourceOwnerMode: {},
+      staffProvisioning: { staffRoles: ['staff'], userCollection: 'users' },
+    })
+    expect(r.staffProvisioning).toMatchObject({
+      nameFrom: 'name',
+      resourceType: 'staff',
+      roleField: 'role',
+      staffRoles: ['staff'],
+      userCollection: 'users',
+    })
+  })
+
+  it('throws when staffProvisioning set without resourceOwnerMode', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ staffProvisioning: { staffRoles: ['staff'], userCollection: 'users' } }))
+      .toThrow(/resourceOwnerMode/)
+  })
+
+  it('throws when staffRoles empty', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ resourceOwnerMode: {}, staffProvisioning: { staffRoles: [], userCollection: 'users' } }))
+      .toThrow(/staffRoles/)
+  })
+
+  it('throws when resourceType not in resourceTypes', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({
+      resourceOwnerMode: {},
+      staffProvisioning: { resourceType: 'wizard', staffRoles: ['staff'], userCollection: 'users' },
+    })).toThrow(/resourceType/)
+  })
+
+  it('throws when no userCollection resolvable', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ resourceOwnerMode: {}, staffProvisioning: { staffRoles: ['staff'] } }))
+      .toThrow(/userCollection/)
+  })
+})
