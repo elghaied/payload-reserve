@@ -2544,4 +2544,14 @@ describe('staffProvisioning + vocab config', () => {
     expect(() => resolveConfig({ resourceOwnerMode: {}, staffProvisioning: { staffRoles: ['staff'] } }))
       .toThrow(/userCollection/)
   })
+
+  it('throws when resourceTypes is empty', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ resourceTypes: [] })).toThrow(/resourceTypes/)
+  })
+
+  it('throws when leaveTypes is empty', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ leaveTypes: [] })).toThrow(/leaveTypes/)
+  })
 })

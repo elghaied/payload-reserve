@@ -48,7 +48,7 @@ function resolveStaffProvisioning(
   if (!pluginOptions.resourceOwnerMode) {
     throw new Error('staffProvisioning requires resourceOwnerMode to be enabled')
   }
-  if (!Array.isArray(sp.staffRoles) || sp.staffRoles.length === 0) {
+  if (sp.staffRoles.length === 0) {
     throw new Error('staffProvisioning.staffRoles must be a non-empty array')
   }
   const resourceType = sp.resourceType ?? 'staff'
@@ -90,6 +90,14 @@ export const DEFAULT_CANCELLATION_NOTICE_PERIOD = 24
 export function resolveConfig(
   pluginOptions: ReservationPluginConfig,
 ): ResolvedReservationPluginConfig {
+  if (pluginOptions.resourceTypes !== undefined && pluginOptions.resourceTypes.length === 0) {
+    throw new Error('resourceTypes must be a non-empty array')
+  }
+  if (pluginOptions.leaveTypes !== undefined && pluginOptions.leaveTypes.length === 0) {
+    throw new Error('leaveTypes must be a non-empty array')
+  }
+
+  const resourceTypes = pluginOptions.resourceTypes ?? DEFAULT_RESOURCE_TYPES
   const userStatusMachine = pluginOptions.statusMachine
   const rom = pluginOptions.resourceOwnerMode
   const resolved: ResolvedReservationPluginConfig = {
@@ -110,7 +118,7 @@ export function resolveConfig(
           ownerField: rom.ownerField ?? 'owner',
         }
       : undefined,
-    resourceTypes: pluginOptions.resourceTypes ?? DEFAULT_RESOURCE_TYPES,
+    resourceTypes,
     slugs: {
       customers: pluginOptions.slugs?.customers ?? DEFAULT_SLUGS.customers,
       media: pluginOptions.slugs?.media ?? DEFAULT_SLUGS.media,
@@ -119,7 +127,7 @@ export function resolveConfig(
       schedules: pluginOptions.slugs?.schedules ?? DEFAULT_SLUGS.schedules,
       services: pluginOptions.slugs?.services ?? DEFAULT_SLUGS.services,
     },
-    staffProvisioning: undefined,
+    staffProvisioning: resolveStaffProvisioning(pluginOptions, resourceTypes),
     statusMachine: userStatusMachine
       ? {
           blockingStatuses:
@@ -134,7 +142,6 @@ export function resolveConfig(
     userCollection: pluginOptions.userCollection ?? undefined,
   }
 
-  resolved.staffProvisioning = resolveStaffProvisioning(pluginOptions, resolved.resourceTypes)
   validateStatusMachine(resolved.statusMachine)
 
   return resolved
