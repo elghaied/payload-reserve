@@ -2622,3 +2622,35 @@ describe('resolveOwnerValue', () => {
     expect(out).toBe('staff-7')
   })
 })
+
+describe('Schedule exceptions range fields', () => {
+  it('exceptions array has endDate and type subfields', () => {
+    const schedules = payload.config.collections.find((c) => c.slug === 'schedules')!
+    const exceptions = schedules.fields.find(
+      (f): f is { fields: Field[]; name: string } & Field => 'name' in f && f.name === 'exceptions',
+    )!
+    const sub = exceptions.fields
+      .filter((f): f is { name: string } & Field => 'name' in f)
+      .map((f) => f.name)
+    expect(sub).toContain('endDate')
+    expect(sub).toContain('type')
+  })
+
+  it('rejects an exception whose endDate precedes date', async () => {
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Sched Range Res', active: true },
+    })
+    await expect(
+      payload.create({
+        collection: col('schedules'),
+        data: {
+          name: 'Bad Range',
+          exceptions: [{ date: '2026-06-10T00:00:00.000Z', endDate: '2026-06-08T00:00:00.000Z' }],
+          resource: resource.id,
+          scheduleType: 'recurring',
+        },
+      }),
+    ).rejects.toThrow()
+  })
+})

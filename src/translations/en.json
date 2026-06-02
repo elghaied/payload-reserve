@@ -26,6 +26,7 @@
   "fieldDay": "Day",
   "fieldManualSlots": "Manual Slots",
   "fieldDate": "Date",
+  "fieldEndDate": "End date",
   "fieldExceptions": "Exceptions",
   "fieldReason": "Reason",
   "fieldDurationMinutes": "Duration (minutes)",
