@@ -2846,4 +2846,28 @@ describe('provisionStaffResource hook', () => {
     } as never)
     expect(created).toHaveLength(1)
   })
+
+  it('swallows and logs a provisioning failure instead of throwing', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const errors: unknown[] = []
+    const req = {
+      payload: {
+        create: () => Promise.reject(new Error('boom')),
+        find: () => Promise.resolve({ docs: [] }),
+        logger: { error: (e: unknown) => errors.push(e) },
+      },
+      transactionID: 'txn-1',
+      user: { id: 'admin1' },
+    }
+    await expect(
+      hook({
+        context: {},
+        doc: { id: 'staff9', name: 'Gus', email: 'g@x.com', role: 'staff' },
+        operation: 'create',
+        req: req as never,
+      } as never),
+    ).resolves.toBeDefined()
+    expect(errors).toHaveLength(1)
+  })
 })

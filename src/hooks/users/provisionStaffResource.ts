@@ -1,4 +1,4 @@
-import type { CollectionAfterChangeHook } from 'payload'
+import type { CollectionAfterChangeHook, CollectionSlug } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
@@ -39,47 +39,55 @@ export const provisionStaffResource =
     }
 
     if (operation === 'update') {
+      // Skip if the user was already staff — provisioned on a prior save.
       const wasStaff = roleMatches(
         (previousDoc as Record<string, unknown> | undefined)?.[sp.roleField],
         sp.staffRoles,
       )
       if (wasStaff) {
         return doc
-      } // already provisioned on a prior save
+      }
     }
 
     const ownerField = config.resourceOwnerMode?.ownerField ?? 'owner'
 
-    // Idempotency: skip if a resource already owns this user.
-    const existing = await req.payload.find({
-      collection: config.slugs.resources as never,
-      depth: 0,
-      limit: 1,
-      req,
-      where: { [ownerField]: { equals: d.id } },
-    })
-    if (existing.docs.length > 0) {
-      return doc
-    }
+    try {
+      // Idempotency: skip if a resource already owns this user.
+      const existing = await req.payload.find({
+        collection: config.slugs.resources as unknown as CollectionSlug,
+        depth: 0,
+        limit: 1,
+        req,
+        where: { [ownerField]: { equals: d.id } },
+      })
+      if (existing.docs.length > 0) {
+        return doc
+      }
 
-    let data: Record<string, unknown> = {
-      name: (d[sp.nameFrom] as string) ?? (d.email as string),
-      [ownerField]: d.id,
-      quantity: 1,
-      resourceType: sp.resourceType,
-    }
+      let data: Record<string, unknown> = {
+        name: (d[sp.nameFrom] as string) ?? (d.email as string),
+        [ownerField]: d.id,
+        quantity: 1,
+        resourceType: sp.resourceType,
+      }
 
-    if (sp.beforeCreate) {
-      data = await sp.beforeCreate({ data, req, user: d })
-    }
+      if (sp.beforeCreate) {
+        data = await sp.beforeCreate({ data, req, user: d })
+      }
 
-    // Impersonate the new staff user so the owner field resolves to them, not
-    // the admin who triggered the create. Spread preserves the transaction.
-    await req.payload.create({
-      collection: config.slugs.resources as never,
-      data,
-      req: { ...req, user: { ...d, collection: sp.userCollection } } as typeof req,
-    })
+      // Impersonate the new staff user so the owner field resolves to them, not
+      // the admin who triggered the create. Spread preserves the transaction.
+      await req.payload.create({
+        collection: config.slugs.resources as unknown as CollectionSlug,
+        data,
+        req: { ...req, user: { ...d, collection: sp.userCollection } } as typeof req,
+      })
+    } catch (err) {
+      req.payload.logger.error({
+        err,
+        msg: `provisionStaffResource: failed to provision a resource for user ${String(d.id)}`,
+      })
+    }
 
     return doc
   }
