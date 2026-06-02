@@ -3209,3 +3209,14 @@ describe('AvailabilityTimeField wiring', () => {
     expect(startTime.admin?.components?.Field).toBeTruthy()
   })
 })
+
+describe('localDayKey', () => {
+  it('uses local calendar components (not UTC)', async () => {
+    const { localDayKey } = await import('../src/utilities/slotUtils.js')
+    // Construct a local-midnight date; key must equal that local calendar day
+    const d = new Date(2026, 5, 9, 0, 0, 0, 0) // local 2026-06-09 00:00
+    expect(localDayKey(d)).toBe('2026-06-09')
+    const evening = new Date(2026, 5, 9, 23, 30, 0, 0)
+    expect(localDayKey(evening)).toBe('2026-06-09')
+  })
+})

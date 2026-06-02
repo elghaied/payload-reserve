@@ -3,6 +3,7 @@ import type { Endpoint, Payload, Where } from 'payload'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { resolveScheduleForDate } from '../utilities/scheduleUtils.js'
+import { localDayKey } from '../utilities/slotUtils.js'
 
 type DayAvailability = {
   date: string
@@ -16,8 +17,6 @@ export type ResourceAvailability = {
   days: DayAvailability[]
   quantity: number
 }
-
-const dayKey = (d: Date) => d.toISOString().split('T')[0]
 
 export async function buildResourceAvailability(params: {
   blockingStatuses: string[]
@@ -66,15 +65,16 @@ export async function buildResourceAvailability(params: {
 
   const days: DayAvailability[] = []
   for (let d = new Date(start); d < end; d = new Date(d.getTime() + 86_400_000)) {
-    const date = dayKey(d)
+    const date = localDayKey(d)
     const shiftWindows: DayAvailability['shiftWindows'] = []
     const timeOff: DayAvailability['timeOff'] = []
+    const localMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate())
 
     for (const sched of schedules as Array<Record<string, unknown>>) {
       // resolveScheduleForDate accepts a Schedule-shaped object; cast through unknown
       const ranges = resolveScheduleForDate(
         sched as unknown as Parameters<typeof resolveScheduleForDate>[0],
-        new Date(`${date}T00:00:00.000Z`),
+        localMidnight,
       )
       for (const r of ranges) {
         shiftWindows.push({ end: r.end.toISOString(), start: r.start.toISOString() })
@@ -82,14 +82,16 @@ export async function buildResourceAvailability(params: {
 
       const exceptions = (sched.exceptions as RawException[] | undefined) ?? []
       for (const exc of exceptions) {
-        const excStart = new Date(exc.date).toISOString().split('T')[0]
-        const excEnd = exc.endDate ? new Date(exc.endDate).toISOString().split('T')[0] : excStart
+        const excStart = localDayKey(new Date(exc.date))
+        const excEnd = exc.endDate ? localDayKey(new Date(exc.endDate)) : excStart
         if (date >= excStart && date <= excEnd) {
+          const localStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
+          const localEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
           timeOff.push({
             type: exc.type,
-            end: `${date}T23:59:59.999Z`,
+            end: localEnd.toISOString(),
             reason: exc.reason,
-            start: `${date}T00:00:00.000Z`,
+            start: localStart.toISOString(),
           })
         }
       }

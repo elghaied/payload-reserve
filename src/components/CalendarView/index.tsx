@@ -9,6 +9,7 @@ import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { statusToI18nKey } from '../../utilities/i18nUtils.js'
+import { localDayKey } from '../../utilities/slotUtils.js'
 import styles from './CalendarView.module.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
 import { useResourceAvailability } from './useResourceAvailability.js'
@@ -743,7 +744,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     const daySlotMaps = availability
       ? new Map(
           weekDays.map((day) => {
-            const isoDay = day.toISOString().split('T')[0]
+            const isoDay = localDayKey(day)
             const dayAvail = availability.days.find((d) => d.date === isoDay)
             const dayStart = new Date(day)
             dayStart.setHours(gridStartHour, 0, 0, 0)
@@ -795,7 +796,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               clickDate.setHours(hour, 0, 0, 0)
 
               // Slot state (only when a resource is selected)
-              const isoDay = day.toISOString().split('T')[0]
+              const isoDay = localDayKey(day)
               const slotMap = daySlotMaps?.get(isoDay)
               const slotInfo = slotMap?.get(clickDate.toISOString()) ?? null
 
@@ -884,7 +885,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     // Build slot-state map for the current day when a resource is selected
     let daySlotMap: Map<string, SlotInfo> | null = null
     if (availability) {
-      const isoDay = currentDate.toISOString().split('T')[0]
+      const isoDay = localDayKey(currentDate)
       const dayAvail = availability.days.find((d) => d.date === isoDay)
       const dayStart = new Date(currentDate)
       dayStart.setHours(gridStartHour, 0, 0, 0)
@@ -942,7 +943,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           }
 
           // Time-off label
-          const isoDay = currentDate.toISOString().split('T')[0]
+          const isoDay = localDayKey(currentDate)
           const dayAvail = availability?.days.find((d) => d.date === isoDay)
           const timeOffEntry =
             slotInfo?.state === 'time-off'

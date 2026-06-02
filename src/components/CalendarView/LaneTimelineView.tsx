@@ -2,6 +2,7 @@
 import React from 'react'
 
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
+import { localDayKey } from '../../utilities/slotUtils.js'
 import styles from './CalendarView.module.css'
 import { useResourceAvailability } from './useResourceAvailability.js'
 
@@ -27,7 +28,7 @@ function Lane({
   dayEnd.setHours(HOUR_END, 0, 0, 0)
 
   const { data } = useResourceAvailability(apiBase, resource.id, dayStart, dayEnd)
-  const isoDay = day.toISOString().split('T')[0]
+  const isoDay = localDayKey(day)
   const dayAvail = data?.days.find((d) => d.date === isoDay)
 
   const slots = dayAvail
