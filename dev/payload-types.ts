@@ -236,7 +236,7 @@ export interface Resource {
   name: string;
   image?: (string | null) | Media;
   description?: string | null;
-  services: (string | Service)[];
+  services?: (string | Service)[] | null;
   active?: boolean | null;
   quantity: number;
   capacityMode?: ('per-reservation' | 'per-guest') | null;
@@ -273,6 +273,8 @@ export interface Schedule {
   exceptions?:
     | {
         date: string;
+        endDate?: string | null;
+        type?: ('vacation' | 'sick' | 'personal' | 'closure' | 'other') | null;
         reason?: string | null;
         id?: string | null;
       }[]
@@ -565,6 +567,8 @@ export interface SchedulesSelect<T extends boolean = true> {
     | T
     | {
         date?: T;
+        endDate?: T;
+        type?: T;
         reason?: T;
         id?: T;
       };
