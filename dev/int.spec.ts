@@ -2983,3 +2983,54 @@ describe('plugin wires staff provisioning', () => {
     ).toThrow(/nonexistent/)
   })
 })
+
+describe('isPrivilegedUser (role-aware staff detection)', () => {
+  const twoCollection = { slugs: { customers: 'customers' } }
+  const singleCollection = {
+    resourceOwnerMode: { adminRoles: ['admin'] },
+    slugs: { customers: 'users' },
+    staffProvisioning: { roleField: 'role', staffRoles: ['staff'] },
+    userCollection: 'users',
+  }
+
+  it('two-collection: a user outside the customers collection is privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users' } as never, twoCollection as never)).toBe(true)
+  })
+
+  it('two-collection: a user in the customers collection is not privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'customers' } as never, twoCollection as never)).toBe(false)
+  })
+
+  it('single-collection: staff role is privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: 'staff' } as never, singleCollection as never)).toBe(true)
+  })
+
+  it('single-collection: admin role is privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: 'admin' } as never, singleCollection as never)).toBe(true)
+  })
+
+  it('single-collection: customer role is not privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: 'customer' } as never, singleCollection as never)).toBe(false)
+  })
+
+  it('single-collection: array-valued role matches', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: ['customer', 'staff'] } as never, singleCollection as never)).toBe(true)
+  })
+
+  it('single-collection with no privileged roles configured: treats everyone as customer', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    const cfg = { slugs: { customers: 'users' }, userCollection: 'users' }
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: 'admin' } as never, cfg as never)).toBe(false)
+  })
+
+  it('returns false for no user', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser(null, twoCollection as never)).toBe(false)
+  })
+})

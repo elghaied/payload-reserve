@@ -2,6 +2,8 @@ import type { CollectionSlug, Endpoint, Field, Where } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { isPrivilegedUser, privilegedRoles } from '../utilities/userRoles.js'
+
 /**
  * Inspect a collection's field list and return the set of top-level named
  * fields as a plain Set<string>. Unnamed fields (rows, groups without a name,
@@ -26,8 +28,9 @@ export function createCustomerSearchEndpoint(
         return Response.json({ message: 'Unauthorized' }, { status: 401 })
       }
 
-      // Only allow staff/admin users (non-customer collection) to search customers
-      if (req.user.collection === config.slugs.customers) {
+      // Only staff/admin may search customers. Role-aware so it works when staff
+      // and customers share one auth collection (userCollection set).
+      if (!isPrivilegedUser(req.user, config)) {
         return Response.json({ message: 'Forbidden' }, { status: 403 })
       }
 
@@ -47,7 +50,7 @@ export function createCustomerSearchEndpoint(
       const hasLastName = availableFields.has('lastName')
       const hasPhone = availableFields.has('phone')
 
-      let where: Where = {}
+      const andClauses: Where[] = []
 
       if (search) {
         const orClauses: Where[] = []
@@ -67,8 +70,26 @@ export function createCustomerSearchEndpoint(
           orClauses.push({ phone: { contains: search } })
         }
 
-        where = { or: orClauses }
+        andClauses.push({ or: orClauses })
       }
+
+      // Single-collection mode: staff/admin live in the same collection as
+      // customers, so exclude privileged roles — the dropdown should list only
+      // actual customers, not bookable-looking staff.
+      if (config.userCollection) {
+        const roleField = config.staffProvisioning?.roleField ?? 'role'
+        const priv = privilegedRoles(config)
+        if (priv.length > 0) {
+          andClauses.push({ [roleField]: { not_in: priv } })
+        }
+      }
+
+      const where: Where =
+        andClauses.length === 0
+          ? {}
+          : andClauses.length === 1
+            ? andClauses[0]
+            : { and: andClauses }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await (req.payload.find as any)({

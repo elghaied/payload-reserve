@@ -6,6 +6,7 @@ import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { validateTransition } from '../../services/AvailabilityService.js'
+import { isPrivilegedUser } from '../../utilities/userRoles.js'
 
 export const validateStatusTransition =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
@@ -19,8 +20,9 @@ export const validateStatusTransition =
       // context.allowConfirmedOnCreate is the escape hatch for payment hooks
       // that need to create confirmed reservations programmatically
       const hasContextBypass = Boolean(context?.allowConfirmedOnCreate)
-      // Admin = user from a non-customer collection (e.g., 'users' admin collection)
-      const isAdmin = req.user != null && req.user.collection !== config.slugs.customers
+      // Staff/admin detection: collection-based, with a role-based fallback for
+      // single-collection deployments (userCollection set). See isPrivilegedUser.
+      const isAdmin = isPrivilegedUser(req.user, config)
       const defaultStatus = statusMachine.defaultStatus
       const nonDefaultStatuses = statusMachine.transitions[defaultStatus] ?? []
       const allowedOnCreate: string[] = (isAdmin || hasContextBypass)
