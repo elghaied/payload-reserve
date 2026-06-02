@@ -1,8 +1,10 @@
 'use client'
 import type { DateFieldClientComponent } from 'payload'
 
-import { FieldLabel, useConfig, useField, useFormFields } from '@payloadcms/ui'
+import { FieldLabel, useConfig, useField, useFormFields, useTranslation } from '@payloadcms/ui'
 import React, { useEffect, useState } from 'react'
+
+import type { PluginT } from '../../translations/index.js'
 
 import styles from './AvailabilityTimeField.module.css'
 
@@ -28,6 +30,8 @@ const toLocalInput = (d: Date) => `${toLocalDay(d)}T${pad(d.getHours())}:${pad(d
 export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: pathProp }) => {
   const fieldPath = pathProp ?? field?.name ?? 'startTime'
   const { config } = useConfig()
+  const { t: _t } = useTranslation()
+  const t = _t as PluginT
   const { setValue, value } = useField<string>({ path: fieldPath })
 
   const service = useFormFields(([fields]) => fields?.service?.value)
@@ -75,7 +79,7 @@ export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: p
           type="datetime-local"
           value={value ? toLocalInput(new Date(value)) : ''}
         />
-        <p className={styles.hint}>Select a service and staff to see available times.</p>
+        <p className={styles.hint}>{t('reservation:pickPrompt')}</p>
       </div>
     )
   }
@@ -85,9 +89,9 @@ export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: p
       <FieldLabel label={field?.label} path={fieldPath} />
       <input className={styles.day} onChange={(e) => setDay(e.target.value)} type="date" value={day} />
       {loading ? (
-        <p className={styles.hint}>Loading available times…</p>
+        <p className={styles.hint}>{t('reservation:pickLoading')}</p>
       ) : slots.length === 0 ? (
-        <p className={styles.hint}>No available times for this day.</p>
+        <p className={styles.hint}>{t('reservation:pickNone')}</p>
       ) : (
         <div className={styles.slots}>
           {slots.map((s) => (

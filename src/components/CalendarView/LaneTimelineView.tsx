@@ -1,5 +1,9 @@
 'use client'
+import { useTranslation } from '@payloadcms/ui'
 import React from 'react'
+
+import type { PluginT } from '../../translations/index.js'
+import type { SlotState } from '../../utilities/computeSlotStates.js'
 
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { localDayKey } from '../../utilities/slotUtils.js'
@@ -10,6 +14,13 @@ type LaneResource = { id: string; name: string }
 
 const HOUR_START = 7
 const HOUR_END = 20
+
+const SLOT_STATE_KEYS: Record<SlotState, string> = {
+  free: 'reservation:slotFree',
+  full: 'reservation:slotFull',
+  'off-shift': 'reservation:slotOffShift',
+  'time-off': 'reservation:slotTimeOff',
+}
 
 function Lane({
   apiBase,
@@ -22,6 +33,9 @@ function Lane({
   onBook: (resourceId: string, startIso: string) => void
   resource: LaneResource
 }) {
+  const { t: _t } = useTranslation()
+  const t = _t as PluginT
+
   const dayStart = new Date(day)
   dayStart.setHours(HOUR_START, 0, 0, 0)
   const dayEnd = new Date(day)
@@ -59,7 +73,7 @@ function Lane({
                   ? styles.slotFull
                   : styles.slotFree
           const isFree = s.state === 'free'
-          const slotLabel = `${s.start.toLocaleTimeString()} — ${s.state}`
+          const slotLabel = `${s.start.toLocaleTimeString()} — ${t(SLOT_STATE_KEYS[s.state])}`
           return isFree ? (
             <div
               aria-label={slotLabel}
@@ -80,7 +94,7 @@ function Lane({
             <div
               className={`${styles.laneCell} ${cls}`}
               key={s.start.toISOString()}
-              title={`${s.start.toLocaleTimeString()} — ${s.state}`}
+              title={slotLabel}
             />
           )
         })}
@@ -100,8 +114,10 @@ export function LaneTimelineView({
   onBook: (resourceId: string, startIso: string) => void
   resources: LaneResource[]
 }) {
+  const { t: _t } = useTranslation()
+  const t = _t as PluginT
   if (resources.length === 0) {
-    return <p className={styles.hint}>No active resources to show.</p>
+    return <p className={styles.hint}>{t('reservation:laneNoResources')}</p>
   }
   const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i)
   return (

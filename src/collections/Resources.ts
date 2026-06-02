@@ -52,7 +52,7 @@ export function createResourcesCollection(
             ({ operation, req, value }) => resolveOwnerValue({ operation, req, value }),
           ],
         },
-        label: 'Owner',
+        label: ({ t }) => (t as PluginT)('reservation:fieldOwner'),
         relationTo: ownerCollection as unknown as CollectionSlug,
         required: true,
       }
@@ -152,7 +152,7 @@ export function createResourcesCollection(
           position: 'sidebar',
         },
         defaultValue: config.resourceTypes[0],
-        label: 'Resource type',
+        label: ({ t }) => (t as PluginT)('reservation:fieldResourceType'),
         options: buildSelectOptions(config.resourceTypes),
       },
       ...(ownerFieldDef ? [ownerFieldDef] : []),

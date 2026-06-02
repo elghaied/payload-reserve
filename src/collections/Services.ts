@@ -27,7 +27,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
               },
             ],
           },
-          label: 'Owner',
+          label: ({ t }) => (t as PluginT)('reservation:fieldOwner'),
           relationTo: config.slugs.customers as unknown as CollectionSlug,
           required: true,
         }
@@ -121,26 +121,33 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         name: 'requiredResources',
         type: 'relationship',
         admin: {
-          description:
-            'Additional resource pools every booking of this service occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full.',
+          description: ({ t }) => (t as PluginT)('reservation:fieldRequiredResourcesDesc'),
         },
         hasMany: true,
-        label: 'Required resources',
+        label: ({ t }) => (t as PluginT)('reservation:fieldRequiredResources'),
         relationTo: config.slugs.resources as unknown as CollectionSlug,
       },
       {
         name: 'allowGuestBooking',
         type: 'select',
         admin: {
-          description:
-            'Allow bookings without a customer account. "Inherit" uses the plugin-level default.',
+          description: ({ t }) => (t as PluginT)('reservation:fieldAllowGuestBookingDesc'),
         },
         defaultValue: 'inherit',
-        label: 'Guest booking',
+        label: ({ t }) => (t as PluginT)('reservation:fieldAllowGuestBooking'),
         options: [
-          { label: 'Inherit plugin default', value: 'inherit' },
-          { label: 'Enabled', value: 'enabled' },
-          { label: 'Disabled', value: 'disabled' },
+          {
+            label: ({ t }) => (t as PluginT)('reservation:guestBookingInherit'),
+            value: 'inherit',
+          },
+          {
+            label: ({ t }) => (t as PluginT)('reservation:guestBookingEnabled'),
+            value: 'enabled',
+          },
+          {
+            label: ({ t }) => (t as PluginT)('reservation:guestBookingDisabled'),
+            value: 'disabled',
+          },
         ],
       },
       {

@@ -3,6 +3,7 @@ import type { CollectionBeforeChangeHook } from 'payload'
 import { randomUUID } from 'node:crypto'
 import { ValidationError } from 'payload'
 
+import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { resolveGuestBookingAllowed } from '../../utilities/guestBooking.js'
@@ -29,7 +30,7 @@ export const validateGuestBooking =
       throw new ValidationError({
         errors: [
           {
-            message: 'A reservation requires either a customer or guest contact information.',
+            message: (req.t as PluginT)('reservation:errorGuestOrCustomerRequired'),
             path: 'customer',
           },
         ],
@@ -40,7 +41,7 @@ export const validateGuestBooking =
       throw new ValidationError({
         errors: [
           {
-            message: 'A reservation cannot have both a customer and guest contact information.',
+            message: (req.t as PluginT)('reservation:errorGuestAndCustomer'),
             path: 'guest',
           },
         ],
@@ -54,14 +55,16 @@ export const validateGuestBooking =
     // Guest path
     if (!guest?.name) {
       throw new ValidationError({
-        errors: [{ message: 'Guest bookings require a name.', path: 'guest.name' }],
+        errors: [
+          { message: (req.t as PluginT)('reservation:errorGuestNameRequired'), path: 'guest.name' },
+        ],
       })
     }
     if (!guest.email && !guest.phone) {
       throw new ValidationError({
         errors: [
           {
-            message: 'Guest bookings require an email or phone number.',
+            message: (req.t as PluginT)('reservation:errorGuestContactRequired'),
             path: 'guest.email',
           },
         ],
@@ -90,7 +93,7 @@ export const validateGuestBooking =
           throw new ValidationError({
             errors: [
               {
-                message: 'Guest bookings are not allowed for this service.',
+                message: (req.t as PluginT)('reservation:errorGuestNotAllowed'),
                 path: 'guest',
               },
             ],

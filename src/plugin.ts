@@ -17,7 +17,7 @@ import { createCustomerSearchEndpoint } from './endpoints/customerSearch.js'
 import { createGetSlotsEndpoint } from './endpoints/getSlots.js'
 import { createResourceAvailabilityEndpoint } from './endpoints/resourceAvailability.js'
 import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
-import { translations } from './translations/index.js'
+import { type PluginT, translations } from './translations/index.js'
 
 export const payloadReserve =
   (pluginOptions: ReservationPluginConfig = {}) =>
@@ -158,7 +158,7 @@ export const payloadReserve =
     config.admin.dashboard.widgets.push({
       slug: 'reservation-todays-reservations',
       Component: 'payload-reserve/rsc#DashboardWidgetServer',
-      label: 'Today\'s Reservations',
+      label: ({ t }) => (t as PluginT)('reservation:dashboardTitle'),
       maxWidth: 'large',
       minWidth: 'medium',
     })

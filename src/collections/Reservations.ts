@@ -108,29 +108,28 @@ export function createReservationsCollection(
         name: 'guest',
         type: 'group',
         admin: {
-          description:
-            'Contact details for a booking made without a customer account. Leave empty when a customer is set.',
+          description: ({ t }) => (t as PluginT)('reservation:fieldGuestDesc'),
         },
         fields: [
           {
             name: 'name',
             type: 'text',
-            label: 'Guest name',
+            label: ({ t }) => (t as PluginT)('reservation:fieldGuestName'),
             maxLength: 200,
           },
           {
             name: 'email',
             type: 'email',
-            label: 'Guest email',
+            label: ({ t }) => (t as PluginT)('reservation:fieldGuestEmail'),
           },
           {
             name: 'phone',
             type: 'text',
-            label: 'Guest phone',
+            label: ({ t }) => (t as PluginT)('reservation:fieldGuestPhone'),
             maxLength: 50,
           },
         ],
-        label: 'Guest',
+        label: ({ t }) => (t as PluginT)('reservation:fieldGuest'),
       },
       {
         name: 'cancellationToken',
@@ -207,7 +206,7 @@ export function createReservationsCollection(
         name: 'items',
         type: 'array',
         admin: {
-          description: 'Resources included in this booking. Leave empty for single-resource bookings.',
+          description: ({ t }) => (t as PluginT)('reservation:fieldItemsDesc'),
         },
         fields: [
           {

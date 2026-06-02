@@ -34,7 +34,8 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Dashboard Widget** — Server component showing today's booking stats
 - **Availability Overview** — Weekly grid of resource availability vs. booked slots
 - **Recurring and Manual Schedules** — Weekly patterns with exception dates, or specific one-off dates
-- **Localization Support** — Collection fields can be localized when Payload localization is enabled
+- **12 Bundled Languages** — Every admin string is translatable; ships with English, French, German, Spanish, Russian, Polish, Turkish, Arabic, Simplified Chinese, Indonesian, Persian/Farsi, and Hindi. Override any string or add your own language
+- **Localization Support** — Collection field *content* can be localized when Payload localization is enabled (separate from the admin-UI language above)
 - **Type-Safe** — Full TypeScript support with exported types
 
 ---
@@ -243,6 +244,27 @@ The first entry of `resourceTypes` becomes the default value for the `Resource.r
 
 The `services` relationship on Resources is now optional. This lets a freshly provisioned staff Resource exist before services are assigned, avoiding validation errors during auto-provisioning.
 
+---
+
+## Internationalization
+
+Every admin string the plugin renders — field labels, descriptions, select options, calendar/dashboard components, and validation errors — is translatable. The plugin ships **12 languages**: English, French (`fr`), German (`de`), Spanish (`es`), Russian (`ru`), Polish (`pl`), Turkish (`tr`), Arabic (`ar`), Simplified Chinese (`zh`), Indonesian (`id`), Persian/Farsi (`fa`), and Hindi (`hi`). All but Hindi ship in Payload core and appear in the admin language switcher automatically.
+
+Translations merge into your config and **your translations take precedence**, so you can override any string or add a language:
+
+```typescript
+payloadReserve()
+// and in buildConfig:
+i18n: {
+  translations: {
+    en: { reservation: { calendarLanes: 'Timeline' } }, // override a plugin string
+  },
+}
+```
+
+> **Hindi** (`hi`) is not bundled by Payload core, so register it as a custom language in your Payload `i18n` config to make it selectable — the plugin's `hi` strings then appear automatically. See the [Internationalization docs](https://github.com/elghaied/payload-reserve/blob/main/docs/i18n.md).
+
+This is separate from Payload **field localization** (localizing the *content* of fields), which the plugin's fields also support when Payload localization is enabled.
 
 ---
 
@@ -260,6 +282,7 @@ The `services` relationship on Resources is now optional. This lets a freshly pr
 | [Hooks API](https://github.com/elghaied/payload-reserve/blob/main/docs/hooks-api.md) | All 7 plugin hook types with signatures and examples |
 | [REST API](https://github.com/elghaied/payload-reserve/blob/main/docs/rest-api.md) | All 5 public endpoints with params, responses, and fetch examples |
 | [Admin UI](https://github.com/elghaied/payload-reserve/blob/main/docs/admin-ui.md) | Calendar view, dashboard widget, availability overview |
+| [Internationalization](https://github.com/elghaied/payload-reserve/blob/main/docs/i18n.md) | 12 bundled languages, overriding strings, adding a language, Hindi setup |
 | [Examples](https://github.com/elghaied/payload-reserve/blob/main/docs/examples.md) | Salon, hotel, restaurant, event venue, Stripe, email, multi-tenant (resource owner mode) |
 | [Advanced](https://github.com/elghaied/payload-reserve/blob/main/docs/advanced.md) | DB indexes, reconciliation job for race condition detection |
 | [Development](https://github.com/elghaied/payload-reserve/blob/main/docs/development.md) | Prerequisites, commands, project file tree |

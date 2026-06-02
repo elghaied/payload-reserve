@@ -101,6 +101,12 @@ payloadReserve({
 | `hooks` | `ReservationPluginHooks` | `{}` | Plugin hook callbacks |
 | `extraReservationFields` | `Field[]` | `[]` | Extra Payload fields appended to the Reservations collection |
 
+> **Vocabularies:** `resourceTypes` (default `['staff', 'equipment', 'room']`) and `leaveTypes` (default `['vacation', 'sick', 'personal', 'closure', 'other']`) customize the option lists for `Resource.resourceType` and `Schedule.exceptions[].type`. See [Staff Scheduling](../README.md#staff-scheduling).
+
+## Internationalization
+
+The plugin's admin strings are translatable and ship in 12 languages. Translations are not a plugin option — they merge into Payload's own `i18n` config (your translations take precedence), so you override strings or add languages through `buildConfig({ i18n })`. See [Internationalization](./i18n.md).
+
 ---
 
 ← [Getting Started](./getting-started.md) | → [Collections](./collections.md) | ↑ [Back to README](../README.md)
