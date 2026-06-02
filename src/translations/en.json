@@ -28,6 +28,7 @@
   "fieldDate": "Date",
   "fieldEndDate": "End date",
   "fieldExceptions": "Exceptions",
+  "fieldLeaveType": "Type",
   "fieldReason": "Reason",
   "fieldDurationMinutes": "Duration (minutes)",
   "fieldBufferTimeBefore": "Buffer Time Before (minutes)",

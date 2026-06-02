@@ -165,6 +165,7 @@ export function createSchedulesCollection(
           {
             name: 'type',
             type: 'select',
+            label: ({ t }) => (t as PluginT)('reservation:fieldLeaveType'),
             options: buildSelectOptions(config.leaveTypes),
           },
           {
