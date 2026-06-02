@@ -564,3 +564,23 @@
   color: var(--theme-elevation-400);
   font-size: 12px;
 }
+
+/* Multi-resource item badges inside event blocks */
+.eventItemExpanded {
+  overflow: visible;
+  white-space: normal;
+}
+
+.itemBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.itemBadge {
+  background: var(--theme-elevation-150);
+  border-radius: 3px;
+  font-size: 9px;
+  padding: 1px 4px;
+}

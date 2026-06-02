@@ -594,9 +594,10 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     const color = STATUS_COLORS[r.status]
     // Only apply inline style when there's no CSS class (custom statuses) or as a supplement
     const inlineStyle = cssClass ? undefined : { background: color }
+    const hasItems = Array.isArray(r.items) && r.items.length > 0
     return (
       <div
-        className={`${styles.eventItem} ${cssClass}`}
+        className={`${styles.eventItem} ${cssClass} ${hasItems && !compact ? styles.eventItemExpanded : ''}`}
         key={r.id}
         onClick={(e) => handleEventClick(e, r.id)}
         onKeyDown={(e) => handleEventKeyDown(e, r.id)}
@@ -606,6 +607,18 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         title={getEventTooltip(r)}
       >
         {getEventLabel(r, compact)}
+        {hasItems && (
+          <div className={styles.itemBadges}>
+            {r.items!.map((it, i) => {
+              const name = typeof it.resource === 'object' ? it.resource?.name : it.resource
+              return (
+                <span className={styles.itemBadge} key={i}>
+                  {String(name ?? '')}
+                </span>
+              )
+            })}
+          </div>
+        )}
       </div>
     )
   }
