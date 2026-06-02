@@ -2654,3 +2654,34 @@ describe('Schedule exceptions range fields', () => {
     ).rejects.toThrow()
   })
 })
+
+describe('isExceptionDate range-aware', () => {
+  it('matches a single-day exception (back-compat)', async () => {
+    const { isExceptionDate } = await import('../src/utilities/scheduleUtils.js')
+    expect(isExceptionDate(new Date('2026-06-10T09:00:00Z'), [{ date: '2026-06-10T00:00:00Z' }])).toBe(true)
+    expect(isExceptionDate(new Date('2026-06-11T09:00:00Z'), [{ date: '2026-06-10T00:00:00Z' }])).toBe(false)
+  })
+
+  it('matches inside a range and both boundaries inclusively', async () => {
+    const { isExceptionDate } = await import('../src/utilities/scheduleUtils.js')
+    const exc = [{ date: '2026-06-08T00:00:00Z', endDate: '2026-06-12T00:00:00Z' }]
+    expect(isExceptionDate(new Date('2026-06-08T09:00:00Z'), exc)).toBe(true) // start boundary
+    expect(isExceptionDate(new Date('2026-06-10T09:00:00Z'), exc)).toBe(true) // inside
+    expect(isExceptionDate(new Date('2026-06-12T09:00:00Z'), exc)).toBe(true) // end boundary
+    expect(isExceptionDate(new Date('2026-06-13T09:00:00Z'), exc)).toBe(false) // outside
+    expect(isExceptionDate(new Date('2026-06-07T09:00:00Z'), exc)).toBe(false) // before
+  })
+
+  it('resolveScheduleForDate returns [] inside a vacation range', async () => {
+    const { resolveScheduleForDate } = await import('../src/utilities/scheduleUtils.js')
+    const schedule = {
+      exceptions: [{ date: '2026-06-08T00:00:00Z', endDate: '2026-06-12T00:00:00Z' }],
+      recurringSlots: [{ day: 'wed' as const, endTime: '17:00', startTime: '09:00' }],
+      scheduleType: 'recurring' as const,
+    }
+    // 2026-06-10 is a Wednesday inside the range
+    expect(resolveScheduleForDate(schedule, new Date('2026-06-10T00:00:00Z'))).toEqual([])
+    // 2026-06-17 is a Wednesday outside the range
+    expect(resolveScheduleForDate(schedule, new Date('2026-06-17T00:00:00Z')).length).toBe(1)
+  })
+})
