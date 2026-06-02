@@ -1,12 +1,18 @@
 # Hooks API
 
-Plugin hook callbacks that fire at key points in the booking lifecycle. Register in the `hooks` option. All hooks receive `req` (Payload request) for full Payload instance access. Each hook type is an array — hooks fire sequentially.
+The plugin exposes hook callbacks that fire at key points in the booking lifecycle. Register them in the `hooks` option. All hooks receive the `req` object (Payload request) so you have access to the full Payload instance and request context.
 
 ```typescript
 import type { ReservationPluginHooks } from 'payload-reserve'
 
-payloadReserve({ hooks: { /* ... */ } })
+const hooks: ReservationPluginHooks = {
+  // ... hook definitions
+}
+
+payloadReserve({ hooks })
 ```
+
+Each hook type is an array — hooks fire sequentially.
 
 > **Escape hatch:** All plugin hooks respect `context.skipReservationHooks`. When you call `payload.update()` or `payload.create()` with `context: { skipReservationHooks: true }`, none of these callbacks fire — including the `afterChange` hooks that trigger `afterBookingCancel`, `afterBookingConfirm`, and `afterStatusChange`. Use this when your code handles the side-effect (email, payment) itself and must not double-fire.
 
@@ -14,21 +20,24 @@ payloadReserve({ hooks: { /* ... */ } })
 
 ## beforeBookingCreate
 
-Fires before a new reservation is saved via `POST /api/reserve/book`. Can modify booking data.
+Fires before a new reservation is saved via the `POST /api/reserve/book` endpoint. Can modify the booking data.
 
 ```typescript
 type beforeBookingCreate = Array<
-  (args: { data: Record<string, unknown>; req: PayloadRequest }) =>
-    Promise<Record<string, unknown>> | Record<string, unknown>
+  (args: {
+    data: Record<string, unknown>
+    req: PayloadRequest
+  }) => Promise<Record<string, unknown>> | Record<string, unknown>
 >
 ```
 
-Return modified data or `undefined` to keep original.
+Return the (optionally modified) data. Returning `undefined` keeps the original data.
 
 ```typescript
 hooks: {
   beforeBookingCreate: [
     async ({ data, req }) => {
+      // Attach the logged-in user as the customer
       if (req.user && !data.customer) {
         return { ...data, customer: req.user.id }
       }
@@ -42,14 +51,17 @@ hooks: {
 
 ## beforeBookingConfirm
 
-Fires before a reservation transitions to `confirmed`. Throw to block the transition.
+Fires before a reservation transitions to `confirmed`. Throw an error to block the transition.
 
 The `doc` contains the merged document (`{ ...originalDoc, ...incomingData }`), so fields like `status` reflect the **new** value being set.
 
 ```typescript
 type beforeBookingConfirm = Array<
-  (args: { doc: Record<string, unknown>; newStatus: string; req: PayloadRequest }) =>
-    Promise<void> | void
+  (args: {
+    doc: Record<string, unknown>
+    newStatus: string
+    req: PayloadRequest
+  }) => Promise<void> | void
 >
 ```
 
@@ -57,8 +69,11 @@ type beforeBookingConfirm = Array<
 hooks: {
   beforeBookingConfirm: [
     async ({ doc, req }) => {
+      // Verify payment before confirming
       const paid = await checkPaymentStatus(doc.stripeSessionId as string)
-      if (!paid) throw new Error('Payment not completed')
+      if (!paid) {
+        throw new Error('Payment not completed')
+      }
     },
   ],
 }
@@ -68,14 +83,17 @@ hooks: {
 
 ## beforeBookingCancel
 
-Fires before a reservation transitions to `cancelled`. Throw to block.
+Fires before a reservation transitions to `cancelled`. Throw an error to block the cancellation.
 
 The `doc` contains the merged document (`{ ...originalDoc, ...incomingData }`). The `reason` is passed as a separate parameter from the incoming cancellation data.
 
 ```typescript
 type beforeBookingCancel = Array<
-  (args: { doc: Record<string, unknown>; reason?: string; req: PayloadRequest }) =>
-    Promise<void> | void
+  (args: {
+    doc: Record<string, unknown>
+    reason?: string
+    req: PayloadRequest
+  }) => Promise<void> | void
 >
 ```
 
@@ -97,7 +115,10 @@ Fires after a new reservation is saved to the database.
 
 ```typescript
 type afterBookingCreate = Array<
-  (args: { doc: Record<string, unknown>; req: PayloadRequest }) => Promise<void> | void
+  (args: {
+    doc: Record<string, unknown>
+    req: PayloadRequest
+  }) => Promise<void> | void
 >
 ```
 
@@ -120,7 +141,10 @@ Fires after a reservation transitions to `confirmed`. Errors thrown in after-hoo
 
 ```typescript
 type afterBookingConfirm = Array<
-  (args: { doc: Record<string, unknown>; req: PayloadRequest }) => Promise<void> | void
+  (args: {
+    doc: Record<string, unknown>
+    req: PayloadRequest
+  }) => Promise<void> | void
 >
 ```
 
@@ -143,7 +167,10 @@ Fires after a reservation transitions to `cancelled`. Errors thrown in after-hoo
 
 ```typescript
 type afterBookingCancel = Array<
-  (args: { doc: Record<string, unknown>; req: PayloadRequest }) => Promise<void> | void
+  (args: {
+    doc: Record<string, unknown>
+    req: PayloadRequest
+  }) => Promise<void> | void
 >
 ```
 
@@ -179,8 +206,26 @@ type afterStatusChange = Array<
 hooks: {
   afterStatusChange: [
     async ({ doc, newStatus, previousStatus }) => {
+      console.log(`Reservation ${doc.id}: ${previousStatus} -> ${newStatus}`)
       await auditLog.record({ docId: doc.id, event: 'status_change', newStatus, previousStatus })
     },
   ],
 }
 ```
+
+---
+
+## Staff Resource Provisioning (user-collection hook)
+
+Separate from the booking-lifecycle hooks above, when `staffProvisioning` is configured (which also requires `resourceOwnerMode`), the plugin registers an `afterChange` hook on the staff **user collection** (`staffProvisioning.userCollection`, defaulting to the top-level `userCollection`).
+
+On user **create** — or on an **update** that promotes a user into a staff role — it provisions a paired Resource owned by that user:
+
+- **Role match** — fires only when the user's `roleField` (default `'role'`) value intersects `staffRoles`. Demoting a user never deletes their Resource.
+- **Idempotent** — skips if a Resource already owns that user, so re-saving never creates a duplicate.
+- **Impersonation-based ownership** — the Resource is created with a `req` whose `user` is the new staff user, so the owner field resolves to them (not the admin who triggered the save); no bypass flag is used.
+- **Non-blocking** — provisioning failures are caught and logged; they never block the user create/update.
+- **Respects `context.skipReservationHooks`** — exits immediately when set.
+- **`beforeCreate` escape hatch** — `staffProvisioning.beforeCreate({ data, req, user })` may stamp tenant IDs or custom fields onto the Resource before it is saved.
+
+See the **Staff Auto-Provisioning** section of [Configuration](./configuration.md) for the full option list.

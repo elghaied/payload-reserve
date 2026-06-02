@@ -4,7 +4,7 @@ Performance tuning, database indexes, and high-concurrency patterns.
 
 ## Recommended Database Indexes
 
-For production with high booking volume. The conflict detection query filters by `resource`, `status`, `startTime`, `endTime` on every create/update — the composite index is the most important.
+For production deployments with high booking volume, add these indexes to your database. The conflict detection query filters by `resource`, `status`, `startTime`, and `endTime` on every create and update — the composite `reservation_conflict_lookup` index is the most important one to add.
 
 ### MongoDB
 
@@ -41,15 +41,15 @@ CREATE INDEX reservation_conflict_lookup
   ON reservations (resource, status, startTime, endTime);
 ```
 
-> **Note:** `idempotencyKey` has `unique: true` in the Payload schema, so Payload-managed databases get this automatically. The snippets above are for manually adding it to databases created before this field existed.
+> **Note:** The `idempotencyKey` field has `unique: true` in the Payload schema definition, so Payload-managed databases will have this automatically. The snippets above are for manually adding it if your database was created before this field was introduced.
 
 ---
 
 ## Reconciliation Job
 
-For high-concurrency deployments, rare race conditions between simultaneous bookings can slip past hook-level conflict checks. A background job can detect and flag these.
+For high-concurrency deployments, rare race conditions between two simultaneous bookings can slip past the hook-level conflict check. A background reconciliation job can detect and flag these after the fact.
 
-Add to your Payload config's `jobs.tasks`:
+Add this to your Payload config's `jobs.tasks` array:
 
 ```typescript
 import type { TaskConfig } from 'payload'
@@ -57,6 +57,7 @@ import type { TaskConfig } from 'payload'
 export const reconcileReservations: TaskConfig = {
   slug: 'reconcile-reservations',
   handler: async ({ req }) => {
+    // Find all active reservations grouped by resource
     const { docs: activeReservations } = await req.payload.find({
       collection: 'reservations',
       depth: 0,
@@ -68,6 +69,7 @@ export const reconcileReservations: TaskConfig = {
       },
     })
 
+    // Group by resource and detect overlaps
     const byResource = new Map<string, typeof activeReservations>()
     for (const reservation of activeReservations) {
       const resourceId = String(reservation.resource)
@@ -89,6 +91,7 @@ export const reconcileReservations: TaskConfig = {
           const bEnd = new Date(b.endTime as string)
           if (aStart < bEnd && aEnd > bStart) {
             conflictCount++
+            // Flag or alert — e.g., add a note, send a Slack message, etc.
             console.warn(`Conflict detected: ${a.id} overlaps ${b.id}`)
           }
         }
@@ -100,4 +103,23 @@ export const reconcileReservations: TaskConfig = {
 }
 ```
 
-Run on a schedule (e.g., hourly) via Payload's job queue. Flags conflicts for human review — does not auto-resolve.
+Run this job on a schedule (e.g., hourly) using Payload's job queue. The job does not resolve conflicts automatically — it flags them for human review.
+
+---
+
+## Capacity & Quantity Race Considerations
+
+For resources with `quantity > 1` (or `capacityMode: 'per-guest'`), the hook-level check counts existing blocking reservations (or sums `guestCount`) and compares against `quantity`. Under high concurrency, two simultaneous bookings can each read capacity-not-yet-full and both succeed, briefly overbooking. The hook check is best-effort, not a transactional lock.
+
+Mitigations:
+
+- Add the conflict-lookup index above so the capacity read is fast (shrinks the race window).
+- Extend the reconciliation job to sum occupancy per resource per time window and compare against `quantity` / per-guest capacity, flagging windows where occupancy exceeds capacity.
+- For strict guarantees, enforce capacity at the database layer (e.g. a unique partial index on `(resource, startTime)` for `per-reservation, quantity: 1` resources, or an application-level lock keyed by resource).
+
+## Multi-Resource Conflict Notes
+
+When a service has `requiredResources`, the plugin expands them into `items[]` and conflict-checks each item independently against its own service's buffer times.
+
+- Conflict detection matches reservations that reference a resource **either** at the top level (`resource`) **or** inside another booking's `items[]` — a resource held only in another booking's items is not invisible.
+- A partial overbooking is possible if the primary resource is free but a required pool is full; the create is rejected atomically per booking. The reconciliation job should iterate `items[]` (not just the top-level `resource`) when grouping reservations by resource.
