@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-06-02
+
+A large feature release: multi-resource availability, staff scheduling & auto-provisioning, an availability-aware calendar, guest (account-less) bookings, and full admin-UI internationalization. The plugin's public API and config surface remain **additive** — with no new options set, behavior is unchanged — so this is a minor release. However, there are behavioral and database-migration notes existing deployments should review before upgrading.
+
+### ⚠️ Breaking changes & migration notes
+
+- **Multi-resource conflict detection corrected (behavioral).** Conflict detection previously counted only a reservation's top-level `resource` and ignored resources held in `items[]`. It now also counts `items.resource`, and multi-resource bookings receive a top-level `[startTime, endTime]` span. **Existing multi-resource deployments will start correctly rejecting bookings that previously slipped through as silent double-bookings.** Single-resource deployments are unaffected.
+- **`Reservation.customer` is now optional.** To support guest bookings, the `customer` relationship is no longer required at the schema level — a reservation must have **either** a `customer` **or** a `guest`. On Postgres the `customer` column becomes nullable.
+- **Resource `owner` collection changed for separate users/customers setups.** With `resourceOwnerMode` and **separate** `users`/`customers` collections, the `owner` relationship now points at `resourceOwnerMode.ownerCollection ?? staffProvisioning.userCollection ?? slugs.customers` instead of always `customers`. If you relied on the previous (incorrect) `customers` target, set `resourceOwnerMode.ownerCollection: 'customers'` explicitly. Single-collection / customer-owned setups are unchanged.
+- **Postgres migrations required** for the new fields: `Service.requiredResources`, `Resource.resourceType`, `Schedule.exceptions.endDate` / `exceptions.type`, the reservation `guest` group + `cancellationToken`, the `items` array, and the now-nullable `customer` (plus the `owner` relationship target change above). **MongoDB needs no migration.**
+- **`resourceType` default.** New Resources default `resourceType` to the first entry of `resourceTypes` (`'staff'` by default).
+
+### Added
+
+- **Multi-resource availability.** A service can declare `requiredResources` (e.g. a shared chair pool) that every booking of it occupies. Slot discovery (`getAvailableSlots`, `/api/reserve/slots`, `/api/reserve/availability`) intersects the schedules and capacity of all required resources, and bookings are auto-expanded into `items[]` so conflict detection blocks a booking when any required pool is full. Adds a descriptive `resourceType` field to Resources.
+- **Staff scheduling & auto-provisioning.** Opt-in `staffProvisioning` (requires `resourceOwnerMode`) auto-creates owner-scoped Resources from staff-role users, assigning ownership securely by impersonating the new staff user (no ownership-bypass flag). Adds full-day-range typed time-off on `Schedule.exceptions` (`endDate` + `type`) and configurable `resourceTypes` / `leaveTypes` vocabularies. `Resource.services` is now optional so freshly provisioned staff resources can exist before services are assigned.
+- **Availability-aware calendar & booking.** The reservation `startTime` field is now a slot picker that only offers free times for the chosen service + staff. The admin calendar's week/day views shade off-shift, time-off, and fully-booked slots when a resource is selected, show capacity (`n/quantity`), render time-off bands, and support click-to-book. Adds a resource-lane horizontal-timeline day view and multi-resource event badges, backed by a new read-only `/api/reserve/resource-availability` endpoint and a pure, tested `computeSlotStates` utility.
+- **Guest (account-less) bookings.** New `allowGuestBooking` plugin option (default `false`) plus a per-service tri-state override (`inherit` / `enabled` / `disabled`). Reservations may carry inline `guest` contact details (name + email/phone) instead of a `customer`. Guest bookings receive a `cancellationToken` exposed via the `afterBookingCreate` hook so the host can deliver an email link or SMS code; `/api/reserve/cancel` accepts `{ reservationId, token }` for unauthenticated guests. The plugin performs no email/SMS delivery itself.
+- **Internationalization.** Every admin string is now translatable, with 11 new bundled locales — French (`fr`), German (`de`), Spanish (`es`), Russian (`ru`), Polish (`pl`), Turkish (`tr`), Arabic (`ar`), Simplified Chinese (`zh`), Indonesian (`id`), Hindi (`hi`), and Persian/Farsi (`fa`) — each with full key parity with English. Translations merge into Payload's `i18n` config and host-provided translations take precedence. All locales except Hindi ship in Payload core and appear in the admin language switcher automatically; `hi` must be registered as a custom language by the host.
+
+### Fixed
+
+- **Silent double-bookings in multi-resource deployments** — conflict detection now counts `items.resource` (see Breaking changes above).
+- **Resource `owner` pointed at the wrong collection** in `resourceOwnerMode` with separate `users`/`customers` collections — it was hardcoded to `customers`. Now relates to `resourceOwnerMode.ownerCollection ?? staffProvisioning.userCollection ?? customers`, and adds an optional `resourceOwnerMode.ownerCollection` to override explicitly.
+- **Staff/admin detection in single-collection (`userCollection`) deployments.** When customers and staff share one auth collection, the previous `req.user.collection === slugs.customers` check could never identify staff. A new role-aware check (collection first, then `resourceOwnerMode.adminRoles ∪ staffProvisioning.staffRoles`) fixes creating non-default-status reservations (e.g. `confirmed`) as staff/admin, the customer-search endpoint returning 403 to staff, and cancellation permission for staff/admin. Customer search also now excludes privileged-role users from results in single-collection mode. Two-collection deployments are unaffected.
+
 ## [1.4.0] - 2026-05-22
 
 ### Fixed
