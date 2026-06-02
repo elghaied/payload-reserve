@@ -487,3 +487,41 @@
   outline: 2px solid var(--theme-text);
   outline-offset: 2px;
 }
+
+/* Availability shading (week/day views, resource selected) */
+.slotOffShift {
+  background: var(--theme-elevation-50);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.slotTimeOff {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--theme-elevation-50),
+    var(--theme-elevation-50) 6px,
+    var(--theme-elevation-100) 6px,
+    var(--theme-elevation-100) 12px
+  );
+  pointer-events: none;
+}
+
+.slotFull {
+  background: var(--theme-error-100);
+  cursor: not-allowed;
+}
+
+.slotFree {
+  cursor: pointer;
+}
+
+.capacityBadge {
+  float: right;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.timeOffLabel {
+  font-size: 10px;
+  opacity: 0.7;
+}

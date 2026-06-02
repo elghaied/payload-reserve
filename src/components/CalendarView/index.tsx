@@ -5,9 +5,12 @@ import { useConfig, useDocumentDrawer, useTranslation } from '@payloadcms/ui'
 import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
+import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 
+import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { statusToI18nKey } from '../../utilities/i18nUtils.js'
 import styles from './CalendarView.module.css'
+import { useResourceAvailability } from './useResourceAvailability.js'
 
 type ViewMode = 'day' | 'month' | 'pending' | 'week'
 
@@ -64,6 +67,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const slugs = config.admin?.custom?.reservationSlugs
   const reservationSlug = slugs?.reservations ?? 'reservations'
   const apiUrl = `${config.serverURL ?? ''}${config.routes.api}/${reservationSlug}`
+  const apiBase = `${config.serverURL ?? ''}${config.routes.api}`
 
   const statusMachine = config.admin?.custom?.reservationStatusMachine as
     | {
@@ -203,6 +207,14 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
 
     return { rangeEnd: end, rangeStart: start }
   }, [currentDate, viewMode])
+
+  // Availability data for the selected resource (null when no resource selected — grid unshaded)
+  const { data: availability } = useResourceAvailability(
+    apiBase,
+    selectedResourceId || undefined,
+    rangeStart,
+    rangeEnd,
+  )
 
   const fetchReservations = useCallback(async () => {
     setLoading(true)
@@ -465,6 +477,19 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     pendingDrawerOpen.current = true
   }, [])
 
+  // Click-to-book: open new-reservation drawer pre-filled with startTime + optional resource
+  const handleSlotClick = useCallback(
+    (startIso: string) => {
+      setDrawerDocId(null)
+      setInitialData({
+        ...(selectedResourceId ? { resource: selectedResourceId } : {}),
+        startTime: startIso,
+      })
+      pendingDrawerOpen.current = true
+    },
+    [selectedResourceId],
+  )
+
   const openDocDrawer = useCallback((id: string) => {
     setDrawerDocId(id)
     setInitialData(undefined)
@@ -687,6 +712,39 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     }
 
     const hours = Array.from({ length: 12 }, (_, i) => i + 7)
+    // Grid bounds: hour 7 to hour 19 (end of last slot), step 60 min
+    const gridStartHour = 7
+    const gridEndHour = gridStartHour + hours.length // 19
+    const gridStep = 60
+
+    // Build per-day slot-state maps when a resource is selected
+    const daySlotMaps = availability
+      ? new Map(
+          weekDays.map((day) => {
+            const isoDay = day.toISOString().split('T')[0]
+            const dayAvail = availability.days.find((d) => d.date === isoDay)
+            const dayStart = new Date(day)
+            dayStart.setHours(gridStartHour, 0, 0, 0)
+            const dayEnd = new Date(day)
+            dayEnd.setHours(gridEndHour, 0, 0, 0)
+            const slots = dayAvail
+              ? computeSlotStates({
+                  busy: availability.busy,
+                  capacityMode: availability.capacityMode,
+                  dayEnd,
+                  dayStart,
+                  quantity: availability.quantity,
+                  shiftWindows: dayAvail.shiftWindows,
+                  step: gridStep,
+                  timeOff: dayAvail.timeOff,
+                })
+              : []
+            // Index by slot start ISO for fast lookup
+            const slotByStart = new Map(slots.map((s) => [s.start.toISOString(), s]))
+            return [isoDay, slotByStart] as const
+          }),
+        )
+      : null
 
     return (
       <div className={styles.weekView}>
@@ -713,21 +771,77 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               })
               const clickDate = new Date(day)
               clickDate.setHours(hour, 0, 0, 0)
-              return (
-                <div
-                  className={styles.weekCell}
-                  key={`cell-${hour}-${di}`}
-                  onClick={() => handleDateClick(clickDate)}
-                  onKeyDown={(e) => {
+
+              // Slot state (only when a resource is selected)
+              const isoDay = day.toISOString().split('T')[0]
+              const slotMap = daySlotMaps?.get(isoDay)
+              const slotInfo = slotMap?.get(clickDate.toISOString()) ?? null
+
+              // Derive cell CSS class and interactivity based on slot state
+              let slotClass = ''
+              let isNonInteractive = false
+              if (slotInfo) {
+                if (slotInfo.state === 'off-shift') {
+                  slotClass = styles.slotOffShift
+                  isNonInteractive = true
+                } else if (slotInfo.state === 'time-off') {
+                  slotClass = styles.slotTimeOff
+                  isNonInteractive = true
+                } else if (slotInfo.state === 'full') {
+                  slotClass = styles.slotFull
+                  isNonInteractive = true
+                } else {
+                  slotClass = styles.slotFree
+                }
+              }
+
+              // Time-off label: show type/reason from dayAvail when in time-off state
+              const dayAvail = availability?.days.find((d) => d.date === isoDay)
+              const timeOffEntry =
+                slotInfo?.state === 'time-off'
+                  ? dayAvail?.timeOff.find(
+                      (to) =>
+                        new Date(to.start) <= clickDate && clickDate < new Date(to.end),
+                    )
+                  : undefined
+              const timeOffLabel = timeOffEntry?.type ?? timeOffEntry?.reason ?? null
+
+              const handleClick = isNonInteractive
+                ? undefined
+                : availability
+                  ? () => handleSlotClick(clickDate.toISOString())
+                  : () => handleDateClick(clickDate)
+              const handleKeyDown = isNonInteractive
+                ? undefined
+                : (e: React.KeyboardEvent) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
-                      handleDateClick(clickDate)
+                      if (availability) {
+                        handleSlotClick(clickDate.toISOString())
+                      } else {
+                        handleDateClick(clickDate)
+                      }
                     }
-                  }}
+                  }
+
+              return (
+                <div
+                  className={`${styles.weekCell} ${slotClass}`}
+                  key={`cell-${hour}-${di}`}
+                  onClick={handleClick}
+                  onKeyDown={handleKeyDown}
                   role="button"
-                  tabIndex={0}
+                  tabIndex={isNonInteractive ? -1 : 0}
                 >
                   {renderCurrentTimeLine(day, hour)}
+                  {timeOffLabel && (
+                    <span className={styles.timeOffLabel}>{timeOffLabel}</span>
+                  )}
+                  {slotInfo && availability && availability.quantity > 1 && (
+                    <span className={styles.capacityBadge}>
+                      {slotInfo.occupancy}/{availability.quantity}
+                    </span>
+                  )}
                   {cellReservations.map((r) => renderEventItem(r, false))}
                 </div>
               )
@@ -740,6 +854,34 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
 
   const renderDayView = () => {
     const hours = Array.from({ length: 14 }, (_, i) => i + 7)
+    // Grid bounds: hour 7 to hour 21 (end of last slot), step 60 min
+    const gridStartHour = 7
+    const gridEndHour = gridStartHour + hours.length // 21
+    const gridStep = 60
+
+    // Build slot-state map for the current day when a resource is selected
+    let daySlotMap: Map<string, SlotInfo> | null = null
+    if (availability) {
+      const isoDay = currentDate.toISOString().split('T')[0]
+      const dayAvail = availability.days.find((d) => d.date === isoDay)
+      const dayStart = new Date(currentDate)
+      dayStart.setHours(gridStartHour, 0, 0, 0)
+      const dayEnd = new Date(currentDate)
+      dayEnd.setHours(gridEndHour, 0, 0, 0)
+      const slots = dayAvail
+        ? computeSlotStates({
+            busy: availability.busy,
+            capacityMode: availability.capacityMode,
+            dayEnd,
+            dayStart,
+            quantity: availability.quantity,
+            shiftWindows: dayAvail.shiftWindows,
+            step: gridStep,
+            timeOff: dayAvail.timeOff,
+          })
+        : []
+      daySlotMap = new Map(slots.map((s) => [s.start.toISOString(), s]))
+    }
 
     return (
       <div className={styles.dayView}>
@@ -755,24 +897,78 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           })
           const clickDate = new Date(currentDate)
           clickDate.setHours(hour, 0, 0, 0)
+
+          // Slot state (only when a resource is selected)
+          const slotInfo = daySlotMap?.get(clickDate.toISOString()) ?? null
+
+          // Derive cell CSS class and interactivity based on slot state
+          let slotClass = ''
+          let isNonInteractive = false
+          if (slotInfo) {
+            if (slotInfo.state === 'off-shift') {
+              slotClass = styles.slotOffShift
+              isNonInteractive = true
+            } else if (slotInfo.state === 'time-off') {
+              slotClass = styles.slotTimeOff
+              isNonInteractive = true
+            } else if (slotInfo.state === 'full') {
+              slotClass = styles.slotFull
+              isNonInteractive = true
+            } else {
+              slotClass = styles.slotFree
+            }
+          }
+
+          // Time-off label
+          const isoDay = currentDate.toISOString().split('T')[0]
+          const dayAvail = availability?.days.find((d) => d.date === isoDay)
+          const timeOffEntry =
+            slotInfo?.state === 'time-off'
+              ? dayAvail?.timeOff.find(
+                  (to) => new Date(to.start) <= clickDate && clickDate < new Date(to.end),
+                )
+              : undefined
+          const timeOffLabel = timeOffEntry?.type ?? timeOffEntry?.reason ?? null
+
+          const handleClick = isNonInteractive
+            ? undefined
+            : availability
+              ? () => handleSlotClick(clickDate.toISOString())
+              : () => handleDateClick(clickDate)
+          const handleKeyDown = isNonInteractive
+            ? undefined
+            : (e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  if (availability) {
+                    handleSlotClick(clickDate.toISOString())
+                  } else {
+                    handleDateClick(clickDate)
+                  }
+                }
+              }
+
           return (
             <Fragment key={`row-${hour}`}>
               <div className={styles.timeLabel}>
                 {hour.toString().padStart(2, '0')}:00
               </div>
               <div
-                className={styles.dayViewCell}
-                onClick={() => handleDateClick(clickDate)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    handleDateClick(clickDate)
-                  }
-                }}
+                className={`${styles.dayViewCell} ${slotClass}`}
+                onClick={handleClick}
+                onKeyDown={handleKeyDown}
                 role="button"
-                tabIndex={0}
+                tabIndex={isNonInteractive ? -1 : 0}
               >
                 {renderCurrentTimeLine(currentDate, hour)}
+                {timeOffLabel && (
+                  <span className={styles.timeOffLabel}>{timeOffLabel}</span>
+                )}
+                {slotInfo && availability && availability.quantity > 1 && (
+                  <span className={styles.capacityBadge}>
+                    {slotInfo.occupancy}/{availability.quantity}
+                  </span>
+                )}
                 {hourReservations.map((r) => renderEventItem(r, false))}
               </div>
             </Fragment>
