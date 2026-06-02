@@ -2555,3 +2555,18 @@ describe('staffProvisioning + vocab config', () => {
     expect(() => resolveConfig({ leaveTypes: [] })).toThrow(/leaveTypes/)
   })
 })
+
+describe('buildSelectOptions', () => {
+  it('capitalizes plain values', async () => {
+    const { buildSelectOptions } = await import('../src/utilities/selectOptions.js')
+    expect(buildSelectOptions(['staff', 'room'])).toEqual([
+      { label: 'Staff', value: 'staff' },
+      { label: 'Room', value: 'room' },
+    ])
+  })
+
+  it('handles hyphenated values', async () => {
+    const { buildSelectOptions } = await import('../src/utilities/selectOptions.js')
+    expect(buildSelectOptions(['no-show'])).toEqual([{ label: 'No-show', value: 'no-show' }])
+  })
+})
