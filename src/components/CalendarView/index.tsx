@@ -10,9 +10,10 @@ import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { statusToI18nKey } from '../../utilities/i18nUtils.js'
 import styles from './CalendarView.module.css'
+import { LaneTimelineView } from './LaneTimelineView.js'
 import { useResourceAvailability } from './useResourceAvailability.js'
 
-type ViewMode = 'day' | 'month' | 'pending' | 'week'
+type ViewMode = 'day' | 'lanes' | 'month' | 'pending' | 'week'
 
 type ReservationItem = {
   endTime?: string
@@ -490,6 +491,13 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     [selectedResourceId],
   )
 
+  // Lane-specific book: pre-fills both the specific resource and startTime
+  const handleLaneBook = useCallback((resourceId: string, startIso: string) => {
+    setDrawerDocId(null)
+    setInitialData({ resource: resourceId, startTime: startIso })
+    pendingDrawerOpen.current = true
+  }, [])
+
   const openDocDrawer = useCallback((id: string) => {
     setDrawerDocId(id)
     setInitialData(undefined)
@@ -505,6 +513,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         } else if (viewMode === 'week') {
           next.setDate(next.getDate() + 7 * direction)
         } else {
+          // day, lanes: step one day at a time
           next.setDate(next.getDate() + direction)
         }
         return next
@@ -1183,6 +1192,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             { key: 'month' as ViewMode, label: t('reservation:calendarMonth') },
             { key: 'week' as ViewMode, label: t('reservation:calendarWeek') },
             { key: 'day' as ViewMode, label: t('reservation:calendarDay') },
+            { key: 'lanes' as ViewMode, label: t('reservation:calendarLanes') },
             { key: 'pending' as ViewMode, label: t('reservation:calendarPending') },
           ]).map(({ key, label }) => (
             <button
@@ -1219,13 +1229,25 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           </select>
         </div>
       )}
-      {loading && viewMode !== 'pending' ? (
+      {loading && viewMode !== 'pending' && viewMode !== 'lanes' ? (
         <div className={styles.loading}>{t('reservation:calendarLoading')}</div>
       ) : (
         <>
           {viewMode === 'month' && renderMonthView()}
           {viewMode === 'week' && renderWeekView()}
           {viewMode === 'day' && renderDayView()}
+          {viewMode === 'lanes' && (
+            <LaneTimelineView
+              apiBase={apiBase}
+              day={currentDate}
+              onBook={handleLaneBook}
+              resources={
+                selectedResourceId
+                  ? resources.filter((r) => r.id === selectedResourceId)
+                  : resources
+              }
+            />
+          )}
         </>
       )}
       {viewMode === 'pending' && renderPendingView()}

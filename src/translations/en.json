@@ -67,6 +67,7 @@
   "calendarMonth": "Month",
   "calendarWeek": "Week",
   "calendarDay": "Day",
+  "calendarLanes": "Lanes",
   "calendarUnknownService": "Unknown service",
   "calendarUnknownCustomer": "Unknown customer",
   "calendarUnknownResource": "Unknown resource",
