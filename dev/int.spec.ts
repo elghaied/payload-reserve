@@ -2871,3 +2871,48 @@ describe('provisionStaffResource hook', () => {
     expect(errors).toHaveLength(1)
   })
 })
+
+describe('plugin wires staff provisioning', () => {
+  const makeConfig = () => ({
+    collections: [{ slug: 'users', auth: true, fields: [] as Field[], hooks: {} as Record<string, unknown> }],
+  })
+
+  it('injects an afterChange hook onto the staff user collection', async () => {
+    const { payloadReserve } = await import('../src/index.js')
+    const cfg = makeConfig()
+    const out = payloadReserve({
+      resourceOwnerMode: {},
+      staffProvisioning: { staffRoles: ['staff'], userCollection: 'users' },
+    })(cfg as never)
+    const users = (out.collections as Array<{ hooks?: { afterChange?: unknown[] }; slug: string }>).find(
+      (c) => c.slug === 'users',
+    )!
+    expect(users.hooks?.afterChange?.length).toBe(1)
+  })
+
+  it('preserves existing afterChange hooks on the user collection', async () => {
+    const { payloadReserve } = await import('../src/index.js')
+    const cfg = makeConfig()
+    const existing = () => undefined
+    cfg.collections[0].hooks = { afterChange: [existing] }
+    const out = payloadReserve({
+      resourceOwnerMode: {},
+      staffProvisioning: { staffRoles: ['staff'], userCollection: 'users' },
+    })(cfg as never)
+    const users = (out.collections as Array<{ hooks?: { afterChange?: unknown[] }; slug: string }>).find(
+      (c) => c.slug === 'users',
+    )!
+    expect(users.hooks?.afterChange?.length).toBe(2)
+    expect(users.hooks?.afterChange?.[0]).toBe(existing)
+  })
+
+  it('throws when the staff user collection is not registered', async () => {
+    const { payloadReserve } = await import('../src/index.js')
+    expect(() =>
+      payloadReserve({
+        resourceOwnerMode: {},
+        staffProvisioning: { staffRoles: ['staff'], userCollection: 'nonexistent' },
+      })({ collections: [] } as never),
+    ).toThrow(/nonexistent/)
+  })
+})
