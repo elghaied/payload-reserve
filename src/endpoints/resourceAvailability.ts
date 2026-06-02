@@ -11,11 +11,45 @@ type DayAvailability = {
   timeOff: Array<{ end: string; reason?: string; start: string; type?: string }>
 }
 
+type Busy = Array<{ end: string; start: string; units: number }>
+
 export type ResourceAvailability = {
-  busy: Array<{ end: string; start: string; units: number }>
+  busy: Busy
   capacityMode: 'per-guest' | 'per-reservation'
   days: DayAvailability[]
   quantity: number
+  /** Capacity of resources this resource's services also require (e.g. a chair pool). */
+  requiredPools: Array<{ busy: Busy; quantity: number }>
+}
+
+/** Busy intervals (with capacity units) for one resource over [start, end). */
+async function busyFor(args: {
+  blockingStatuses: string[]
+  capacityMode: 'per-guest' | 'per-reservation'
+  end: Date
+  payload: Payload
+  reservationSlug: string
+  resourceId: number | string
+  start: Date
+}): Promise<Busy> {
+  const { blockingStatuses, capacityMode, end, payload, reservationSlug, resourceId, start } = args
+  const where: Where = {
+    and: [
+      { status: { in: blockingStatuses } },
+      { startTime: { less_than: end.toISOString() } },
+      { endTime: { greater_than: start.toISOString() } },
+      { or: [{ resource: { equals: resourceId } }, { 'items.resource': { equals: resourceId } }] },
+    ],
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { docs } = await (payload.find as any)({ collection: reservationSlug, depth: 0, limit: 500, where })
+  return (docs as Array<Record<string, unknown>>)
+    .filter((r) => r.startTime && r.endTime)
+    .map((r) => ({
+      end: new Date(r.endTime as string).toISOString(),
+      start: new Date(r.startTime as string).toISOString(),
+      units: capacityMode === 'per-guest' ? ((r.guestCount as number) ?? 1) : 1,
+    }))
 }
 
 export async function buildResourceAvailability(params: {
@@ -39,11 +73,12 @@ export async function buildResourceAvailability(params: {
     start,
   } = params
 
+  // depth 1 so `services` are populated (their `requiredResources` come back as ids)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const resource = await (payload.findByID as any)({
     id: resourceId,
     collection: resourceSlug,
-    depth: 0,
+    depth: 1,
   })
   const quantity = (resource?.quantity as number) ?? 1
   const capacityMode = (resource?.capacityMode as 'per-guest' | 'per-reservation') ?? 'per-reservation'
@@ -100,37 +135,59 @@ export async function buildResourceAvailability(params: {
     days.push({ date, shiftWindows, timeOff })
   }
 
-  const where: Where = {
-    and: [
-      { status: { in: blockingStatuses } },
-      { startTime: { less_than: end.toISOString() } },
-      { endTime: { greater_than: start.toISOString() } },
-      {
-        or: [
-          { resource: { equals: resourceId } },
-          { 'items.resource': { equals: resourceId } },
-        ],
-      },
-    ],
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { docs: reservations } = await (payload.find as any)({
-    collection: reservationSlug,
-    depth: 0,
-    limit: 500,
-    where,
+  const busy = await busyFor({
+    blockingStatuses,
+    capacityMode,
+    end,
+    payload,
+    reservationSlug,
+    resourceId,
+    start,
   })
 
-  const busy = (reservations as Array<Record<string, unknown>>)
-    .filter((r) => r.startTime && r.endTime)
-    .map((r) => ({
-      end: new Date(r.endTime as string).toISOString(),
-      start: new Date(r.startTime as string).toISOString(),
-      units: capacityMode === 'per-guest' ? ((r.guestCount as number) ?? 1) : 1,
-    }))
+  // Resources this resource's services ALSO require (e.g. a shared chair pool).
+  // A slot isn't truly bookable if any of these is at capacity, even when the
+  // resource itself is free — so the calendar reflects real availability.
+  const poolIds = new Set<string>()
+  for (const svc of (resource?.services as Array<Record<string, unknown>>) ?? []) {
+    const reqs = (typeof svc === 'object' ? (svc.requiredResources as unknown[]) : []) ?? []
+    for (const rr of reqs) {
+      const id: number | string | undefined =
+        typeof rr === 'object' && rr !== null
+          ? (rr as { id?: number | string }).id
+          : (rr as number | string)
+      if (id != null && String(id) !== String(resourceId)) {
+        poolIds.add(String(id))
+      }
+    }
+  }
 
-  return { busy, capacityMode, days, quantity }
+  const requiredPools: ResourceAvailability['requiredPools'] = []
+  for (const poolId of poolIds) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pool = await (payload.findByID as any)({ id: poolId, collection: resourceSlug, depth: 0 }).catch(
+      () => null,
+    )
+    if (!pool) {
+      continue
+    }
+    const poolCapacityMode =
+      (pool.capacityMode as 'per-guest' | 'per-reservation') ?? 'per-reservation'
+    requiredPools.push({
+      busy: await busyFor({
+        blockingStatuses,
+        capacityMode: poolCapacityMode,
+        end,
+        payload,
+        reservationSlug,
+        resourceId: poolId,
+        start,
+      }),
+      quantity: (pool.quantity as number) ?? 1,
+    })
+  }
+
+  return { busy, capacityMode, days, quantity, requiredPools }
 }
 
 export function createResourceAvailabilityEndpoint(

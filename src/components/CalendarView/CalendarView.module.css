@@ -560,6 +560,19 @@
   min-height: 32px;
 }
 
+.laneHeader {
+  align-items: stretch;
+  display: flex;
+  gap: 8px;
+}
+
+.laneTime {
+  border-left: 1px solid var(--theme-elevation-100);
+  color: var(--theme-elevation-500);
+  font-size: 10px;
+  padding: 2px 0 2px 3px;
+}
+
 .hint {
   color: var(--theme-elevation-400);
   font-size: 12px;
@@ -579,8 +592,12 @@
 }
 
 .itemBadge {
-  background: var(--theme-elevation-150);
+  /* Events have fixed light status backgrounds, so the badge must use
+     theme-independent colors — a subtle dark overlay + the event's own (dark)
+     text — to stay readable in both light and dark mode. */
+  background: rgba(0, 0, 0, 0.08);
   border-radius: 3px;
+  color: inherit;
   font-size: 9px;
   padding: 1px 4px;
 }

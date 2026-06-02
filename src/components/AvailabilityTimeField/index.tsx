@@ -19,6 +19,12 @@ const fmt = (iso: string) =>
     month: 'short',
   })
 
+const pad = (n: number) => String(n).padStart(2, '0')
+/** Local YYYY-MM-DD for the date picker (not UTC). */
+const toLocalDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+/** Local YYYY-MM-DDTHH:mm for a `datetime-local` input (browsers treat it as local). */
+const toLocalInput = (d: Date) => `${toLocalDay(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+
 export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: pathProp }) => {
   const fieldPath = pathProp ?? field?.name ?? 'startTime'
   const { config } = useConfig()
@@ -30,7 +36,7 @@ export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: p
   const [slots, setSlots] = useState<Slot[]>([])
   const [loading, setLoading] = useState(false)
   const [day, setDay] = useState<string>(() =>
-    value ? new Date(value).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    value ? toLocalDay(new Date(value)) : toLocalDay(new Date()),
   )
 
   const serviceId = extractId(service)
@@ -67,7 +73,7 @@ export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: p
           className={styles.fallback}
           onChange={(e) => setValue(e.target.value ? new Date(e.target.value).toISOString() : '')}
           type="datetime-local"
-          value={value ? new Date(value).toISOString().slice(0, 16) : ''}
+          value={value ? toLocalInput(new Date(value)) : ''}
         />
         <p className={styles.hint}>Select a service and staff to see available times.</p>
       </div>

@@ -38,6 +38,7 @@ function Lane({
         dayEnd,
         dayStart,
         quantity: data!.quantity,
+        requiredPools: data!.requiredPools,
         shiftWindows: dayAvail.shiftWindows,
         step: 60,
         timeOff: dayAvail.timeOff,
@@ -102,8 +103,19 @@ export function LaneTimelineView({
   if (resources.length === 0) {
     return <p className={styles.hint}>No active resources to show.</p>
   }
+  const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i)
   return (
     <div className={styles.lanes}>
+      <div className={styles.laneHeader}>
+        <div className={styles.laneLabel} />
+        <div className={styles.laneTrack}>
+          {hours.map((h) => (
+            <div className={styles.laneTime} key={h}>
+              {String(h).padStart(2, '0')}:00
+            </div>
+          ))}
+        </div>
+      </div>
       {resources.map((r) => (
         <Lane apiBase={apiBase} day={day} key={r.id} onBook={onBook} resource={r} />
       ))}

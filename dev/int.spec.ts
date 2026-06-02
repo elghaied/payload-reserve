@@ -3220,3 +3220,89 @@ describe('localDayKey', () => {
     expect(localDayKey(evening)).toBe('2026-06-09')
   })
 })
+
+describe('computeSlotStates required pools (chair-aware)', () => {
+  it('marks a slot full when a required pool is at capacity even if the resource itself is free', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      busy: [], // the stylist is free
+      capacityMode: 'per-reservation',
+      dayEnd: new Date('2026-06-08T12:00:00.000Z'),
+      dayStart: new Date('2026-06-08T09:00:00.000Z'),
+      quantity: 1,
+      requiredPools: [
+        {
+          busy: [
+            { end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 1 },
+            { end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 1 },
+          ],
+          quantity: 2,
+        },
+      ],
+      shiftWindows: [{ end: '2026-06-08T12:00:00.000Z', start: '2026-06-08T09:00:00.000Z' }],
+      step: 60,
+      timeOff: [],
+    })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!.state).toBe('full')
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T09:00:00.000Z')!.state).toBe('free')
+  })
+})
+
+describe('resource-availability requiredPools', () => {
+  it('reports a required chair pool and its busy for a stylist whose service needs it', async () => {
+    const { buildResourceAvailability } = await import('../src/endpoints/resourceAvailability.js')
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RP Chair', active: true, quantity: 2 },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'RP Svc', active: true, duration: 60, requiredResources: [chair.id] },
+    })
+    const stylist1 = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RP Stylist 1', active: true, quantity: 1, services: [svc.id] },
+    })
+    const stylist2 = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RP Stylist 2', active: true, quantity: 1, services: [svc.id] },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'rp@example.com', firstName: 'Rp', lastName: 'Test', password: 'testpass123' },
+    })
+    // stylist2 takes the chair at 10:00 — stylist1 stays free, but the shared chair is busy.
+    await (payload.create as never as (a: unknown) => Promise<unknown>)({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        customer: cust.id,
+        endTime: '2026-06-08T11:00:00.000Z',
+        items: [
+          { endTime: '2026-06-08T11:00:00.000Z', resource: chair.id, startTime: '2026-06-08T10:00:00.000Z' },
+        ],
+        resource: stylist2.id,
+        service: svc.id,
+        startTime: '2026-06-08T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    const result = await buildResourceAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      end: new Date('2026-06-09T00:00:00.000Z'),
+      payload,
+      reservationSlug: 'reservations',
+      resourceId: stylist1.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      start: new Date('2026-06-08T00:00:00.000Z'),
+    })
+
+    expect(result.requiredPools.length).toBe(1)
+    expect(result.requiredPools[0].quantity).toBe(2)
+    expect(result.requiredPools[0].busy.some((b) => new Date(b.start).toISOString() === '2026-06-08T10:00:00.000Z')).toBe(true)
+    // stylist1 itself has no own booking — proving the pool busy is independent of the stylist
+    expect(result.busy.length).toBe(0)
+  })
+})
