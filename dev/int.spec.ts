@@ -3034,3 +3034,65 @@ describe('isPrivilegedUser (role-aware staff detection)', () => {
     expect(isPrivilegedUser(null, twoCollection as never)).toBe(false)
   })
 })
+
+describe('computeSlotStates', () => {
+  const base = {
+    capacityMode: 'per-reservation' as const,
+    dayEnd: new Date('2026-06-08T17:00:00.000Z'),
+    dayStart: new Date('2026-06-08T09:00:00.000Z'),
+    quantity: 1,
+    shiftWindows: [{ end: '2026-06-08T12:00:00.000Z', start: '2026-06-08T09:00:00.000Z' }],
+    step: 60,
+    timeOff: [],
+  }
+
+  it('marks slots outside shift windows as off-shift', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({ ...base, busy: [] })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T09:00:00.000Z')!.state).toBe('free')
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T13:00:00.000Z')!.state).toBe('off-shift')
+  })
+
+  it('marks a slot full when occupancy reaches quantity', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      ...base,
+      busy: [{ end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 1 }],
+    })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!.state).toBe('full')
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T09:00:00.000Z')!.state).toBe('free')
+  })
+
+  it('stays free when occupancy is below quantity (capacity 2)', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      ...base,
+      busy: [{ end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 1 }],
+      quantity: 2,
+    })
+    const ten = slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!
+    expect(ten.state).toBe('free')
+    expect(ten.occupancy).toBe(1)
+  })
+
+  it('marks time-off slots', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      ...base,
+      busy: [],
+      timeOff: [{ end: '2026-06-08T12:00:00.000Z', start: '2026-06-08T09:00:00.000Z' }],
+    })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!.state).toBe('time-off')
+  })
+
+  it('sums guestCount units in per-guest mode', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      ...base,
+      busy: [{ end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 3 }],
+      capacityMode: 'per-guest',
+      quantity: 3,
+    })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!.state).toBe('full')
+  })
+})
