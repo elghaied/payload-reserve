@@ -2,6 +2,8 @@ import type { Endpoint } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { isPrivilegedUser } from '../utilities/userRoles.js'
+
 export function createCancelBookingEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
     handler: async (req) => {
@@ -27,11 +29,12 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
       })
 
       if (req.user) {
-        // Authenticated path: owner (customer === req.user) or admin (non-customer collection).
+        // Authenticated path: owner (customer === req.user) or admin/staff.
         const customerId =
           typeof existing.customer === 'object' ? existing.customer?.id : existing.customer
         const isOwner = customerId === req.user.id
-        const isAdmin = req.user.collection !== config.slugs.customers
+        // Staff/admin detection (role-aware for single-collection deployments)
+        const isAdmin = isPrivilegedUser(req.user, config)
         if (!isOwner && !isAdmin) {
           return Response.json({ message: 'Forbidden' }, { status: 403 })
         }

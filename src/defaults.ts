@@ -1,4 +1,9 @@
-import type { ReservationPluginConfig, ResolvedReservationPluginConfig, StatusMachineConfig } from './types.js'
+import type {
+  ReservationPluginConfig,
+  ResolvedReservationPluginConfig,
+  ResolvedStaffProvisioningConfig,
+  StatusMachineConfig,
+} from './types.js'
 
 import { DEFAULT_STATUS_MACHINE } from './types.js'
 
@@ -28,6 +33,47 @@ function validateStatusMachine(sm: StatusMachineConfig): void {
   }
 }
 
+export const DEFAULT_RESOURCE_TYPES = ['staff', 'equipment', 'room']
+export const DEFAULT_LEAVE_TYPES = ['vacation', 'sick', 'personal', 'closure', 'other']
+
+function resolveStaffProvisioning(
+  pluginOptions: ReservationPluginConfig,
+  resourceTypes: string[],
+): ResolvedStaffProvisioningConfig | undefined {
+  const sp = pluginOptions.staffProvisioning
+  if (!sp) {
+    return undefined
+  }
+
+  if (!pluginOptions.resourceOwnerMode) {
+    throw new Error('staffProvisioning requires resourceOwnerMode to be enabled')
+  }
+  if (sp.staffRoles.length === 0) {
+    throw new Error('staffProvisioning.staffRoles must be a non-empty array')
+  }
+  const resourceType = sp.resourceType ?? 'staff'
+  if (!resourceTypes.includes(resourceType)) {
+    throw new Error(
+      `staffProvisioning.resourceType "${resourceType}" is not in resourceTypes [${resourceTypes.join(', ')}]`,
+    )
+  }
+  const userCollection = sp.userCollection ?? pluginOptions.userCollection
+  if (!userCollection) {
+    throw new Error(
+      'staffProvisioning.userCollection is required when top-level userCollection is unset',
+    )
+  }
+
+  return {
+    beforeCreate: sp.beforeCreate,
+    nameFrom: sp.nameFrom ?? 'name',
+    resourceType,
+    roleField: sp.roleField ?? 'role',
+    staffRoles: sp.staffRoles,
+    userCollection,
+  }
+}
+
 export const DEFAULT_SLUGS = {
   customers: 'customers',
   media: 'media',
@@ -45,6 +91,14 @@ export const DEFAULT_CANCELLATION_NOTICE_PERIOD = 24
 export function resolveConfig(
   pluginOptions: ReservationPluginConfig,
 ): ResolvedReservationPluginConfig {
+  if (pluginOptions.resourceTypes !== undefined && pluginOptions.resourceTypes.length === 0) {
+    throw new Error('resourceTypes must be a non-empty array')
+  }
+  if (pluginOptions.leaveTypes !== undefined && pluginOptions.leaveTypes.length === 0) {
+    throw new Error('leaveTypes must be a non-empty array')
+  }
+
+  const resourceTypes = pluginOptions.resourceTypes ?? DEFAULT_RESOURCE_TYPES
   const userStatusMachine = pluginOptions.statusMachine
   const rom = pluginOptions.resourceOwnerMode
   const resolved: ResolvedReservationPluginConfig = {
@@ -57,14 +111,17 @@ export function resolveConfig(
     disabled: pluginOptions.disabled ?? false,
     extraReservationFields: pluginOptions.extraReservationFields ?? [],
     hooks: pluginOptions.hooks ?? {},
+    leaveTypes: pluginOptions.leaveTypes ?? DEFAULT_LEAVE_TYPES,
     localized: false,
     resourceOwnerMode: rom
       ? {
           adminRoles: rom.adminRoles ?? [],
           ownedServices: rom.ownedServices ?? false,
+          ownerCollection: rom.ownerCollection,
           ownerField: rom.ownerField ?? 'owner',
         }
       : undefined,
+    resourceTypes,
     slugs: {
       customers: pluginOptions.slugs?.customers ?? DEFAULT_SLUGS.customers,
       media: pluginOptions.slugs?.media ?? DEFAULT_SLUGS.media,
@@ -73,6 +130,7 @@ export function resolveConfig(
       schedules: pluginOptions.slugs?.schedules ?? DEFAULT_SLUGS.schedules,
       services: pluginOptions.slugs?.services ?? DEFAULT_SLUGS.services,
     },
+    staffProvisioning: resolveStaffProvisioning(pluginOptions, resourceTypes),
     statusMachine: userStatusMachine
       ? {
           blockingStatuses:

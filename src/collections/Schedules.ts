@@ -6,6 +6,7 @@ import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { makeScheduleOwnerAccess } from '../utilities/ownerAccess.js'
+import { buildSelectOptions } from '../utilities/selectOptions.js'
 
 const TIME_REGEX = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
@@ -151,13 +152,21 @@ export function createSchedulesCollection(
           {
             name: 'date',
             type: 'date',
-            admin: {
-              date: {
-                pickerAppearance: 'dayOnly',
-              },
-            },
+            admin: { date: { pickerAppearance: 'dayOnly' } },
             label: ({ t }) => (t as PluginT)('reservation:fieldDate'),
             required: true,
+          },
+          {
+            name: 'endDate',
+            type: 'date',
+            admin: { date: { pickerAppearance: 'dayOnly' } },
+            label: ({ t }) => (t as PluginT)('reservation:fieldEndDate'),
+          },
+          {
+            name: 'type',
+            type: 'select',
+            label: ({ t }) => (t as PluginT)('reservation:fieldLeaveType'),
+            options: buildSelectOptions(config.leaveTypes),
           },
           {
             name: 'reason',
@@ -194,6 +203,18 @@ export function createSchedulesCollection(
               throw new ValidationError({
                 errors: [{ message: 'endTime must be after startTime', path: 'manualSlots' }],
               })
+            }
+          }
+          const exceptions = (data?.exceptions as Array<{ date?: string; endDate?: string }>) ?? []
+          for (const exc of exceptions) {
+            if (exc.date && exc.endDate) {
+              const start = new Date(exc.date).toISOString().split('T')[0]
+              const end = new Date(exc.endDate).toISOString().split('T')[0]
+              if (end < start) {
+                throw new ValidationError({
+                  errors: [{ message: 'exception endDate must be on or after date', path: 'exceptions' }],
+                })
+              }
             }
           }
           return data

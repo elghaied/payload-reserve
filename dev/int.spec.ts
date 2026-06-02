@@ -1292,6 +1292,64 @@ describe('Reservation plugin - multi-resource bookings (items array)', () => {
   })
 })
 
+describe('Reservation plugin - occupancy counting for items-held resources', () => {
+  let svcId: string
+  let primaryId: string
+  let poolId: string
+  let custId: string
+  const T = '2031-03-04T09:00:00.000Z'
+
+  beforeAll(async () => {
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'Occupancy Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60 },
+    })
+    const primary = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Occupancy Primary', active: true, services: [svc.id] },
+    })
+    const pool = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Occupancy Pool', active: true, quantity: 1, services: [svc.id] },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'occ@example.com', firstName: 'Occ', lastName: 'Test', password: 'testpass123' },
+    })
+    svcId = svc.id
+    primaryId = primary.id
+    poolId = pool.id
+    custId = cust.id
+  })
+
+  it('rejects a standalone booking on a resource already held only in another booking\'s items[]', async () => {
+    // Booking 1 holds poolId ONLY inside items[]; top-level resource is primaryId.
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: custId,
+        items: [
+          { resource: primaryId, service: svcId, startTime: T },
+          { resource: poolId, service: svcId, startTime: T },
+        ],
+        resource: primaryId,
+        service: svcId,
+        startTime: T,
+        status: 'pending',
+      },
+    })
+
+    // Booking 2 books poolId standalone at the same time. poolId quantity is 1,
+    // so this MUST be rejected once items[] occupancy is counted.
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: { customer: custId, resource: poolId, service: svcId, startTime: T, status: 'pending' },
+      }),
+    ).rejects.toThrow()
+  })
+})
+
 // ---------------------------------------------------------------------------
 // skipReservationHooks escape hatch
 // ---------------------------------------------------------------------------
@@ -1762,6 +1820,23 @@ describe('AvailabilityService - pure functions', () => {
     expect(where).toHaveProperty('and')
     const conditions = (where as { and: unknown[] }).and
     expect(conditions.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('buildOverlapQuery: matches a resource in either top-level or items', async () => {
+    const { buildOverlapQuery } = await import('../src/services/AvailabilityService.js')
+    const where = buildOverlapQuery({
+      blockingStatuses: ['pending', 'confirmed'],
+      effectiveEnd: new Date('2030-01-01T10:00:00.000Z'),
+      effectiveStart: new Date('2030-01-01T09:00:00.000Z'),
+      resourceId: 'res-123',
+    })
+    const conditions = (where as { and: Array<Record<string, unknown>> }).and
+    const orClause = conditions.find((c) => 'or' in c) as { or: unknown[] } | undefined
+    expect(orClause).toBeDefined()
+    expect(orClause!.or).toEqual([
+      { resource: { equals: 'res-123' } },
+      { 'items.resource': { equals: 'res-123' } },
+    ])
   })
 })
 
@@ -2305,5 +2380,1279 @@ describe('Guest bookings - cancel endpoint', () => {
     const json = (await resp.json()) as Record<string, unknown>
     expect(json.status).toBe('cancelled')
     expect(json.cancellationToken).toBeUndefined()
+  })
+})
+
+describe('intersectIntervals', () => {
+  const iv = (s: string, e: string) => ({ end: new Date(e), start: new Date(s) })
+
+  it('returns overlap of two single intervals', async () => {
+    const { intersectIntervals } = await import('../src/utilities/slotUtils.js')
+    const out = intersectIntervals(
+      [iv('2030-01-01T09:00:00Z', '2030-01-01T12:00:00Z')],
+      [iv('2030-01-01T10:00:00Z', '2030-01-01T17:00:00Z')],
+    )
+    expect(out).toEqual([iv('2030-01-01T10:00:00Z', '2030-01-01T12:00:00Z')])
+  })
+
+  it('handles split shifts (multiple intervals per side)', async () => {
+    const { intersectIntervals } = await import('../src/utilities/slotUtils.js')
+    const out = intersectIntervals(
+      [iv('2030-01-01T09:00:00Z', '2030-01-01T12:00:00Z'), iv('2030-01-01T13:00:00Z', '2030-01-01T17:00:00Z')],
+      [iv('2030-01-01T10:00:00Z', '2030-01-01T18:00:00Z')],
+    )
+    expect(out).toEqual([
+      iv('2030-01-01T10:00:00Z', '2030-01-01T12:00:00Z'),
+      iv('2030-01-01T13:00:00Z', '2030-01-01T17:00:00Z'),
+    ])
+  })
+
+  it('returns empty when there is no overlap', async () => {
+    const { intersectIntervals } = await import('../src/utilities/slotUtils.js')
+    const out = intersectIntervals(
+      [iv('2030-01-01T09:00:00Z', '2030-01-01T10:00:00Z')],
+      [iv('2030-01-01T11:00:00Z', '2030-01-01T12:00:00Z')],
+    )
+    expect(out).toEqual([])
+  })
+})
+
+describe('Reservation plugin - resourceType field', () => {
+  it('resources collection has a resourceType field defaulting to the first resourceType (staff)', () => {
+    const cfg = payload.config.collections.find((c) => c.slug === 'resources')
+    const field = cfg!.fields.find((f) => 'name' in f && f.name === 'resourceType') as
+      | { defaultValue?: string; options?: unknown[] }
+      | undefined
+    expect(field).toBeDefined()
+    expect(field!.defaultValue).toBe('staff')
+  })
+
+  it('can create a resource with resourceType staff', async () => {
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'RT Svc', active: true, duration: 30 },
+    })
+    const r = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Stylist RT', active: true, resourceType: 'staff', services: [svc.id] },
+    })
+    expect((r as { resourceType?: string }).resourceType).toBe('staff')
+  })
+})
+
+describe('Reservation plugin - requiredResources field', () => {
+  it('services collection has a hasMany requiredResources relationship', () => {
+    const cfg = payload.config.collections.find((c) => c.slug === 'services')
+    const field = cfg!.fields.find((f) => 'name' in f && f.name === 'requiredResources') as
+      | { hasMany?: boolean; relationTo?: string; type?: string }
+      | undefined
+    expect(field).toBeDefined()
+    expect(field!.type).toBe('relationship')
+    expect(field!.hasMany).toBe(true)
+    expect(field!.relationTo).toBe('resources')
+  })
+
+  it('can set requiredResources on a service', async () => {
+    const pool = await payload.create({
+      collection: col('services'),
+      data: { name: 'RR pool svc', active: true, duration: 30 },
+    })
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RR Chair', active: true, services: [pool.id] },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'RR Haircut', active: true, duration: 60, requiredResources: [chair.id] },
+    })
+    expect((svc as { requiredResources?: unknown[] }).requiredResources).toHaveLength(1)
+  })
+})
+
+describe('mergeResourceIds', () => {
+  it('dedupes primary and required ids preserving order', async () => {
+    const { mergeResourceIds } = await import('../src/utilities/resolveRequiredResources.js')
+    expect(mergeResourceIds(['a'], ['b', 'a'])).toEqual(['a', 'b'])
+  })
+
+  it('drops empty/undefined values', async () => {
+    const { mergeResourceIds } = await import('../src/utilities/resolveRequiredResources.js')
+    expect(mergeResourceIds(['a', ''], [undefined as unknown as string, 'c'])).toEqual(['a', 'c'])
+  })
+
+  it('treats numeric and string ids as distinct only by string value', async () => {
+    const { mergeResourceIds } = await import('../src/utilities/resolveRequiredResources.js')
+    expect(mergeResourceIds([1], [1, 2])).toEqual([1, 2])
+  })
+})
+
+describe('Reservation plugin - requiredResources auto-expansion', () => {
+  let svcId: string
+  let stylistId: string
+  let chairId: string
+  let custId: string
+  const T1 = '2032-05-04T09:00:00.000Z'
+  const T2 = '2032-05-04T11:00:00.000Z'
+
+  beforeAll(async () => {
+    const chairSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'AX chair svc', active: true, duration: 60 },
+    })
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'AX Chair Pool', active: true, quantity: 1, services: [chairSvc.id] },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'AX Haircut', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60, requiredResources: [chair.id] },
+    })
+    const stylist = await payload.create({
+      collection: col('resources'),
+      data: { name: 'AX Stylist', active: true, services: [svc.id] },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'ax@example.com', firstName: 'Ax', lastName: 'Test', password: 'testpass123' },
+    })
+    svcId = svc.id
+    stylistId = stylist.id
+    chairId = chair.id
+    custId = cust.id
+  })
+
+  it('auto-creates an items[] entry for the required chair pool', async () => {
+    const res = await payload.create({
+      collection: col('reservations'),
+      data: { customer: custId, resource: stylistId, service: svcId, startTime: T1, status: 'pending' },
+    })
+    const items = (res as { items?: Array<{ resource: unknown }> }).items ?? []
+    const ids = items.map((i) => (typeof i.resource === 'object' ? (i.resource as { id: string }).id : i.resource))
+    expect(ids).toContain(stylistId)
+    expect(ids).toContain(chairId)
+  })
+
+  it('rejects a second booking when the required pool is full', async () => {
+    await payload.create({
+      collection: col('reservations'),
+      data: { customer: custId, resource: stylistId, service: svcId, startTime: T2, status: 'pending' },
+    })
+    const stylist2 = await payload.create({
+      collection: col('resources'),
+      data: { name: 'AX Stylist 2', active: true, services: [svcId] },
+    })
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: { customer: custId, resource: stylist2.id, service: svcId, startTime: T2, status: 'pending' },
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('does not re-expand items on update (create-only)', async () => {
+    const created = await payload.create({
+      collection: col('reservations'),
+      data: { customer: custId, resource: stylistId, service: svcId, startTime: '2032-05-04T13:00:00.000Z', status: 'pending' },
+    })
+    const createdItemCount = ((created as { items?: unknown[] }).items ?? []).length
+
+    // Clear items and update; the hook must NOT re-add them on update.
+    const updated = await payload.update({
+      id: created.id,
+      collection: col('reservations'),
+      data: { items: [] },
+    })
+    expect(((updated as { items?: unknown[] }).items ?? []).length).toBe(0)
+    // Sanity: create DID expand (so the test is meaningful)
+    expect(createdItemCount).toBeGreaterThan(0)
+  })
+})
+
+describe('Reservation plugin - multi-resource slot discovery', () => {
+  let svcId: string
+  let stylistId: string
+  let chairId: string
+  let custId: string
+  const DAY = new Date(2033, 3, 4) // local midnight, arbitrary weekday
+
+  // Seed all weekdays so the resolved window is the same regardless of which
+  // weekday this date lands on in the host timezone.
+  const allDaySlots = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({
+    day,
+    endTime: '12:00',
+    startTime: '09:00',
+  }))
+
+  beforeAll(async () => {
+    const chairSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'MS chair svc', active: true, duration: 60 },
+    })
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'MS Chair', active: true, quantity: 1, services: [chairSvc.id] },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'MS Haircut', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60, durationType: 'fixed', requiredResources: [chair.id] },
+    })
+    const stylist = await payload.create({
+      collection: col('resources'),
+      data: { name: 'MS Stylist', active: true, services: [svc.id] },
+    })
+    // Stylist has a schedule (constrains time); chair has NO schedule (capacity-only).
+    await payload.create({
+      collection: col('schedules'),
+      data: { name: 'MS Stylist Schedule', active: true, recurringSlots: allDaySlots, resource: stylist.id, scheduleType: 'recurring' },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'ms@example.com', firstName: 'Ms', lastName: 'Test', password: 'testpass123' },
+    })
+    svcId = svc.id
+    stylistId = stylist.id
+    chairId = chair.id
+    custId = cust.id
+  })
+
+  const callSlots = async () => {
+    const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
+    return getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: DAY,
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceIds: [stylistId, chairId],
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: svcId,
+      serviceSlug: 'services',
+    })
+  }
+
+  it('returns slots where both stylist and chair are free', async () => {
+    const slots = await callSlots()
+    // 09:00–12:00 window, 60-min fixed service, stepSize = min(60,15) = 15 min
+    // → slots at 09:00, 09:15, 09:30, ..., 11:00 = 9 candidate slots, chair free.
+    expect(slots.length).toBe(9)
+  })
+
+  it('drops a slot when the shared chair pool is fully booked at that time', async () => {
+    const before = await callSlots()
+    const target = before[0] // occupy the chair (quantity 1) at this slot's start
+    await payload.create({
+      collection: col('reservations'),
+      data: { customer: custId, resource: chairId, service: svcId, startTime: target.start.toISOString(), status: 'pending' },
+    })
+    const after = await callSlots()
+    // The booking at target.start blocks any candidate whose window overlaps the booked 09:00–10:00 range.
+    // With stepSize=15 and 60-min slots: 09:00, 09:15, 09:30, 09:45 all overlap → 4 fewer slots.
+    expect(after.some((s) => s.start.getTime() === target.start.getTime())).toBe(false)
+    expect(after.length).toBeLessThan(before.length)
+  })
+})
+
+describe('Reservation plugin - slots endpoint resource resolution', () => {
+  it('unions service.requiredResources so a full pool removes a slot', async () => {
+    const { createGetSlotsEndpoint } = await import('../src/endpoints/getSlots.js')
+    const { resolveConfig } = await import('../src/defaults.js')
+    const resolved = resolveConfig({})
+
+    const allDaySlots = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({
+      day,
+      endTime: '12:00',
+      startTime: '09:00',
+    }))
+
+    const chairSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'EP chair svc', active: true, duration: 60 },
+    })
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'EP Chair', active: true, quantity: 1, services: [chairSvc.id] },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: {
+        name: 'EP Haircut',
+        active: true,
+        bufferTimeAfter: 0,
+        bufferTimeBefore: 0,
+        duration: 60,
+        durationType: 'fixed',
+        requiredResources: [chair.id],
+      },
+    })
+    const stylist = await payload.create({
+      collection: col('resources'),
+      data: { name: 'EP Stylist', active: true, services: [svc.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'EP Stylist Schedule',
+        active: true,
+        recurringSlots: allDaySlots,
+        resource: stylist.id,
+        scheduleType: 'recurring',
+      },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'ep@example.com', firstName: 'Ep', lastName: 'Test', password: 'testpass123' },
+    })
+
+    const endpoint = createGetSlotsEndpoint(resolved)
+    const makeReq = (qs: string) =>
+      ({ payload, url: `http://localhost/api/reserve/slots?${qs}` }) as unknown as Parameters<
+        typeof endpoint.handler
+      >[0]
+    const date = '2033-04-04'
+
+    // Caller passes ONLY the stylist + service; endpoint must add the chair pool.
+    const res1 = await endpoint.handler(makeReq(`date=${date}&service=${svc.id}&resource=${stylist.id}`))
+    const body1 = await res1.json()
+    expect(body1.slots.length).toBeGreaterThan(0)
+
+    // Occupy the chair (quantity 1) at the first returned slot.
+    // Must provide endTime explicitly because skipReservationHooks bypasses calculateEndTime.
+    const occupyStart = new Date(body1.slots[0].start)
+    const occupyEnd = new Date(occupyStart.getTime() + 60 * 60_000)
+    await payload.create({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        customer: cust.id,
+        endTime: occupyEnd.toISOString(),
+        resource: chair.id,
+        service: svc.id,
+        startTime: occupyStart.toISOString(),
+        status: 'confirmed',
+      },
+    })
+
+    const res2 = await endpoint.handler(makeReq(`date=${date}&service=${svc.id}&resource=${stylist.id}`))
+    const body2 = await res2.json()
+    // Fewer slots proves the endpoint resolved + capacity-checked the chair pool.
+    // A 60-min booking at the first slot blocks all 15-min step slots that overlap it.
+    expect(body2.slots.length).toBeLessThan(body1.slots.length)
+    expect(body2.slots.some((s: { start: string }) => s.start === body1.slots[0].start)).toBe(false)
+  })
+})
+
+describe('Reservation plugin - multi-resource startTime span', () => {
+  let svcId: string
+  let primaryId: string
+  let earlyId: string
+  let custId: string
+  // Booking 1: top-level startTime 10:00, but an item holds `early` resource at 08:00-09:00.
+  const PRIMARY_START = '2034-02-06T10:00:00.000Z'
+  const EARLY_START = '2034-02-06T08:00:00.000Z'
+
+  beforeAll(async () => {
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'Span Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60 },
+    })
+    const primary = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Span Primary', active: true, services: [svc.id] },
+    })
+    const early = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Span Early Pool', active: true, quantity: 1, services: [svc.id] },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'span@example.com', firstName: 'Span', lastName: 'Test', password: 'testpass123' },
+    })
+    svcId = svc.id
+    primaryId = primary.id
+    earlyId = early.id
+    custId = cust.id
+  })
+
+  it('counts an items[] resource that starts before the top-level startTime', async () => {
+    // Booking 1: top-level startTime 10:00; items hold `early` at 08:00-09:00 and primary at 10:00.
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: custId,
+        items: [
+          { resource: primaryId, service: svcId, startTime: PRIMARY_START },
+          { resource: earlyId, service: svcId, startTime: EARLY_START },
+        ],
+        resource: primaryId,
+        service: svcId,
+        startTime: PRIMARY_START,
+        status: 'pending',
+      },
+    })
+
+    // Booking 2: standalone on `early` (quantity 1) at 08:00. The early pool is already
+    // occupied 08:00-09:00 by Booking 1's item, so this MUST be rejected.
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: { customer: custId, resource: earlyId, service: svcId, startTime: EARLY_START, status: 'pending' },
+      }),
+    ).rejects.toThrow()
+  })
+})
+
+describe('staffProvisioning + vocab config', () => {
+  it('resolveConfig applies vocab defaults', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const r = resolveConfig({})
+    expect(r.resourceTypes).toEqual(['staff', 'equipment', 'room'])
+    expect(r.leaveTypes).toEqual(['vacation', 'sick', 'personal', 'closure', 'other'])
+    expect(r.staffProvisioning).toBeUndefined()
+  })
+
+  it('resolveConfig resolves staffProvisioning defaults', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const r = resolveConfig({
+      resourceOwnerMode: {},
+      staffProvisioning: { staffRoles: ['staff'], userCollection: 'users' },
+    })
+    expect(r.staffProvisioning).toMatchObject({
+      nameFrom: 'name',
+      resourceType: 'staff',
+      roleField: 'role',
+      staffRoles: ['staff'],
+      userCollection: 'users',
+    })
+  })
+
+  it('throws when staffProvisioning set without resourceOwnerMode', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ staffProvisioning: { staffRoles: ['staff'], userCollection: 'users' } }))
+      .toThrow(/resourceOwnerMode/)
+  })
+
+  it('throws when staffRoles empty', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ resourceOwnerMode: {}, staffProvisioning: { staffRoles: [], userCollection: 'users' } }))
+      .toThrow(/staffRoles/)
+  })
+
+  it('throws when resourceType not in resourceTypes', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({
+      resourceOwnerMode: {},
+      staffProvisioning: { resourceType: 'wizard', staffRoles: ['staff'], userCollection: 'users' },
+    })).toThrow(/resourceType/)
+  })
+
+  it('throws when no userCollection resolvable', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ resourceOwnerMode: {}, staffProvisioning: { staffRoles: ['staff'] } }))
+      .toThrow(/userCollection/)
+  })
+
+  it('throws when resourceTypes is empty', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ resourceTypes: [] })).toThrow(/resourceTypes/)
+  })
+
+  it('throws when leaveTypes is empty', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    expect(() => resolveConfig({ leaveTypes: [] })).toThrow(/leaveTypes/)
+  })
+})
+
+describe('buildSelectOptions', () => {
+  it('capitalizes plain values', async () => {
+    const { buildSelectOptions } = await import('../src/utilities/selectOptions.js')
+    expect(buildSelectOptions(['staff', 'room'])).toEqual([
+      { label: 'Staff', value: 'staff' },
+      { label: 'Room', value: 'room' },
+    ])
+  })
+
+  it('handles hyphenated values', async () => {
+    const { buildSelectOptions } = await import('../src/utilities/selectOptions.js')
+    expect(buildSelectOptions(['no-show'])).toEqual([{ label: 'No-show', value: 'no-show' }])
+  })
+})
+
+describe('Resources field changes', () => {
+  it('resourceType select has the three default options', () => {
+    const resources = payload.config.collections.find((c) => c.slug === 'resources')!
+    const field = resources.fields.find(
+      (f): f is { name: string; options: Array<{ value: string }> } & Field =>
+        'name' in f && f.name === 'resourceType',
+    )!
+    const values = field.options.map((o) => (typeof o === 'string' ? o : o.value))
+    expect(values).toEqual(['staff', 'equipment', 'room'])
+  })
+
+  it('can create a resource without services', async () => {
+    const r = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Unassigned Staff', active: true },
+    })
+    expect(r.id).toBeDefined()
+  })
+})
+
+describe('resolveOwnerValue', () => {
+  it('forces req.user.id on create', async () => {
+    const { resolveOwnerValue } = await import('../src/collections/Resources.js')
+    const out = resolveOwnerValue({
+      operation: 'create',
+      req: { user: { id: 'admin1' } },
+      value: 'someone-else',
+    })
+    expect(out).toBe('admin1')
+  })
+
+  it('returns value unchanged on update', async () => {
+    const { resolveOwnerValue } = await import('../src/collections/Resources.js')
+    const out = resolveOwnerValue({
+      operation: 'update',
+      req: { user: { id: 'admin1' } },
+      value: 'staff-7',
+    })
+    expect(out).toBe('staff-7')
+  })
+
+  it('returns value unchanged when there is no req.user on create', async () => {
+    const { resolveOwnerValue } = await import('../src/collections/Resources.js')
+    const out = resolveOwnerValue({
+      operation: 'create',
+      req: { user: null },
+      value: 'staff-7',
+    })
+    expect(out).toBe('staff-7')
+  })
+})
+
+describe('Schedule exceptions range fields', () => {
+  it('exceptions array has endDate and type subfields', () => {
+    const schedules = payload.config.collections.find((c) => c.slug === 'schedules')!
+    const exceptions = schedules.fields.find(
+      (f): f is { fields: Field[]; name: string } & Field => 'name' in f && f.name === 'exceptions',
+    )!
+    const sub = exceptions.fields
+      .filter((f): f is { name: string } & Field => 'name' in f)
+      .map((f) => f.name)
+    expect(sub).toContain('endDate')
+    expect(sub).toContain('type')
+  })
+
+  it('rejects an exception whose endDate precedes date', async () => {
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Sched Range Res', active: true },
+    })
+    await expect(
+      payload.create({
+        collection: col('schedules'),
+        data: {
+          name: 'Bad Range',
+          exceptions: [{ date: '2026-06-10T00:00:00.000Z', endDate: '2026-06-08T00:00:00.000Z' }],
+          resource: resource.id,
+          scheduleType: 'recurring',
+        },
+      }),
+    ).rejects.toThrow()
+  })
+})
+
+describe('isExceptionDate range-aware', () => {
+  it('matches a single-day exception (back-compat)', async () => {
+    const { isExceptionDate } = await import('../src/utilities/scheduleUtils.js')
+    expect(isExceptionDate(new Date('2026-06-10T09:00:00Z'), [{ date: '2026-06-10T00:00:00Z' }])).toBe(true)
+    expect(isExceptionDate(new Date('2026-06-11T09:00:00Z'), [{ date: '2026-06-10T00:00:00Z' }])).toBe(false)
+  })
+
+  it('matches inside a range and both boundaries inclusively', async () => {
+    const { isExceptionDate } = await import('../src/utilities/scheduleUtils.js')
+    const exc = [{ date: '2026-06-08T00:00:00Z', endDate: '2026-06-12T00:00:00Z' }]
+    expect(isExceptionDate(new Date('2026-06-08T09:00:00Z'), exc)).toBe(true) // start boundary
+    expect(isExceptionDate(new Date('2026-06-10T09:00:00Z'), exc)).toBe(true) // inside
+    expect(isExceptionDate(new Date('2026-06-12T09:00:00Z'), exc)).toBe(true) // end boundary
+    expect(isExceptionDate(new Date('2026-06-13T09:00:00Z'), exc)).toBe(false) // outside
+    expect(isExceptionDate(new Date('2026-06-07T09:00:00Z'), exc)).toBe(false) // before
+  })
+
+  it('resolveScheduleForDate returns [] inside a vacation range', async () => {
+    const { resolveScheduleForDate } = await import('../src/utilities/scheduleUtils.js')
+    const schedule = {
+      exceptions: [{ date: '2026-06-08T00:00:00Z', endDate: '2026-06-12T00:00:00Z' }],
+      recurringSlots: [{ day: 'wed' as const, endTime: '17:00', startTime: '09:00' }],
+      scheduleType: 'recurring' as const,
+    }
+    // 2026-06-10 is a Wednesday inside the range
+    expect(resolveScheduleForDate(schedule, new Date('2026-06-10T00:00:00Z'))).toEqual([])
+    // 2026-06-17 is a Wednesday outside the range
+    expect(resolveScheduleForDate(schedule, new Date('2026-06-17T00:00:00Z')).length).toBe(1)
+  })
+})
+
+describe('provisionStaffResource hook', () => {
+  const baseConfig = {
+    resourceOwnerMode: { adminRoles: ['admin'], ownedServices: false, ownerField: 'owner' },
+    slugs: { resources: 'resources' },
+    staffProvisioning: {
+      nameFrom: 'name',
+      resourceType: 'staff',
+      roleField: 'role',
+      staffRoles: ['staff'],
+      userCollection: 'users',
+    },
+  }
+
+  const makeReq = (created: unknown[], existing: unknown[] = []) => ({
+    payload: {
+      create: (args: { data: unknown }) => {
+        created.push(args)
+        return Promise.resolve({ id: 'res1', ...(args.data as object) })
+      },
+      find: () => Promise.resolve({ docs: existing }),
+    },
+    transactionID: 'txn-1',
+    user: { id: 'admin1' },
+  })
+
+  it('provisions a resource owned by the new staff user on create (via impersonation)', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: Array<{
+      collection: string
+      data: Record<string, unknown>
+      req: { transactionID?: unknown; user?: { id?: unknown } }
+    }> = []
+    await hook({
+      context: {},
+      doc: { id: 'staff1', name: 'Alice', email: 'a@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(1)
+    expect(created[0].collection).toBe('resources')
+    expect(created[0].data.owner).toBe('staff1')
+    expect(created[0].data.resourceType).toBe('staff')
+    expect(created[0].data.name).toBe('Alice')
+    expect(created[0].req.user?.id).toBe('staff1')
+    expect(created[0].req.transactionID).toBe('txn-1')
+  })
+
+  it('falls back to email when nameFrom field is absent', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: Array<{ data: Record<string, unknown> }> = []
+    await hook({
+      context: {},
+      doc: { id: 'staff2', email: 'b@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created[0].data.name).toBe('b@x.com')
+  })
+
+  it('does nothing for a non-staff user', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'cust1', email: 'c@x.com', role: 'customer' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(0)
+  })
+
+  it('is idempotent — skips when a resource already owns the user', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'staff1', email: 'a@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created, [{ id: 'res-existing' }]) as never,
+    } as never)
+    expect(created).toHaveLength(0)
+  })
+
+  it('provisions on promotion (update into a staff role)', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'staff3', email: 'd@x.com', role: 'staff' },
+      operation: 'update',
+      previousDoc: { id: 'staff3', email: 'd@x.com', role: 'customer' },
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(1)
+  })
+
+  it('does NOT re-provision on an update that was already staff', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'staff3', email: 'd@x.com', role: 'staff' },
+      operation: 'update',
+      previousDoc: { id: 'staff3', email: 'd@x.com', role: 'staff' },
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(0)
+  })
+
+  it('runs beforeCreate to stamp custom fields', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const cfg = {
+      ...baseConfig,
+      staffProvisioning: {
+        ...baseConfig.staffProvisioning,
+        beforeCreate: ({ data }: { data: Record<string, unknown> }) => ({ ...data, tenant: 't-1' }),
+      },
+    }
+    const hook = provisionStaffResource(cfg as never)
+    const created: Array<{ data: Record<string, unknown> }> = []
+    await hook({
+      context: {},
+      doc: { id: 'staff4', name: 'Eve', email: 'e@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created[0].data.tenant).toBe('t-1')
+  })
+
+  it('respects context.skipReservationHooks', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: { skipReservationHooks: true },
+      doc: { id: 'staff1', email: 'a@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(0)
+  })
+
+  it('matches array-valued roles', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'staff5', email: 'f@x.com', role: ['customer', 'staff'] },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(1)
+  })
+
+  it('swallows and logs a provisioning failure instead of throwing', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const errors: unknown[] = []
+    const req = {
+      payload: {
+        create: () => Promise.reject(new Error('boom')),
+        find: () => Promise.resolve({ docs: [] }),
+        logger: { error: (e: unknown) => errors.push(e) },
+      },
+      transactionID: 'txn-1',
+      user: { id: 'admin1' },
+    }
+    await expect(
+      hook({
+        context: {},
+        doc: { id: 'staff9', name: 'Gus', email: 'g@x.com', role: 'staff' },
+        operation: 'create',
+        req: req as never,
+      } as never),
+    ).resolves.toBeDefined()
+    expect(errors).toHaveLength(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Leave range removes availability end-to-end (Task 9)
+// ---------------------------------------------------------------------------
+describe('leave range removes availability end-to-end', () => {
+  it('returns no slots inside a vacation range and slots outside it', async () => {
+    const { getAvailableSlots } = await import('../src/services/index.js')
+
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Haircut LR', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Stylist LR', active: true, services: [service.id] },
+    })
+    // Vacation range 2026-06-08 (Mon) to 2026-06-12 (Fri)
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'Stylist LR shifts',
+        active: true,
+        exceptions: [{ date: '2026-06-08T00:00:00.000Z', endDate: '2026-06-12T00:00:00.000Z' }],
+        recurringSlots: [
+          { day: 'mon', endTime: '17:00', startTime: '09:00' },
+          { day: 'tue', endTime: '17:00', startTime: '09:00' },
+          { day: 'wed', endTime: '17:00', startTime: '09:00' },
+          { day: 'thu', endTime: '17:00', startTime: '09:00' },
+          { day: 'fri', endTime: '17:00', startTime: '09:00' },
+        ],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+
+    // 2026-06-10 (Wed) is inside the vacation range → no slots
+    // Use UTC midnight so toISOString().split('T')[0] === '2026-06-10'
+    const inRange = await getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: new Date('2026-06-10T00:00:00.000Z'),
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: service.id,
+      serviceSlug: 'services',
+    })
+    expect(inRange.length).toBe(0)
+
+    // 2026-06-17 (Wed) is outside the range → slots available
+    const outRange = await getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: new Date('2026-06-17T00:00:00.000Z'),
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: service.id,
+      serviceSlug: 'services',
+    })
+    expect(outRange.length).toBeGreaterThan(0)
+  })
+})
+
+describe('plugin wires staff provisioning', () => {
+  const makeConfig = () => ({
+    collections: [{ slug: 'users', auth: true, fields: [] as Field[], hooks: {} as Record<string, unknown> }],
+  })
+
+  it('injects an afterChange hook onto the staff user collection', async () => {
+    const { payloadReserve } = await import('../src/index.js')
+    const cfg = makeConfig()
+    const out = payloadReserve({
+      resourceOwnerMode: {},
+      staffProvisioning: { staffRoles: ['staff'], userCollection: 'users' },
+    })(cfg as never)
+    const users = (out.collections as Array<{ hooks?: { afterChange?: unknown[] }; slug: string }>).find(
+      (c) => c.slug === 'users',
+    )!
+    expect(users.hooks?.afterChange?.length).toBe(1)
+  })
+
+  it('preserves existing afterChange hooks on the user collection', async () => {
+    const { payloadReserve } = await import('../src/index.js')
+    const cfg = makeConfig()
+    const existing = () => undefined
+    cfg.collections[0].hooks = { afterChange: [existing] }
+    const out = payloadReserve({
+      resourceOwnerMode: {},
+      staffProvisioning: { staffRoles: ['staff'], userCollection: 'users' },
+    })(cfg as never)
+    const users = (out.collections as Array<{ hooks?: { afterChange?: unknown[] }; slug: string }>).find(
+      (c) => c.slug === 'users',
+    )!
+    expect(users.hooks?.afterChange?.length).toBe(2)
+    expect(users.hooks?.afterChange?.[0]).toBe(existing)
+  })
+
+  it('throws when the staff user collection is not registered', async () => {
+    const { payloadReserve } = await import('../src/index.js')
+    expect(() =>
+      payloadReserve({
+        resourceOwnerMode: {},
+        staffProvisioning: { staffRoles: ['staff'], userCollection: 'nonexistent' },
+      })({ collections: [] } as never),
+    ).toThrow(/nonexistent/)
+  })
+})
+
+describe('isPrivilegedUser (role-aware staff detection)', () => {
+  const twoCollection = { slugs: { customers: 'customers' } }
+  const singleCollection = {
+    resourceOwnerMode: { adminRoles: ['admin'] },
+    slugs: { customers: 'users' },
+    staffProvisioning: { roleField: 'role', staffRoles: ['staff'] },
+    userCollection: 'users',
+  }
+
+  it('two-collection: a user outside the customers collection is privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users' } as never, twoCollection as never)).toBe(true)
+  })
+
+  it('two-collection: a user in the customers collection is not privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'customers' } as never, twoCollection as never)).toBe(false)
+  })
+
+  it('single-collection: staff role is privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: 'staff' } as never, singleCollection as never)).toBe(true)
+  })
+
+  it('single-collection: admin role is privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: 'admin' } as never, singleCollection as never)).toBe(true)
+  })
+
+  it('single-collection: customer role is not privileged', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: 'customer' } as never, singleCollection as never)).toBe(false)
+  })
+
+  it('single-collection: array-valued role matches', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: ['customer', 'staff'] } as never, singleCollection as never)).toBe(true)
+  })
+
+  it('single-collection with no privileged roles configured: treats everyone as customer', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    const cfg = { slugs: { customers: 'users' }, userCollection: 'users' }
+    expect(isPrivilegedUser({ id: '1', collection: 'users', role: 'admin' } as never, cfg as never)).toBe(false)
+  })
+
+  it('returns false for no user', async () => {
+    const { isPrivilegedUser } = await import('../src/utilities/userRoles.js')
+    expect(isPrivilegedUser(null, twoCollection as never)).toBe(false)
+  })
+})
+
+describe('computeSlotStates', () => {
+  const base = {
+    capacityMode: 'per-reservation' as const,
+    dayEnd: new Date('2026-06-08T17:00:00.000Z'),
+    dayStart: new Date('2026-06-08T09:00:00.000Z'),
+    quantity: 1,
+    shiftWindows: [{ end: '2026-06-08T12:00:00.000Z', start: '2026-06-08T09:00:00.000Z' }],
+    step: 60,
+    timeOff: [],
+  }
+
+  it('marks slots outside shift windows as off-shift', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({ ...base, busy: [] })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T09:00:00.000Z')!.state).toBe('free')
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T13:00:00.000Z')!.state).toBe('off-shift')
+  })
+
+  it('marks a slot full when occupancy reaches quantity', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      ...base,
+      busy: [{ end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 1 }],
+    })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!.state).toBe('full')
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T09:00:00.000Z')!.state).toBe('free')
+  })
+
+  it('stays free when occupancy is below quantity (capacity 2)', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      ...base,
+      busy: [{ end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 1 }],
+      quantity: 2,
+    })
+    const ten = slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!
+    expect(ten.state).toBe('free')
+    expect(ten.occupancy).toBe(1)
+  })
+
+  it('marks time-off slots', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      ...base,
+      busy: [],
+      timeOff: [{ end: '2026-06-08T12:00:00.000Z', start: '2026-06-08T09:00:00.000Z' }],
+    })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!.state).toBe('time-off')
+  })
+
+  it('sums guestCount units in per-guest mode', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      ...base,
+      busy: [{ end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 3 }],
+      capacityMode: 'per-guest',
+      quantity: 3,
+    })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!.state).toBe('full')
+  })
+})
+
+describe('resource-availability endpoint logic', () => {
+  it('returns shift windows, time-off, and busy for a resource', async () => {
+    const { buildResourceAvailability } = await import('../src/endpoints/resourceAvailability.js')
+
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'RA Haircut', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RA Stylist', active: true, quantity: 1, services: [service.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'RA shifts',
+        active: true,
+        exceptions: [{ type: 'vacation', date: '2026-06-15T00:00:00.000Z', reason: 'Off' }],
+        recurringSlots: [{ day: 'mon', endTime: '17:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'ra-stylist@example.com',
+        firstName: 'RA',
+        lastName: 'Customer',
+        password: 'testpass123',
+      },
+    })
+    await (payload.create as never as (a: unknown) => Promise<unknown>)({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        customer: customer.id,
+        endTime: '2026-06-08T11:00:00.000Z',
+        resource: resource.id,
+        service: service.id,
+        startTime: '2026-06-08T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    const result = await buildResourceAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      end: new Date('2026-06-16T00:00:00.000Z'),
+      payload,
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      start: new Date('2026-06-08T00:00:00.000Z'),
+    })
+
+    expect(result.quantity).toBe(1)
+    const monday = result.days.find((d) => d.date === '2026-06-08') // Monday → has a shift
+    expect(monday?.shiftWindows.length).toBeGreaterThan(0)
+    expect(result.busy.some((b) => new Date(b.start).toISOString() === '2026-06-08T10:00:00.000Z')).toBe(true)
+    const vacationDay = result.days.find((d) => d.date === '2026-06-15')
+    expect(vacationDay?.timeOff.length).toBeGreaterThan(0)
+    expect(vacationDay?.timeOff[0]?.type).toBe('vacation')
+  })
+
+  it('ignores inactive schedules (no time-off leak)', async () => {
+    const { buildResourceAvailability } = await import('../src/endpoints/resourceAvailability.js')
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'RA2 Svc', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RA2 Stylist', active: true, quantity: 1, services: [service.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'RA2 inactive',
+        active: false,
+        exceptions: [{ type: 'vacation', date: '2026-07-06T00:00:00.000Z', reason: 'Off' }],
+        recurringSlots: [{ day: 'mon', endTime: '17:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+    const result = await buildResourceAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      end: new Date('2026-07-08T00:00:00.000Z'),
+      payload,
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      start: new Date('2026-07-06T00:00:00.000Z'),
+    })
+    const day = result.days.find((d) => d.date === '2026-07-06')
+    expect(day?.shiftWindows.length ?? 0).toBe(0)
+    expect(day?.timeOff.length ?? 0).toBe(0)
+  })
+})
+
+describe('AvailabilityTimeField wiring', () => {
+  it('startTime field has a custom Field component configured', () => {
+    const reservations = payload.config.collections.find((c) => c.slug === 'reservations')!
+    const startTime = reservations.fields.find(
+      (f): f is { admin?: { components?: { Field?: unknown } }; name: string } & Field =>
+        'name' in f && f.name === 'startTime',
+    )!
+    expect(startTime.admin?.components?.Field).toBeTruthy()
+  })
+})
+
+describe('localDayKey', () => {
+  it('uses local calendar components (not UTC)', async () => {
+    const { localDayKey } = await import('../src/utilities/slotUtils.js')
+    // Construct a local-midnight date; key must equal that local calendar day
+    const d = new Date(2026, 5, 9, 0, 0, 0, 0) // local 2026-06-09 00:00
+    expect(localDayKey(d)).toBe('2026-06-09')
+    const evening = new Date(2026, 5, 9, 23, 30, 0, 0)
+    expect(localDayKey(evening)).toBe('2026-06-09')
+  })
+})
+
+describe('computeSlotStates required pools (chair-aware)', () => {
+  it('marks a slot full when a required pool is at capacity even if the resource itself is free', async () => {
+    const { computeSlotStates } = await import('../src/utilities/computeSlotStates.js')
+    const slots = computeSlotStates({
+      busy: [], // the stylist is free
+      capacityMode: 'per-reservation',
+      dayEnd: new Date('2026-06-08T12:00:00.000Z'),
+      dayStart: new Date('2026-06-08T09:00:00.000Z'),
+      quantity: 1,
+      requiredPools: [
+        {
+          busy: [
+            { end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 1 },
+            { end: '2026-06-08T11:00:00.000Z', start: '2026-06-08T10:00:00.000Z', units: 1 },
+          ],
+          quantity: 2,
+        },
+      ],
+      shiftWindows: [{ end: '2026-06-08T12:00:00.000Z', start: '2026-06-08T09:00:00.000Z' }],
+      step: 60,
+      timeOff: [],
+    })
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!.state).toBe('full')
+    expect(slots.find((s) => s.start.toISOString() === '2026-06-08T09:00:00.000Z')!.state).toBe('free')
+  })
+})
+
+describe('resource-availability requiredPools', () => {
+  it('reports a required chair pool and its busy for a stylist whose service needs it', async () => {
+    const { buildResourceAvailability } = await import('../src/endpoints/resourceAvailability.js')
+    const chair = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RP Chair', active: true, quantity: 2 },
+    })
+    const svc = await payload.create({
+      collection: col('services'),
+      data: { name: 'RP Svc', active: true, duration: 60, requiredResources: [chair.id] },
+    })
+    const stylist1 = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RP Stylist 1', active: true, quantity: 1, services: [svc.id] },
+    })
+    const stylist2 = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RP Stylist 2', active: true, quantity: 1, services: [svc.id] },
+    })
+    const cust = await payload.create({
+      collection: col('customers'),
+      data: { email: 'rp@example.com', firstName: 'Rp', lastName: 'Test', password: 'testpass123' },
+    })
+    // stylist2 takes the chair at 10:00 — stylist1 stays free, but the shared chair is busy.
+    await (payload.create as never as (a: unknown) => Promise<unknown>)({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        customer: cust.id,
+        endTime: '2026-06-08T11:00:00.000Z',
+        items: [
+          { endTime: '2026-06-08T11:00:00.000Z', resource: chair.id, startTime: '2026-06-08T10:00:00.000Z' },
+        ],
+        resource: stylist2.id,
+        service: svc.id,
+        startTime: '2026-06-08T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    const result = await buildResourceAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      end: new Date('2026-06-09T00:00:00.000Z'),
+      payload,
+      reservationSlug: 'reservations',
+      resourceId: stylist1.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      start: new Date('2026-06-08T00:00:00.000Z'),
+    })
+
+    expect(result.requiredPools.length).toBe(1)
+    expect(result.requiredPools[0].quantity).toBe(2)
+    expect(result.requiredPools[0].busy.some((b) => new Date(b.start).toISOString() === '2026-06-08T10:00:00.000Z')).toBe(true)
+    // stylist1 itself has no own booking — proving the pool busy is independent of the stylist
+    expect(result.busy.length).toBe(0)
+  })
+})
+
+describe('resourceOwnerMode owner field relationTo', () => {
+  it('owner relates to the staffProvisioning user collection, not customers (separate users/customers)', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    // Mirrors the issue author: separate users + customers, staff provisioned from users
+    const resolved = resolveConfig({
+      resourceOwnerMode: { adminRoles: ['admin'] },
+      slugs: { customers: 'customers' },
+      staffProvisioning: { roleField: 'roles', staffRoles: ['employee'], userCollection: 'users' },
+    })
+    const col = createResourcesCollection(resolved)
+    const owner = col.fields.find(
+      (f): f is { name: string; relationTo: string } & Field => 'name' in f && f.name === 'owner',
+    )!
+    expect(owner.relationTo).toBe('users')
+  })
+
+  it('honours an explicit ownerCollection override', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    const resolved = resolveConfig({
+      resourceOwnerMode: { adminRoles: ['admin'], ownerCollection: 'staff' },
+      staffProvisioning: { staffRoles: ['employee'], userCollection: 'users' },
+    })
+    const col = createResourcesCollection(resolved)
+    const owner = col.fields.find(
+      (f): f is { name: string; relationTo: string } & Field => 'name' in f && f.name === 'owner',
+    )!
+    expect(owner.relationTo).toBe('staff')
+  })
+
+  it('falls back to customers when no staffProvisioning/ownerCollection (back-compat)', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    const resolved = resolveConfig({ resourceOwnerMode: { adminRoles: ['admin'] } })
+    const col = createResourcesCollection(resolved)
+    const owner = col.fields.find(
+      (f): f is { name: string; relationTo: string } & Field => 'name' in f && f.name === 'owner',
+    )!
+    expect(owner.relationTo).toBe('customers')
   })
 })

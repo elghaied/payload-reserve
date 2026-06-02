@@ -47,15 +47,17 @@ export function combineDateAndTime(date: Date, time: string): Date {
 
 /**
  * Check if a given date is an exception date in the schedule.
+ * Supports range exceptions via optional endDate (inclusive on both ends).
  */
 export function isExceptionDate(
   date: Date,
-  exceptions: Array<{ date: string }>,
+  exceptions: Array<{ date: string; endDate?: string }>,
 ): boolean {
-  const dateStr = date.toISOString().split('T')[0]
+  const target = date.toISOString().split('T')[0]
   return exceptions.some((exc) => {
-    const excDateStr = new Date(exc.date).toISOString().split('T')[0]
-    return excDateStr === dateStr
+    const start = new Date(exc.date).toISOString().split('T')[0]
+    const end = exc.endDate ? new Date(exc.endDate).toISOString().split('T')[0] : start
+    return target >= start && target <= end
   })
 }
 
@@ -73,7 +75,7 @@ type ManualSlot = {
 
 type Schedule = {
   active?: boolean
-  exceptions?: Array<{ date: string }>
+  exceptions?: Array<{ date: string; endDate?: string }>
   manualSlots?: ManualSlot[]
   recurringSlots?: RecurringSlot[]
   scheduleType: 'manual' | 'recurring'

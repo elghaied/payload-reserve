@@ -112,7 +112,6 @@ export interface Config {
   globalsSelect: {};
   locale: null;
   widgets: {
-    'sms-recent-logs': SmsRecentLogsWidget;
     'reservation-todays-reservations': ReservationTodaysReservationsWidget;
     collections: CollectionsWidget;
   };
@@ -261,6 +260,10 @@ export interface Service {
   bufferTimeBefore?: number | null;
   bufferTimeAfter?: number | null;
   /**
+   * Additional resource pools every booking of this service occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full.
+   */
+  requiredResources?: (string | Resource)[] | null;
+  /**
    * Allow bookings without a customer account. "Inherit" uses the plugin-level default.
    */
   allowGuestBooking?: ('inherit' | 'enabled' | 'disabled') | null;
@@ -277,11 +280,12 @@ export interface Resource {
   name: string;
   image?: (string | null) | Media;
   description?: string | null;
-  services: (string | Service)[];
+  services?: (string | Service)[] | null;
   active?: boolean | null;
   quantity: number;
   capacityMode?: ('per-reservation' | 'per-guest') | null;
   timezone?: string | null;
+  resourceType?: ('staff' | 'equipment' | 'room') | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -313,6 +317,8 @@ export interface Schedule {
   exceptions?:
     | {
         date: string;
+        endDate?: string | null;
+        type?: ('vacation' | 'sick' | 'personal' | 'closure' | 'other') | null;
         reason?: string | null;
         id?: string | null;
       }[]
@@ -608,6 +614,7 @@ export interface ServicesSelect<T extends boolean = true> {
   price?: T;
   bufferTimeBefore?: T;
   bufferTimeAfter?: T;
+  requiredResources?: T;
   allowGuestBooking?: T;
   active?: T;
   updatedAt?: T;
@@ -626,6 +633,7 @@ export interface ResourcesSelect<T extends boolean = true> {
   quantity?: T;
   capacityMode?: T;
   timezone?: T;
+  resourceType?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -657,6 +665,8 @@ export interface SchedulesSelect<T extends boolean = true> {
     | T
     | {
         date?: T;
+        endDate?: T;
+        type?: T;
         reason?: T;
         id?: T;
       };
@@ -766,16 +776,6 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "sms-recent-logs_widget".
- */
-export interface SmsRecentLogsWidget {
-  data?: {
-    [k: string]: unknown;
-  };
-  width: 'small' | 'medium';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

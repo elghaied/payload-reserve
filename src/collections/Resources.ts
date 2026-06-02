@@ -4,12 +4,40 @@ import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { makeResourceOwnerAccess } from '../utilities/ownerAccess.js'
+import { buildSelectOptions } from '../utilities/selectOptions.js'
+
+/**
+ * Owner-field beforeChange logic, extracted for testability. On create the
+ * owner defaults to the requesting user; on other operations the existing
+ * value is preserved. Staff provisioning assigns the correct owner by creating
+ * the Resource AS the new staff user (impersonation in the provisioning hook),
+ * so this function needs no special-case branch.
+ */
+export function resolveOwnerValue({
+  operation,
+  req,
+  value,
+}: {
+  operation: string | undefined
+  req: { user?: { id: unknown } | null }
+  value: unknown
+}): unknown {
+  if (operation === 'create' && req.user) {
+    return req.user.id
+  }
+  return value
+}
 
 export function createResourcesCollection(
   config: ResolvedReservationPluginConfig,
 ): CollectionConfig {
   const rom = config.resourceOwnerMode
   const ownerField = rom?.ownerField ?? 'owner'
+  // The owner relationship points to where owners/staff live: an explicit
+  // ownerCollection, else the staff-provisioning user collection, else customers.
+  // (Previously hardcoded to customers, which broke separate users/customers setups.)
+  const ownerCollection =
+    rom?.ownerCollection ?? config.staffProvisioning?.userCollection ?? config.slugs.customers
 
   // Build the owner field when resourceOwnerMode is enabled
   const ownerFieldDef: Field | null = rom
@@ -21,14 +49,11 @@ export function createResourcesCollection(
         },
         hooks: {
           beforeChange: [
-            ({ operation, req, value }) => {
-              if (operation === 'create' && req.user) {return req.user.id}
-              return value
-            },
+            ({ operation, req, value }) => resolveOwnerValue({ operation, req, value }),
           ],
         },
         label: 'Owner',
-        relationTo: config.slugs.customers as unknown as CollectionSlug,
+        relationTo: ownerCollection as unknown as CollectionSlug,
         required: true,
       }
     : null
@@ -71,7 +96,6 @@ export function createResourcesCollection(
         hasMany: true,
         label: ({ t }) => (t as PluginT)('reservation:fieldServices'),
         relationTo: config.slugs.services as unknown as CollectionSlug,
-        required: true,
       },
       {
         name: 'active',
@@ -120,6 +144,16 @@ export function createResourcesCollection(
           position: 'sidebar',
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldTimezone'),
+      },
+      {
+        name: 'resourceType',
+        type: 'select',
+        admin: {
+          position: 'sidebar',
+        },
+        defaultValue: config.resourceTypes[0],
+        label: 'Resource type',
+        options: buildSelectOptions(config.resourceTypes),
       },
       ...(ownerFieldDef ? [ownerFieldDef] : []),
     ],

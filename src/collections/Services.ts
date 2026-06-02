@@ -118,6 +118,17 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         min: 0,
       },
       {
+        name: 'requiredResources',
+        type: 'relationship',
+        admin: {
+          description:
+            'Additional resource pools every booking of this service occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full.',
+        },
+        hasMany: true,
+        label: 'Required resources',
+        relationTo: config.slugs.resources as unknown as CollectionSlug,
+      },
+      {
         name: 'allowGuestBooking',
         type: 'select',
         admin: {

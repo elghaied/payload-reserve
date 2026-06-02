@@ -21,7 +21,13 @@ if (!process.env.ROOT_DIR) {
 }
 
 const buildConfigWithMemoryDB = async () => {
-  if (process.env.NODE_ENV === 'test') {
+  // Only spin up the in-memory replica set when actually running under Vitest.
+  // Gating on NODE_ENV alone is too broad: CLI tooling that inherits NODE_ENV=test
+  // (e.g. `payload generate:types`) would otherwise spawn an untracked 3-node mongod
+  // cluster at config-import time that nothing ever tears down — orphaned mongods then
+  // pile up and pin the CPU. `VITEST` is only set inside Vitest workers, which own the
+  // replica-set lifecycle via getPayload/payload.destroy() in int.spec.ts.
+  if (process.env.NODE_ENV === 'test' && process.env.VITEST) {
     const memoryDB = await MongoMemoryReplSet.create({
       replSet: {
         count: 3,

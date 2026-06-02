@@ -41,3 +41,35 @@ export function hoursUntil(futureDate: Date, now?: Date): number {
   const reference = now ?? new Date()
   return (futureDate.getTime() - reference.getTime()) / (1000 * 60 * 60)
 }
+
+/**
+ * Local-calendar day key (YYYY-MM-DD) for a Date, using local components (not UTC).
+ */
+export function localDayKey(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/**
+ * Intersect two lists of half-open [start, end) intervals.
+ * Returns every non-empty overlap between an interval in `a` and one in `b`.
+ * Fold over N lists to intersect more than two.
+ */
+export function intersectIntervals(
+  a: Array<{ end: Date; start: Date }>,
+  b: Array<{ end: Date; start: Date }>,
+): Array<{ end: Date; start: Date }> {
+  const out: Array<{ end: Date; start: Date }> = []
+  for (const x of a) {
+    for (const y of b) {
+      const start = x.start > y.start ? x.start : y.start
+      const end = x.end < y.end ? x.end : y.end
+      if (start < end) {
+        out.push({ end, start })
+      }
+    }
+  }
+  return out
+}

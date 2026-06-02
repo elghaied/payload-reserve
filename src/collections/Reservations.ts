@@ -10,6 +10,7 @@ import type { ReservationPluginHooks, ResolvedReservationPluginConfig } from '..
 
 import { calculateEndTime } from '../hooks/reservations/calculateEndTime.js'
 import { checkIdempotency } from '../hooks/reservations/checkIdempotency.js'
+import { expandRequiredResources } from '../hooks/reservations/expandRequiredResources.js'
 import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
@@ -147,6 +148,9 @@ export function createReservationsCollection(
         name: 'startTime',
         type: 'date',
         admin: {
+          components: {
+            Field: 'payload-reserve/client#AvailabilityTimeField',
+          },
           date: {
             pickerAppearance: 'dayAndTime',
           },
@@ -258,6 +262,7 @@ export function createReservationsCollection(
         createPluginHooksBeforeCreate(config.hooks),
         checkIdempotency(config),
         validateGuestBooking(config),
+        expandRequiredResources(config),
         calculateEndTime(config),
         validateConflicts(config),
         validateStatusTransition(config),

@@ -1,0 +1,7 @@
+.wrapper { margin-bottom: 1rem; }
+.slots { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.slot { background: var(--theme-elevation-100); border: 1px solid var(--theme-elevation-200); border-radius: 4px; cursor: pointer; font-size: 13px; padding: 5px 9px; }
+.slot:hover { background: var(--theme-elevation-150); }
+.selected { background: var(--theme-success-500); border-color: var(--theme-success-500); color: #fff; }
+.day, .fallback { background: var(--theme-input-bg); border: 1px solid var(--theme-elevation-200); border-radius: 4px; padding: 6px 8px; }
+.hint { color: var(--theme-elevation-400); font-size: 12px; margin-top: 6px; }
