@@ -44,16 +44,19 @@ By default, with no options set, the plugin creates:
 - `reservations` — the core booking records
 
 **3 admin UI components:**
-- Calendar view replacing the default reservations list (month/week/day)
+- Calendar view replacing the default reservations list (month/week/day/lanes/pending, with availability shading and click-to-book)
 - Dashboard widget showing today's booking stats
 - Availability overview at `/admin/reservation-availability`
 
-**5 public REST endpoints:**
-- `GET /api/reserve/availability` — available slots for a date
+**6 public REST endpoints:**
+- `GET /api/reserve/availability` — available slots for a date (guest-count and multi-resource aware)
 - `GET /api/reserve/slots` — slots with richer metadata + guest count support
-- `POST /api/reserve/book` — create a booking
-- `POST /api/reserve/cancel` — cancel a booking
-- `GET /api/reserve/customers` — customer search
+- `GET /api/reserve/resource-availability` — a resource's shift windows, time-off, and busy intervals over a date range (backs the calendar shading)
+- `POST /api/reserve/book` — create a booking (supports account-less `guest` bookings and multi-resource `items`)
+- `POST /api/reserve/cancel` — cancel a booking (authenticated owner/admin, or guest via cancellation token)
+- `GET /api/reservation-customer-search` — customer search (privileged staff/admin only)
+
+> For multi-tenant setups where staff own their own resources, see [`resourceOwnerMode` and `staffProvisioning`](./configuration.md). The admin UI is fully translatable — see [Internationalization](./i18n.md).
 
 ## Using Your Existing Users Collection
 

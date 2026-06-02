@@ -98,6 +98,23 @@ Each item in the `items` array has its own `resource`, optional `service`, optio
 
 **Conflict detection** runs independently for each resource in the `items` array. Each item's own service determines its buffer times (`bufferTimeBefore`/`bufferTimeAfter`), so different items can have different buffer windows.
 
+### Auto-expanded required resources
+
+A service can declare `requiredResources` (a `hasMany` relationship to additional resource pools it always needs — e.g. a treatment that also consumes a shared room or a salon haircut that occupies a chair). On create, the `expandRequiredResources` hook automatically appends those resources to the reservation's `items[]` before conflict detection and `endTime` calculation run, so the caller doesn't have to list them manually.
+
+```typescript
+// Service with a required shared room pool
+{ name: 'Deep Tissue Massage', requiredResources: [roomPoolId] }
+
+// Booking only needs the therapist; the room pool is auto-added to items[]
+await payload.create({
+  collection: 'reservations',
+  data: { service: massageId, resource: therapistId, customer, startTime },
+})
+```
+
+Conflict detection then verifies every expanded item — including required pools — is free for the window. If any required pool is fully booked at that time, the create fails with a conflict error that identifies the offending item (e.g. `items.1.startTime`).
+
 ---
 
 ## Capacity and Inventory
@@ -149,6 +166,16 @@ await payload.create({
 // Booking with guestCount: 3 occupies 3 of the 20 spots
 // When 20 total guests are booked, the class is full
 ```
+
+### Guest counts
+
+`guestCount` on a reservation (or per item) records how many people the booking is for. It only affects capacity math when the resource uses `capacityMode: 'per-guest'` (above); in `per-reservation` mode it is informational. Items inherit the parent `guestCount` when omitted, defaulting to `1`. The availability endpoints (`/api/reserve/availability`, `/api/reserve/slots`) accept a `guestCount` query param so slot listings reflect per-guest capacity.
+
+---
+
+## Guest Bookings
+
+Reservations can be made without a customer account. Enable globally with the `allowGuestBooking` plugin option, or per-service via the service's `allowGuestBooking` field (`inherit` / `enabled` / `disabled`). A guest booking captures inline contact details (`guest.name` plus at least one of `guest.email` / `guest.phone`) instead of a `customer`, and the plugin generates a `cancellationToken` for self-service cancellation (delivered via the `afterBookingCreate` hook, never over the API). See [Guest Bookings](../README.md#guest-bookings) and [Examples](./examples.md).
 
 ---
 

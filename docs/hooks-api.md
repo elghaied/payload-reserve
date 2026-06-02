@@ -215,4 +215,21 @@ hooks: {
 
 ---
 
+## Staff Resource Provisioning (user-collection hook)
+
+Separate from the booking-lifecycle hooks above, when `staffProvisioning` is configured (which also requires `resourceOwnerMode`), the plugin registers an `afterChange` hook on the staff **user collection** (`staffProvisioning.userCollection`, defaulting to the top-level `userCollection`).
+
+On user **create** — or on an **update** that promotes a user into a staff role — it provisions a paired Resource owned by that user:
+
+- **Role match** — fires only when the user's `roleField` (default `'role'`) value intersects `staffRoles`. Demoting a user never deletes their Resource.
+- **Idempotent** — skips if a Resource already owns that user, so re-saving never creates a duplicate.
+- **Impersonation-based ownership** — the Resource is created with a `req` whose `user` is the new staff user, so the owner field resolves to them (not the admin who triggered the save); no bypass flag is used.
+- **Non-blocking** — provisioning failures are caught and logged; they never block the user create/update.
+- **Respects `context.skipReservationHooks`** — exits immediately when set.
+- **`beforeCreate` escape hatch** — `staffProvisioning.beforeCreate({ data, req, user })` may stamp tenant IDs or custom fields onto the Resource before it is saved.
+
+See the **Staff Auto-Provisioning** section of the [README](../README.md#staff-scheduling) and the [Configuration](./configuration.md) docs for the full option list.
+
+---
+
 ← [Booking Features](./booking-features.md) | → [REST API](./rest-api.md) | ↑ [Back to README](../README.md)

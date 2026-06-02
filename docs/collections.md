@@ -18,6 +18,9 @@ Defines what can be booked (e.g., "Haircut", "Consultation", "Massage").
 | `price` | Number | No | Price (min: 0, step: 0.01) |
 | `bufferTimeBefore` | Number | No | Buffer minutes before the slot (default: 0) |
 | `bufferTimeAfter` | Number | No | Buffer minutes after the slot (default: 0) |
+| `requiredResources` | Relationship | No | Extra resource pools (hasMany) auto-expanded into the reservation `items[]` at booking time |
+| `allowGuestBooking` | Select | No | `'inherit'`, `'enabled'`, or `'disabled'` (default: `'inherit'`). Controls whether anonymous guest bookings are permitted for this service |
+| `owner` | Relationship | Yes* | *Only present when `resourceOwnerMode.ownedServices` is enabled.* Owner of this service (sidebar). Defaults to the requesting user on create |
 | `active` | Checkbox | No | Whether service is bookable (default: true) |
 
 ```typescript
@@ -50,11 +53,13 @@ Who or what performs the service (a stylist, a room, a machine, a yoga instructo
 | `name` | Text | Yes | Resource name (max 200 chars) |
 | `image` | Upload | No | Resource photo |
 | `description` | Textarea | No | Resource description |
-| `services` | Relationship | Yes | Services this resource can perform (hasMany) |
+| `services` | Relationship | No | Services this resource can perform (hasMany). Optional so freshly provisioned staff resources can exist before services are assigned |
 | `active` | Checkbox | No | Whether resource accepts bookings (default: true) |
 | `quantity` | Number | Yes | How many concurrent bookings allowed (default: 1) |
 | `capacityMode` | Select | No | `'per-reservation'` or `'per-guest'` — shown only when `quantity > 1` |
 | `timezone` | Text | No | IANA timezone for display purposes |
+| `resourceType` | Select | No | Descriptive resource category. Options come from the `resourceTypes` config (default `['staff','equipment','room']`); defaults to the first entry (`'staff'`). Drives no logic |
+| `owner` | Relationship | Yes* | *Only present when `resourceOwnerMode` is enabled.* Owner of this resource (sidebar). Defaults to the requesting user on create. Relates to `resourceOwnerMode.ownerCollection ?? staffProvisioning.userCollection ?? customers` |
 
 ```typescript
 await payload.create({
@@ -85,10 +90,10 @@ Defines when a resource is available. Supports **recurring** (weekly pattern) an
 | `scheduleType` | Select | `'recurring'` or `'manual'` (default: `'recurring'`) |
 | `recurringSlots` | Array | Weekly slots with `day`, `startTime`, `endTime` |
 | `manualSlots` | Array | Specific date slots with `date`, `startTime`, `endTime` |
-| `exceptions` | Array | Dates the resource is unavailable (`date`, `reason`) |
+| `exceptions` | Array | Dates the resource is unavailable. Each: `date` (required), `endDate` (optional — makes a full inclusive date range), `type` (select from `leaveTypes` config, default `['vacation','sick','personal','closure','other']`), `reason` (text) |
 | `active` | Checkbox | Whether this schedule is in effect (default: true) |
 
-Times use `HH:mm` format (24-hour, e.g., `09:00`, `17:30`). The format is validated — values like `9:00` (missing leading zero) or `09:00:00` (with seconds) are rejected. Within each slot, `endTime` must be after `startTime`. Exception dates block out the entire day.
+Times use `HH:mm` format (24-hour, e.g., `09:00`, `17:30`). The format is validated — values like `9:00` (missing leading zero) or `09:00:00` (with seconds) are rejected. Within each slot, `endTime` must be after `startTime`. Any date inside an exception (including a `date`–`endDate` range, where `endDate` must be on or after `date`) blocks out that entire day.
 
 ```typescript
 await payload.create({
@@ -105,7 +110,9 @@ await payload.create({
       { day: 'fri', startTime: '09:00', endTime: '15:00' },
     ],
     exceptions: [
-      { date: '2025-12-25', reason: 'Christmas' },
+      { date: '2025-12-25', reason: 'Christmas', type: 'closure' },
+      // A multi-day range (inclusive): the resource is off all week
+      { date: '2025-07-01', endDate: '2025-07-07', reason: 'Vacation', type: 'vacation' },
     ],
     active: true,
   },
@@ -148,23 +155,25 @@ Field deduplication prevents double-injection — the plugin checks each field's
 
 **Slug:** `reservations`
 
-The core booking records. Each reservation links a customer to a service performed by a resource.
+The core booking records. Each reservation links a service performed by a resource to either a registered customer or an anonymous guest.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `service` | Relationship | Yes | Service being booked |
 | `resource` | Relationship | Yes | Resource performing the service |
-| `customer` | Relationship | Yes | Customer making the booking |
-| `startTime` | Date | Yes | Appointment start (date + time picker) |
+| `customer` | Relationship | No | Customer making the booking. Optional — bookings may instead capture an anonymous `guest`. Uses a custom CustomerField admin component with inline create/edit |
+| `guest` | Group | No | Anonymous guest details: `name` (text, max 200), `email` (email), `phone` (text, max 50). Used when no `customer` is set |
+| `cancellationToken` | Text | No | Hidden, indexed token for self-service (guest) cancellation. Read access restricted to non-customer users (admins/staff); never returned by the public API |
+| `startTime` | Date | Yes | Appointment start (availability-aware slot picker) |
 | `endTime` | Date | No | Auto-calculated from service duration (read-only) |
 | `status` | Select | No | Workflow status (default: `'pending'`) |
 | `guestCount` | Number | No | Number of guests (default: 1, min: 1) |
 | `cancellationReason` | Textarea | No | Visible only when status is `'cancelled'` |
 | `notes` | Textarea | No | Additional notes |
-| `items` | Array | No | Additional resources in a multi-resource booking |
-| `idempotencyKey` | Text | No | Unique key to prevent duplicate submissions |
+| `items` | Array | No | Multi-resource booking lines. Each item: `resource` (relationship, required), `service` (relationship, optional), `startTime` (date, optional), `endTime` (date, optional), `guestCount` (number, optional, min 1). Missing values inherit the parent reservation |
+| `idempotencyKey` | Text | No | Unique key to prevent duplicate submissions (sidebar, read-only) |
 
-See [Booking Features → Multi-Resource Bookings](./booking-features.md#multi-resource-bookings) for details on the `items` array.
+A reservation must have **either** a `customer` **or** a `guest` — not both, not neither (enforced by the `validateGuestBooking` hook, gated by `allowGuestBooking`). See [Booking Features → Multi-Resource Bookings](./booking-features.md#multi-resource-bookings) for the `items` array and [Guest Bookings](../README.md#guest-bookings) for account-less bookings.
 
 ---
 

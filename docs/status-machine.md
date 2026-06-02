@@ -54,17 +54,20 @@ payloadReserve({
 
 ## Business Logic Hooks
 
-Four `beforeChange` hooks run on the Reservations collection on every create and update:
+Seven `beforeChange` hooks run on the Reservations collection. They fire in this order (after the plugin's `beforeBookingCreate` integration hooks):
 
-1. **`checkIdempotency`** — Rejects creates where `idempotencyKey` has already been used
-2. **`calculateEndTime`** — Computes `endTime` from `startTime + service.duration` (respects `durationType`)
-3. **`validateConflicts`** — Checks for overlapping reservations on the same resource using blocking statuses and buffer times
-4. **`validateStatusTransition`** — Enforces allowed transitions defined in the status machine; on create, enforces that new bookings start in `defaultStatus` (admin users can also use statuses reachable from `defaultStatus`; use `context.allowConfirmedOnCreate` for programmatic bypass)
-5. **`validateCancellation`** — When transitioning to `cancelled`, verifies the appointment is at least `cancellationNoticePeriod` hours away
+1. **`checkIdempotency`** — On create, rejects creates where `idempotencyKey` has already been used
+2. **`validateGuestBooking`** — On create, requires either a `customer` or guest contact details (and rejects supplying both); driven by the `allowGuestBooking` config and per-service overrides
+3. **`expandRequiredResources`** — On create, expands the service's `requiredResources` into the reservation's `items[]` so every required resource pool is occupied (runs before `calculateEndTime`/`validateConflicts` so appended items get end times and are conflict-checked)
+4. **`calculateEndTime`** — Computes `endTime` from `startTime + service.duration` (respects `durationType`)
+5. **`validateConflicts`** — Checks for overlapping reservations per item using blocking statuses and buffer times
+6. **`validateStatusTransition`** — Enforces allowed transitions defined in the status machine; on create, enforces that new bookings start in `defaultStatus` (admin/staff users can also use statuses reachable from `defaultStatus`; use `context.allowConfirmedOnCreate` for programmatic bypass)
+7. **`validateCancellation`** — When transitioning to `cancelled`, verifies the appointment is at least `cancellationNoticePeriod` hours away
 
-One `afterChange` hook also runs:
+Two `afterChange` hooks also run:
 
-6. **`onStatusChange`** — Detects status changes; fires `afterStatusChange`, `afterBookingConfirm`, and `afterBookingCancel` plugin hooks
+8. **`createPluginHooksAfterCreate`** — On create, fires the `afterBookingCreate` plugin hooks
+9. **`onStatusChange`** — Detects status changes; fires `afterStatusChange`, `afterBookingConfirm`, and `afterBookingCancel` plugin hooks (each wrapped in try-catch — errors are logged, not thrown)
 
 ## Escape Hatch
 

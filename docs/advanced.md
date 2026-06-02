@@ -107,4 +107,23 @@ Run this job on a schedule (e.g., hourly) using Payload's job queue. The job doe
 
 ---
 
+## Capacity & Quantity Race Considerations
+
+For resources with `quantity > 1` (or `capacityMode: 'per-guest'`), the hook-level check counts existing blocking reservations (or sums `guestCount`) and compares against `quantity`. Under high concurrency, two simultaneous bookings can each read capacity-not-yet-full and both succeed, briefly overbooking. The hook check is best-effort, not a transactional lock.
+
+Mitigations:
+
+- Add the conflict-lookup index above so the capacity read is fast (shrinks the race window).
+- Extend the reconciliation job to sum occupancy per resource per time window and compare against `quantity` / per-guest capacity, flagging windows where occupancy exceeds capacity.
+- For strict guarantees, enforce capacity at the database layer (e.g. a unique partial index on `(resource, startTime)` for `per-reservation, quantity: 1` resources, or an application-level lock keyed by resource).
+
+## Multi-Resource Conflict Notes
+
+When a service has `requiredResources`, the plugin expands them into `items[]` and conflict-checks each item independently against its own service's buffer times.
+
+- Conflict detection matches reservations that reference a resource **either** at the top level (`resource`) **or** inside another booking's `items[]` — a resource held only in another booking's items is not invisible.
+- A partial overbooking is possible if the primary resource is free but a required pool is full; the create is rejected atomically per booking. The reconciliation job should iterate `items[]` (not just the top-level `resource`) when grouping reservations by resource.
+
+---
+
 ← [Examples](./examples.md) | → [Development](./development.md) | ↑ [Back to README](../README.md)

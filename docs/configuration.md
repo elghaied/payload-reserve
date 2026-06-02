@@ -79,8 +79,54 @@ payloadReserve({
   extraReservationFields: [
     { name: 'paymentReminderSent', type: 'checkbox', defaultValue: false },
   ],
+
+  // Allow bookings without a customer account (per-service override available)
+  allowGuestBooking: false,
+
+  // Customize the option list for Resource.resourceType (first entry is the field default).
+  // Passing an empty array throws at init.
+  resourceTypes: ['staff', 'equipment', 'room'],
+
+  // Customize the option list for Schedule.exceptions[].type.
+  // Passing an empty array throws at init.
+  leaveTypes: ['vacation', 'sick', 'personal', 'closure', 'other'],
+
+  // Resource-owner multi-tenancy (opt-in). Adds an owner relationship to Resources
+  // (and optionally Services) so owners only see their own records.
+  resourceOwnerMode: {
+    // Roles that bypass ownership scoping and see all records.
+    // Default: anyone whose req.user.collection is the admin collection.
+    adminRoles: ['admin'],
+    // Also add an owner field to Services (default: false — Services are platform-managed).
+    ownedServices: false,
+    // Field name for the owner relationship on Resources (default: 'owner').
+    ownerField: 'owner',
+    // Collection the owner field relates to. Defaults to staffProvisioning.userCollection
+    // when set, otherwise slugs.customers. Set this when owners live in a different
+    // collection than your customers.
+    ownerCollection: 'users',
+  },
+
+  // Auto-provision a Resource for staff-role users (opt-in; REQUIRES resourceOwnerMode).
+  // On user create/update, a paired Resource owned by that user is created (idempotent).
+  staffProvisioning: {
+    // Role value(s) that mark a user as staff. Required, must be non-empty.
+    staffRoles: ['stylist', 'therapist'],
+    // Auth collection holding staff users. Defaults to top-level userCollection.
+    userCollection: 'users',
+    // Field on the user holding the role (default: 'role').
+    roleField: 'role',
+    // resourceType stamped on the provisioned Resource (default: 'staff'; must be a valid resourceType).
+    resourceType: 'staff',
+    // User field copied into Resource.name (default: 'name', falls back to email).
+    nameFrom: 'name',
+    // Escape hatch to stamp tenant IDs / custom fields before the Resource is saved.
+    beforeCreate: ({ data, req, user }) => data,
+  },
 })
 ```
+
+> **`staffProvisioning` requires `resourceOwnerMode`.** Configuring `staffProvisioning` without `resourceOwnerMode` throws at init. `staffProvisioning.staffRoles` must be a non-empty array, and `staffProvisioning.userCollection` is required when the top-level `userCollection` is unset. The provisioned Resource is created by impersonating the staff user (so `owner` is always that user), is idempotent (deduped by owner), is non-blocking (failures are logged, not thrown), and is never auto-deleted on demotion.
 
 ## Defaults Table
 
@@ -100,6 +146,21 @@ payloadReserve({
 | `statusMachine` | `Partial<StatusMachineConfig>` | Default 5-status machine | Custom status machine (validated at init) |
 | `hooks` | `ReservationPluginHooks` | `{}` | Plugin hook callbacks |
 | `extraReservationFields` | `Field[]` | `[]` | Extra Payload fields appended to the Reservations collection |
+| `allowGuestBooking` | `boolean` | `false` | Allow bookings without a customer account (per-service override available) |
+| `resourceTypes` | `string[]` | `['staff', 'equipment', 'room']` | Option list for `Resource.resourceType`; first entry is the field default. Empty array throws |
+| `leaveTypes` | `string[]` | `['vacation', 'sick', 'personal', 'closure', 'other']` | Option list for `Schedule.exceptions[].type`. Empty array throws |
+| `resourceOwnerMode` | `ResourceOwnerModeConfig` | `undefined` | Opt-in resource-owner multi-tenancy (see sub-options below) |
+| `resourceOwnerMode.adminRoles` | `string[]` | `[]` | Roles that bypass ownership scoping; falls back to admin-collection check |
+| `resourceOwnerMode.ownedServices` | `boolean` | `false` | Also add an owner field to Services |
+| `resourceOwnerMode.ownerField` | `string` | `'owner'` | Owner relationship field name on Resources |
+| `resourceOwnerMode.ownerCollection` | `string` | `staffProvisioning.userCollection` ?? `slugs.customers` | Collection the owner field relates to |
+| `staffProvisioning` | `StaffProvisioningConfig` | `undefined` | Opt-in staff auto-provisioning; **requires** `resourceOwnerMode` |
+| `staffProvisioning.staffRoles` | `string[]` | — (required, non-empty) | Role value(s) marking a user as staff |
+| `staffProvisioning.userCollection` | `string` | top-level `userCollection` | Auth collection holding staff users (required if top-level `userCollection` unset) |
+| `staffProvisioning.roleField` | `string` | `'role'` | User field holding the role |
+| `staffProvisioning.resourceType` | `string` | `'staff'` | resourceType stamped on the Resource (must be a valid `resourceType`) |
+| `staffProvisioning.nameFrom` | `string` | `'name'` | User field copied into `Resource.name` (falls back to email) |
+| `staffProvisioning.beforeCreate` | `function` | `undefined` | Stamp tenant/custom fields onto the Resource before create |
 
 > **Vocabularies:** `resourceTypes` (default `['staff', 'equipment', 'room']`) and `leaveTypes` (default `['vacation', 'sick', 'personal', 'closure', 'other']`) customize the option lists for `Resource.resourceType` and `Schedule.exceptions[].type`. See [Staff Scheduling](../README.md#staff-scheduling).
 

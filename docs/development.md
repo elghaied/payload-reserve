@@ -33,43 +33,66 @@ src/
   defaults.ts           # Default config values + resolveConfig()
 
   collections/
-    Services.ts         # Service definitions (name, duration, durationType, price, buffers)
-    Resources.ts        # Resources (quantity, capacityMode, timezone)
-    Schedules.ts        # Availability schedules (recurring/manual + exceptions)
-    Reservations.ts     # Bookings with hooks, guestCount, items, idempotencyKey
+    Services.ts         # Services (duration, durationType, requiredResources, allowGuestBooking, buffers, owner)
+    Resources.ts        # Resources (quantity, capacityMode, timezone, resourceType, owner)
+    Schedules.ts        # Availability schedules (recurring/manual + exceptions w/ endDate + leave type)
+    Reservations.ts     # Bookings (hooks, guest, cancellationToken, guestCount, items, idempotencyKey)
     Customers.ts        # Standalone customer auth collection
 
-  hooks/reservations/
-    checkIdempotency.ts       # Duplicate submission prevention
-    calculateEndTime.ts       # Auto end time from service duration
-    validateConflicts.ts      # Double-booking prevention
-    validateStatusTransition.ts # Status machine enforcement
-    validateCancellation.ts   # Cancellation notice period
-    onStatusChange.ts         # afterChange hook — fires plugin hook callbacks
+  hooks/
+    index.ts                    # Wires reservation hooks onto the collection
+    reservations/
+      checkIdempotency.ts       # Duplicate submission prevention
+      validateGuestBooking.ts   # Guest vs customer validation + cancellation token
+      expandRequiredResources.ts # Auto-expand service.requiredResources into items[]
+      calculateEndTime.ts       # Auto end time from service duration
+      validateConflicts.ts      # Double-booking prevention (per item)
+      validateStatusTransition.ts # Status machine enforcement
+      validateCancellation.ts   # Cancellation notice period
+      onStatusChange.ts         # afterChange — fires plugin hook callbacks
+    users/
+      provisionStaffResource.ts # afterChange — auto-provision Resource for staff users
 
   services/
-    AvailabilityService.ts    # computeEndTime, checkAvailability, getAvailableSlots
+    AvailabilityService.ts    # computeEndTime, checkAvailability, getAvailableSlots, ...
+    index.ts                  # Barrel re-export of availability functions
 
   endpoints/
     checkAvailability.ts      # GET /api/reserve/availability
     getSlots.ts               # GET /api/reserve/slots
+    resourceAvailability.ts   # GET /api/reserve/resource-availability (calendar shading)
     createBooking.ts          # POST /api/reserve/book
     cancelBooking.ts          # POST /api/reserve/cancel
-    customerSearch.ts         # GET /api/reserve/customers
+    customerSearch.ts         # GET /api/reservation-customer-search
 
   utilities/
-    slotUtils.ts              # addMinutes, doRangesOverlap, computeBlockedWindow, hoursUntil
+    slotUtils.ts              # addMinutes, doRangesOverlap, computeBlockedWindow, hoursUntil, localDayKey
     scheduleUtils.ts          # resolveScheduleForDate, combineDateAndTime, etc.
     resolveReservationItems.ts # Normalizes reservation data into ResolvedItem[]
+    resolveRequiredResources.ts # Merge primary + required resource ids
+    computeSlotStates.ts      # Derive slot states (free/full/off-shift/time-off) for the calendar
+    guestBooking.ts           # resolveGuestBookingAllowed — per-service guest tri-state
+    selectOptions.ts          # buildSelectOptions — string[] -> Payload select options
+    userRoles.ts              # isPrivilegedUser — role-aware staff/admin detection
+    ownerAccess.ts            # Access helpers for resource-owner mode
+    i18nUtils.ts              # Translation helpers
+
+  translations/
+    index.ts                  # Locale registry + PluginTranslationKeys / PluginT types
+    en.json, ar.json, de.json, es.json, fa.json, fr.json,
+    hi.json, id.json, pl.json, ru.json, tr.json, zh.json  # 12 bundled locales
 
   components/
-    CalendarView/             # Client: month/week/day calendar
+    CalendarView/             # Client: month/week/day/lanes/pending calendar
+      LaneTimelineView.tsx    #   per-resource lane timeline
+      useResourceAvailability.ts #   hook fetching resource availability
+    AvailabilityTimeField/    # Client: availability-aware startTime slot picker
     CustomerField/            # Client: rich customer search field
     DashboardWidget/          # RSC: today's reservation stats
     AvailabilityOverview/     # Client: weekly resource grid
 
   exports/
-    client.ts                 # CalendarView, AvailabilityOverview, CustomerField
+    client.ts                 # CalendarView, AvailabilityOverview, CustomerField, AvailabilityTimeField
     rsc.ts                    # DashboardWidgetServer
 
 dev/

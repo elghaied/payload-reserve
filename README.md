@@ -29,8 +29,8 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Cancellation Policy** — Configurable minimum notice period enforcement
 - **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems
 - **Availability Service** — Pure functions and DB helpers for slot generation (15-min step) and conflict checking with guest-count-aware filtering
-- **Public REST API** — Five pre-built endpoints for availability, slot listing, booking, cancellation, and customer search — with ownership enforcement and input validation
-- **Calendar View** — Month/week/day calendar replacing the default reservations list view
+- **Public REST API** — Six pre-built endpoints for availability, slot listing, resource availability, booking (incl. guest bookings), cancellation, and customer search — with ownership enforcement and input validation
+- **Calendar View** — Month/week/day/lanes/pending calendar replacing the default reservations list view, with per-resource availability shading and click-a-free-slot-to-book; plus an availability-aware slot picker on the reservation form
 - **Dashboard Widget** — Server component showing today's booking stats
 - **Availability Overview** — Weekly grid of resource availability vs. booked slots
 - **Recurring and Manual Schedules** — Weekly patterns with exception dates, or specific one-off dates
@@ -280,7 +280,7 @@ This is separate from Payload **field localization** (localizing the *content* o
 | [Status Machine](https://github.com/elghaied/payload-reserve/blob/main/docs/status-machine.md) | Default flow, custom machines, business logic hooks, escape hatch |
 | [Booking Features](https://github.com/elghaied/payload-reserve/blob/main/docs/booking-features.md) | Duration types, multi-resource bookings, capacity modes |
 | [Hooks API](https://github.com/elghaied/payload-reserve/blob/main/docs/hooks-api.md) | All 7 plugin hook types with signatures and examples |
-| [REST API](https://github.com/elghaied/payload-reserve/blob/main/docs/rest-api.md) | All 5 public endpoints with params, responses, and fetch examples |
+| [REST API](https://github.com/elghaied/payload-reserve/blob/main/docs/rest-api.md) | All 6 public endpoints with params, responses, and fetch examples |
 | [Admin UI](https://github.com/elghaied/payload-reserve/blob/main/docs/admin-ui.md) | Calendar view, dashboard widget, availability overview |
 | [Internationalization](https://github.com/elghaied/payload-reserve/blob/main/docs/i18n.md) | 12 bundled languages, overriding strings, adding a language, Hindi setup |
 | [Examples](https://github.com/elghaied/payload-reserve/blob/main/docs/examples.md) | Salon, hotel, restaurant, event venue, Stripe, email, multi-tenant (resource owner mode) |
