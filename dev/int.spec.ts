@@ -3096,3 +3096,66 @@ describe('computeSlotStates', () => {
     expect(slots.find((s) => s.start.toISOString() === '2026-06-08T10:00:00.000Z')!.state).toBe('full')
   })
 })
+
+describe('resource-availability endpoint logic', () => {
+  it('returns shift windows, time-off, and busy for a resource', async () => {
+    const { buildResourceAvailability } = await import('../src/endpoints/resourceAvailability.js')
+
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'RA Haircut', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RA Stylist', active: true, quantity: 1, services: [service.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'RA shifts',
+        active: true,
+        exceptions: [{ type: 'vacation', date: '2026-06-15T00:00:00.000Z', reason: 'Off' }],
+        recurringSlots: [{ day: 'mon', endTime: '17:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'ra-stylist@example.com',
+        firstName: 'RA',
+        lastName: 'Customer',
+        password: 'testpass123',
+      },
+    })
+    await (payload.create as never as (a: unknown) => Promise<unknown>)({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        customer: customer.id,
+        endTime: '2026-06-08T11:00:00.000Z',
+        resource: resource.id,
+        service: service.id,
+        startTime: '2026-06-08T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    const result = await buildResourceAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      end: new Date('2026-06-16T00:00:00.000Z'),
+      payload,
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      start: new Date('2026-06-08T00:00:00.000Z'),
+    })
+
+    expect(result.quantity).toBe(1)
+    const monday = result.days.find((d) => d.date === '2026-06-08') // Monday → has a shift
+    expect(monday?.shiftWindows.length).toBeGreaterThan(0)
+    expect(result.busy.some((b) => new Date(b.start).toISOString() === '2026-06-08T10:00:00.000Z')).toBe(true)
+  })
+})

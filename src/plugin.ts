@@ -15,6 +15,7 @@ import { createCheckAvailabilityEndpoint } from './endpoints/checkAvailability.j
 import { createBookingEndpoint } from './endpoints/createBooking.js'
 import { createCustomerSearchEndpoint } from './endpoints/customerSearch.js'
 import { createGetSlotsEndpoint } from './endpoints/getSlots.js'
+import { createResourceAvailabilityEndpoint } from './endpoints/resourceAvailability.js'
 import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
 import { translations } from './translations/index.js'
 
@@ -115,6 +116,7 @@ export const payloadReserve =
       createBookingEndpoint(resolved),
       createCustomerSearchEndpoint(resolved),
       createGetSlotsEndpoint(resolved),
+      createResourceAvailabilityEndpoint(resolved),
     )
 
     // Wire staff auto-provisioning onto the staff user collection
