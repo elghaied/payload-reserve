@@ -6,6 +6,29 @@ import type { ResolvedReservationPluginConfig } from '../types.js'
 import { makeResourceOwnerAccess } from '../utilities/ownerAccess.js'
 import { buildSelectOptions } from '../utilities/selectOptions.js'
 
+/**
+ * Owner-field beforeChange logic. On create, defaults the owner to the
+ * requesting user — UNLESS `context.allowExplicitOwner` is set by a trusted
+ * server-side caller (e.g. staff provisioning), which lets the explicit value
+ * (the new staff user's id) survive instead of being clobbered by the admin's id.
+ */
+export function resolveOwnerValue({
+  context,
+  operation,
+  req,
+  value,
+}: {
+  context?: { allowExplicitOwner?: boolean }
+  operation: string
+  req: { user?: { id: unknown } | null }
+  value: unknown
+}): unknown {
+  if (operation === 'create' && req.user && !context?.allowExplicitOwner) {
+    return req.user.id
+  }
+  return value
+}
+
 export function createResourcesCollection(
   config: ResolvedReservationPluginConfig,
 ): CollectionConfig {
@@ -22,10 +45,8 @@ export function createResourcesCollection(
         },
         hooks: {
           beforeChange: [
-            ({ operation, req, value }) => {
-              if (operation === 'create' && req.user) {return req.user.id}
-              return value
-            },
+            ({ context, operation, req, value }) =>
+              resolveOwnerValue({ context, operation, req, value }),
           ],
         },
         label: 'Owner',
