@@ -115,6 +115,7 @@ export function resolveConfig(
       ? {
           adminRoles: rom.adminRoles ?? [],
           ownedServices: rom.ownedServices ?? false,
+          ownerCollection: rom.ownerCollection,
           ownerField: rom.ownerField ?? 'owner',
         }
       : undefined,

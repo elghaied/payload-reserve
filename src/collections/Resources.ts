@@ -33,6 +33,11 @@ export function createResourcesCollection(
 ): CollectionConfig {
   const rom = config.resourceOwnerMode
   const ownerField = rom?.ownerField ?? 'owner'
+  // The owner relationship points to where owners/staff live: an explicit
+  // ownerCollection, else the staff-provisioning user collection, else customers.
+  // (Previously hardcoded to customers, which broke separate users/customers setups.)
+  const ownerCollection =
+    rom?.ownerCollection ?? config.staffProvisioning?.userCollection ?? config.slugs.customers
 
   // Build the owner field when resourceOwnerMode is enabled
   const ownerFieldDef: Field | null = rom
@@ -48,7 +53,7 @@ export function createResourcesCollection(
           ],
         },
         label: 'Owner',
-        relationTo: config.slugs.customers as unknown as CollectionSlug,
+        relationTo: ownerCollection as unknown as CollectionSlug,
         required: true,
       }
     : null

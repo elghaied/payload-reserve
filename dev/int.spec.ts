@@ -3306,3 +3306,46 @@ describe('resource-availability requiredPools', () => {
     expect(result.busy.length).toBe(0)
   })
 })
+
+describe('resourceOwnerMode owner field relationTo', () => {
+  it('owner relates to the staffProvisioning user collection, not customers (separate users/customers)', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    // Mirrors the issue author: separate users + customers, staff provisioned from users
+    const resolved = resolveConfig({
+      resourceOwnerMode: { adminRoles: ['admin'] },
+      slugs: { customers: 'customers' },
+      staffProvisioning: { roleField: 'roles', staffRoles: ['employee'], userCollection: 'users' },
+    })
+    const col = createResourcesCollection(resolved)
+    const owner = col.fields.find(
+      (f): f is { name: string; relationTo: string } & Field => 'name' in f && f.name === 'owner',
+    )!
+    expect(owner.relationTo).toBe('users')
+  })
+
+  it('honours an explicit ownerCollection override', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    const resolved = resolveConfig({
+      resourceOwnerMode: { adminRoles: ['admin'], ownerCollection: 'staff' },
+      staffProvisioning: { staffRoles: ['employee'], userCollection: 'users' },
+    })
+    const col = createResourcesCollection(resolved)
+    const owner = col.fields.find(
+      (f): f is { name: string; relationTo: string } & Field => 'name' in f && f.name === 'owner',
+    )!
+    expect(owner.relationTo).toBe('staff')
+  })
+
+  it('falls back to customers when no staffProvisioning/ownerCollection (back-compat)', async () => {
+    const { resolveConfig } = await import('../src/defaults.js')
+    const { createResourcesCollection } = await import('../src/collections/Resources.js')
+    const resolved = resolveConfig({ resourceOwnerMode: { adminRoles: ['admin'] } })
+    const col = createResourcesCollection(resolved)
+    const owner = col.fields.find(
+      (f): f is { name: string; relationTo: string } & Field => 'name' in f && f.name === 'owner',
+    )!
+    expect(owner.relationTo).toBe('customers')
+  })
+})

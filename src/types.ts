@@ -89,6 +89,13 @@ export type ResourceOwnerModeConfig = {
   adminRoles?: string[]
   /** Whether Services also get an owner field (default: false — Services are platform-managed) */
   ownedServices?: boolean
+  /**
+   * Collection the owner field relates to (where owners/staff live). Defaults to
+   * `staffProvisioning.userCollection` when set, otherwise `slugs.customers`. Set
+   * this when owners live in a different collection than your customers (e.g.
+   * separate `users` and `customers` collections).
+   */
+  ownerCollection?: string
   /** Field name for the owner relationship on Resources (default: 'owner') */
   ownerField?: string
 }
@@ -96,6 +103,7 @@ export type ResourceOwnerModeConfig = {
 export type ResolvedResourceOwnerModeConfig = {
   adminRoles: string[]
   ownedServices: boolean
+  ownerCollection?: string
   ownerField: string
 }
 
