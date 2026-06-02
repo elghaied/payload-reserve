@@ -4,6 +4,7 @@ import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { makeResourceOwnerAccess } from '../utilities/ownerAccess.js'
+import { buildSelectOptions } from '../utilities/selectOptions.js'
 
 export function createResourcesCollection(
   config: ResolvedReservationPluginConfig,
@@ -71,7 +72,6 @@ export function createResourcesCollection(
         hasMany: true,
         label: ({ t }) => (t as PluginT)('reservation:fieldServices'),
         relationTo: config.slugs.services as unknown as CollectionSlug,
-        required: true,
       },
       {
         name: 'active',
@@ -127,13 +127,9 @@ export function createResourcesCollection(
         admin: {
           position: 'sidebar',
         },
-        defaultValue: 'equipment',
+        defaultValue: config.resourceTypes[0],
         label: 'Resource type',
-        options: [
-          { label: 'Staff', value: 'staff' },
-          { label: 'Equipment', value: 'equipment' },
-          { label: 'Room', value: 'room' },
-        ],
+        options: buildSelectOptions(config.resourceTypes),
       },
       ...(ownerFieldDef ? [ownerFieldDef] : []),
     ],

@@ -2111,13 +2111,13 @@ describe('intersectIntervals', () => {
 })
 
 describe('Reservation plugin - resourceType field', () => {
-  it('resources collection has a resourceType field defaulting to equipment', () => {
+  it('resources collection has a resourceType field defaulting to the first resourceType (staff)', () => {
     const cfg = payload.config.collections.find((c) => c.slug === 'resources')
     const field = cfg!.fields.find((f) => 'name' in f && f.name === 'resourceType') as
       | { defaultValue?: string; options?: unknown[] }
       | undefined
     expect(field).toBeDefined()
-    expect(field!.defaultValue).toBe('equipment')
+    expect(field!.defaultValue).toBe('staff')
   })
 
   it('can create a resource with resourceType staff', async () => {
@@ -2568,5 +2568,25 @@ describe('buildSelectOptions', () => {
   it('handles hyphenated values', async () => {
     const { buildSelectOptions } = await import('../src/utilities/selectOptions.js')
     expect(buildSelectOptions(['no-show'])).toEqual([{ label: 'No-show', value: 'no-show' }])
+  })
+})
+
+describe('Resources field changes', () => {
+  it('resourceType select has the three default options', () => {
+    const resources = payload.config.collections.find((c) => c.slug === 'resources')!
+    const field = resources.fields.find(
+      (f): f is { name: string; options: Array<{ value: string }> } & Field =>
+        'name' in f && f.name === 'resourceType',
+    )!
+    const values = field.options.map((o) => (typeof o === 'string' ? o : o.value))
+    expect(values).toEqual(['staff', 'equipment', 'room'])
+  })
+
+  it('can create a resource without services', async () => {
+    const r = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Unassigned Staff', active: true },
+    })
+    expect(r.id).toBeDefined()
   })
 })
