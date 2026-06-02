@@ -516,9 +516,11 @@
 }
 
 .capacityBadge {
-  float: right;
   font-size: 10px;
   opacity: 0.7;
+  position: absolute;
+  right: 4px;
+  top: 2px;
 }
 
 .timeOffLabel {
