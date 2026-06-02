@@ -3198,3 +3198,14 @@ describe('resource-availability endpoint logic', () => {
     expect(day?.timeOff.length ?? 0).toBe(0)
   })
 })
+
+describe('AvailabilityTimeField wiring', () => {
+  it('startTime field has a custom Field component configured', () => {
+    const reservations = payload.config.collections.find((c) => c.slug === 'reservations')!
+    const startTime = reservations.fields.find(
+      (f): f is { admin?: { components?: { Field?: unknown } }; name: string } & Field =>
+        'name' in f && f.name === 'startTime',
+    )!
+    expect(startTime.admin?.components?.Field).toBeTruthy()
+  })
+})

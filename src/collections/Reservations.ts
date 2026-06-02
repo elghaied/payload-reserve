@@ -107,6 +107,9 @@ export function createReservationsCollection(
         name: 'startTime',
         type: 'date',
         admin: {
+          components: {
+            Field: 'payload-reserve/client#AvailabilityTimeField',
+          },
           date: {
             pickerAppearance: 'dayAndTime',
           },
