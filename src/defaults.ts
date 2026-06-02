@@ -84,6 +84,7 @@ export const DEFAULT_SLUGS = {
 } as const
 
 export const DEFAULT_ADMIN_GROUP = 'Reservations'
+export const DEFAULT_ALLOW_GUEST_BOOKING = false
 export const DEFAULT_BUFFER_TIME = 0
 export const DEFAULT_CANCELLATION_NOTICE_PERIOD = 24
 
@@ -103,6 +104,7 @@ export function resolveConfig(
   const resolved: ResolvedReservationPluginConfig = {
     access: pluginOptions.access ?? {},
     adminGroup: pluginOptions.adminGroup ?? DEFAULT_ADMIN_GROUP,
+    allowGuestBooking: pluginOptions.allowGuestBooking ?? DEFAULT_ALLOW_GUEST_BOOKING,
     cancellationNoticePeriod:
       pluginOptions.cancellationNoticePeriod ?? DEFAULT_CANCELLATION_NOTICE_PERIOD,
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,

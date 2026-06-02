@@ -4,6 +4,12 @@ import config from '@payload-config'
 import { getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, test } from 'vitest'
 
+import { resolveConfig } from '../src/defaults.js'
+import { createCancelBookingEndpoint } from '../src/endpoints/cancelBooking.js'
+import { createBookingEndpoint } from '../src/endpoints/createBooking.js'
+import { validateGuestBooking } from '../src/hooks/reservations/validateGuestBooking.js'
+import { resolveGuestBookingAllowed } from '../src/utilities/guestBooking.js'
+
 let payload: Payload
 
 afterAll(async () => {
@@ -2073,6 +2079,307 @@ describe('resourceOwnerMode - collection factory behaviour', () => {
     const collection = createResourcesCollection(resolved)
     // The custom access function should be used, not the auto-wired one
     expect((collection.access as Record<string, unknown>).read).toBe(customReadFn)
+  })
+})
+
+describe('Guest bookings - fields', () => {
+  const findField = (slug: string, name: string) => {
+    const collection = payload.config.collections.find((c) => c.slug === slug)
+    return collection!.fields.find((f) => 'name' in f && f.name === name) as
+      | ({ name: string } & Record<string, unknown>)
+      | undefined
+  }
+
+  it('reservations customer field is optional', () => {
+    const field = findField('reservations', 'customer')
+    expect(field).toBeDefined()
+    expect(field!.required).toBeFalsy()
+  })
+
+  it('reservations has a guest group field', () => {
+    const field = findField('reservations', 'guest')
+    expect(field).toBeDefined()
+    expect(field!.type).toBe('group')
+  })
+
+  it('reservations has a cancellationToken field', () => {
+    const field = findField('reservations', 'cancellationToken')
+    expect(field).toBeDefined()
+    expect(field!.type).toBe('text')
+  })
+
+  it('services has an allowGuestBooking select field', () => {
+    const field = findField('services', 'allowGuestBooking')
+    expect(field).toBeDefined()
+    expect(field!.type).toBe('select')
+  })
+})
+
+describe('Guest bookings - config', () => {
+  it('allowGuestBooking resolves to false by default', () => {
+    expect(resolveConfig({}).allowGuestBooking).toBe(false)
+  })
+
+  it('allowGuestBooking can be enabled at the plugin level', () => {
+    expect(resolveConfig({ allowGuestBooking: true }).allowGuestBooking).toBe(true)
+  })
+
+  it('resolveGuestBookingAllowed honors service override, else plugin default', () => {
+    expect(resolveGuestBookingAllowed({ allowGuestBooking: 'enabled' }, false)).toBe(true)
+    expect(resolveGuestBookingAllowed({ allowGuestBooking: 'disabled' }, true)).toBe(false)
+    expect(resolveGuestBookingAllowed({ allowGuestBooking: 'inherit' }, true)).toBe(true)
+    expect(resolveGuestBookingAllowed({ allowGuestBooking: null }, true)).toBe(true)
+    expect(resolveGuestBookingAllowed({}, true)).toBe(true)
+    expect(resolveGuestBookingAllowed(undefined, false)).toBe(false)
+  })
+})
+
+describe('Guest bookings - validation hook', () => {
+  const future = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
+
+  async function makeServiceAndResource(guestSetting: string) {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: `GB Service ${guestSetting}`, active: true, allowGuestBooking: guestSetting, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: `GB Resource ${guestSetting}`, active: true, services: [service.id] },
+    })
+    return { resource, service }
+  }
+
+  it('guest booking succeeds when the service enables it; token is generated', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    const res = await payload.create({
+      collection: col('reservations'),
+      data: {
+        guest: { name: 'Jane Doe', email: 'jane@example.com' },
+        resource: resource.id,
+        service: service.id,
+        startTime: future(72),
+      },
+    })
+    expect(res.id).toBeDefined()
+    expect(typeof (res as Record<string, unknown>).cancellationToken).toBe('string')
+  })
+
+  it('guest booking is rejected when the service disables it', async () => {
+    const { resource, service } = await makeServiceAndResource('disabled')
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          guest: { name: 'Jane Doe', email: 'jane@example.com' },
+          resource: resource.id,
+          service: service.id,
+          startTime: future(72),
+        },
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('booking with neither customer nor guest is rejected', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: { resource: resource.id, service: service.id, startTime: future(72) },
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('guest requires name and at least one contact method', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          guest: { name: 'No Contact' },
+          resource: resource.id,
+          service: service.id,
+          startTime: future(72),
+        },
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('admin bypasses the per-service gate for guest bookings', async () => {
+    const { resource, service } = await makeServiceAndResource('disabled')
+    const hook = validateGuestBooking(resolveConfig({}))
+    const data: Record<string, unknown> = {
+      guest: { name: 'Walk In', email: 'admin-guest@example.com' },
+      resource: resource.id,
+      service: service.id,
+      startTime: future(72),
+    }
+    const result = await hook({
+      context: {},
+      data,
+      operation: 'create',
+      req: { payload, t: (k: string) => k, user: { id: 1, collection: 'users' } },
+    } as unknown as Parameters<ReturnType<typeof validateGuestBooking>>[0])
+    expect(result).toBe(data)
+    expect(typeof data.cancellationToken).toBe('string')
+  })
+
+  it('a customer booking does not receive a cancellation token', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: { email: `cust-${Date.now()}@example.com`, firstName: 'Cust', lastName: 'Omer', password: 'password123' },
+    })
+    const res = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: future(72),
+      },
+    })
+    expect(res.id).toBeDefined()
+    expect((res as Record<string, unknown>).cancellationToken).toBeFalsy()
+  })
+
+  it('a booking with both a customer and a guest block is rejected', async () => {
+    const { resource, service } = await makeServiceAndResource('enabled')
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: { email: `both-${Date.now()}@example.com`, firstName: 'Both', lastName: 'User', password: 'password123' },
+    })
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          customer: customer.id,
+          guest: { name: 'Ghost', email: 'ghost@example.com' },
+          resource: resource.id,
+          service: service.id,
+          startTime: future(72),
+        },
+      }),
+    ).rejects.toThrow()
+  })
+})
+
+describe('Guest bookings - book endpoint', () => {
+  const future = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
+
+  it('book endpoint does not return the cancellationToken', async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Endpoint GB Service', active: true, allowGuestBooking: 'enabled', duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Endpoint GB Resource', active: true, services: [service.id] },
+    })
+
+    const ep = createBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () =>
+        Promise.resolve({
+          guest: { name: 'Endpoint Guest', phone: '+15551230000' },
+          resource: resource.id,
+          service: service.id,
+          startTime: future(96),
+        }),
+      payload,
+      t: (k: string) => k,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    const json = (await resp.json()) as Record<string, unknown>
+
+    expect(json.id).toBeDefined()
+    expect(json.cancellationToken).toBeUndefined()
+  })
+})
+
+describe('Guest bookings - cancel endpoint', () => {
+  const future = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
+
+  async function createGuestReservation() {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Cancel GB Service', active: true, allowGuestBooking: 'enabled', duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Cancel GB Resource', active: true, services: [service.id] },
+    })
+    // Far-future start so the cancellation notice period does not block it.
+    return payload.create({
+      collection: col('reservations'),
+      data: {
+        guest: { name: 'Cancel Guest', email: 'cancel@example.com' },
+        resource: resource.id,
+        service: service.id,
+        startTime: future(24 * 30),
+      },
+    })
+  }
+
+  it('a valid token cancels a guest reservation', async () => {
+    const reservation = await createGuestReservation()
+    const token = (reservation as Record<string, unknown>).cancellationToken as string
+    const ep = createCancelBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () => Promise.resolve({ reservationId: reservation.id, token }),
+      payload,
+      t: (k: string) => k,
+      user: undefined,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    const json = (await resp.json()) as Record<string, unknown>
+    expect(json.status).toBe('cancelled')
+  })
+
+  it('a wrong token is rejected with 403', async () => {
+    const reservation = await createGuestReservation()
+    const ep = createCancelBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () => Promise.resolve({ reservationId: reservation.id, token: 'wrong-token' }),
+      payload,
+      t: (k: string) => k,
+      user: undefined,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    expect(resp.status).toBe(403)
+  })
+
+  it('a missing token (and no user) is rejected with 403', async () => {
+    const reservation = await createGuestReservation()
+    const ep = createCancelBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () => Promise.resolve({ reservationId: reservation.id }),
+      payload,
+      t: (k: string) => k,
+      user: undefined,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    expect(resp.status).toBe(403)
+  })
+
+  it('does not return the cancellationToken in the cancel response', async () => {
+    const reservation = await createGuestReservation()
+    const token = (reservation as Record<string, unknown>).cancellationToken as string
+    const ep = createCancelBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () => Promise.resolve({ reservationId: reservation.id, token }),
+      payload,
+      t: (k: string) => k,
+      user: undefined,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    const json = (await resp.json()) as Record<string, unknown>
+    expect(json.status).toBe('cancelled')
+    expect(json.cancellationToken).toBeUndefined()
   })
 })
 

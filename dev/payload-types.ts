@@ -71,6 +71,8 @@ export interface Config {
     users: User;
     posts: Post;
     media: Media;
+    'cancel-otps': CancelOtp;
+    'sms-logs': SmsLog;
     services: Service;
     resources: Resource;
     schedules: Schedule;
@@ -90,6 +92,8 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     posts: PostsSelect<false> | PostsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    'cancel-otps': CancelOtpsSelect<false> | CancelOtpsSelect<true>;
+    'sms-logs': SmsLogsSelect<false> | SmsLogsSelect<true>;
     services: ServicesSelect<false> | ServicesSelect<true>;
     resources: ResourcesSelect<false> | ResourcesSelect<true>;
     schedules: SchedulesSelect<false> | SchedulesSelect<true>;
@@ -207,6 +211,42 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cancel-otps".
+ */
+export interface CancelOtp {
+  id: string;
+  reservation?: string | null;
+  code?: string | null;
+  expiresAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sms-logs".
+ */
+export interface SmsLog {
+  id: string;
+  to: string;
+  from: string;
+  body: string;
+  provider: string;
+  status: 'queued' | 'sent' | 'delivered' | 'failed' | 'unknown';
+  providerMessageId?: string | null;
+  cost?: {
+    amount?: string | null;
+    currency?: string | null;
+  };
+  error?: string | null;
+  errorCode?: string | null;
+  sentAt: string;
+  deliveredAt?: string | null;
+  failedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "services".
  */
 export interface Service {
@@ -223,6 +263,10 @@ export interface Service {
    * Additional resource pools every booking of this service occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full.
    */
   requiredResources?: (string | Resource)[] | null;
+  /**
+   * Allow bookings without a customer account. "Inherit" uses the plugin-level default.
+   */
+  allowGuestBooking?: ('inherit' | 'enabled' | 'disabled') | null;
   active?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -291,7 +335,16 @@ export interface Reservation {
   id: string;
   service: string | Service;
   resource: string | Resource;
-  customer: string | Customer;
+  customer?: (string | null) | Customer;
+  /**
+   * Contact details for a booking made without a customer account. Leave empty when a customer is set.
+   */
+  guest?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  };
+  cancellationToken?: string | null;
   startTime: string;
   endTime?: string | null;
   status?: ('pending' | 'confirmed' | 'completed' | 'cancelled' | 'no-show') | null;
@@ -384,6 +437,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: string | Media;
+      } | null)
+    | ({
+        relationTo: 'cancel-otps';
+        value: string | CancelOtp;
+      } | null)
+    | ({
+        relationTo: 'sms-logs';
+        value: string | SmsLog;
       } | null)
     | ({
         relationTo: 'services';
@@ -506,6 +567,42 @@ export interface MediaSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "cancel-otps_select".
+ */
+export interface CancelOtpsSelect<T extends boolean = true> {
+  reservation?: T;
+  code?: T;
+  expiresAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "sms-logs_select".
+ */
+export interface SmsLogsSelect<T extends boolean = true> {
+  to?: T;
+  from?: T;
+  body?: T;
+  provider?: T;
+  status?: T;
+  providerMessageId?: T;
+  cost?:
+    | T
+    | {
+        amount?: T;
+        currency?: T;
+      };
+  error?: T;
+  errorCode?: T;
+  sentAt?: T;
+  deliveredAt?: T;
+  failedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "services_select".
  */
 export interface ServicesSelect<T extends boolean = true> {
@@ -518,6 +615,7 @@ export interface ServicesSelect<T extends boolean = true> {
   bufferTimeBefore?: T;
   bufferTimeAfter?: T;
   requiredResources?: T;
+  allowGuestBooking?: T;
   active?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -584,6 +682,14 @@ export interface ReservationsSelect<T extends boolean = true> {
   service?: T;
   resource?: T;
   customer?: T;
+  guest?:
+    | T
+    | {
+        name?: T;
+        email?: T;
+        phone?: T;
+      };
+  cancellationToken?: T;
   startTime?: T;
   endTime?: T;
   status?: T;

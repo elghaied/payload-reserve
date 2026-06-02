@@ -1,3 +1,5 @@
+import { smsPlugin } from '@elghaied/payload-plugin-sms'
+import { mockAdapter } from '@elghaied/payload-plugin-sms/mock'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
@@ -7,6 +9,7 @@ import { payloadReserve } from 'payload-reserve'
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
+import { guestCancelOtpEndpoints } from './helpers/guestCancelEndpoints.js'
 import { testEmailAdapter } from './helpers/testEmailAdapter.js'
 import { seed } from './seed.js'
 
@@ -58,6 +61,27 @@ const buildConfigWithMemoryDB = async () => {
           staticDir: path.resolve(dirname, 'media'),
         },
       },
+      // Dev-only: stores short-lived OTP codes for guest SMS cancellation.
+      {
+        slug: 'cancel-otps',
+        admin: {
+          hidden: true,
+        },
+        fields: [
+          {
+            name: 'reservation',
+            type: 'text',
+          },
+          {
+            name: 'code',
+            type: 'text',
+          },
+          {
+            name: 'expiresAt',
+            type: 'date',
+          },
+        ],
+      },
     ],
     db: mongooseAdapter({
       ensureIndexes: true,
@@ -65,11 +89,32 @@ const buildConfigWithMemoryDB = async () => {
     }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
+    endpoints: guestCancelOtpEndpoints,
     onInit: async (payload) => {
       await seed(payload)
     },
     plugins: [
+      smsPlugin({
+        adapter: mockAdapter({ defaultFrom: '+15550000000' }),
+        collections: { logs: true },
+        defaultFrom: '+15550000000',
+        onSend: ({ result }) => {
+          // eslint-disable-next-line no-console
+          console.log(`[sms-mock] SMS to ${result.to}: ${result.body}`)
+        },
+        // The dashboard widget is an RSC that imports '@payload-config', which the
+        // dev app's bundler can't resolve from node_modules. Disable it — the
+        // sms-logs collection + the onSend console log give enough visibility.
+        widgets: false,
+      }),
       payloadReserve({
+        // Dev: let the public /book page read services/resources without auth.
+        access: {
+          resources: { read: () => true },
+          schedules: { read: () => true },
+          services: { read: () => true },
+        },
+        allowGuestBooking: true,
         cancellationNoticePeriod: 24,
         defaultBufferTime: 10,
         hooks: {
@@ -77,6 +122,35 @@ const buildConfigWithMemoryDB = async () => {
             ({ doc }) => {
               // eslint-disable-next-line no-console
               console.log(`[reservation-plugin] Booking created: ${String(doc.id)}`)
+            },
+            // Email cancellation: when a guest books with an email, send a
+            // clickable cancel link. The test email adapter logs the email, and
+            // we also log the bare URL on its own line for easy copy/paste.
+            async ({ doc, req }) => {
+              try {
+                const guest = doc.guest as { email?: string; name?: string } | undefined
+                const token = doc.cancellationToken as string | undefined
+                if (guest?.email && token) {
+                  const host = req.headers?.get?.('host') ?? 'localhost:3000'
+                  const proto = req.headers?.get?.('x-forwarded-proto') ?? 'http'
+                  const cancelUrl = `${proto}://${host}/cancel?reservationId=${String(doc.id)}&token=${token}`
+                  await req.payload.sendEmail({
+                    html: [
+                      `<div style="font-family:system-ui,sans-serif;font-size:15px;color:#111">`,
+                      `<h2 style="margin:0 0 8px">Your booking is confirmed</h2>`,
+                      `<p>Hi ${guest.name ?? 'there'}, thanks for booking.</p>`,
+                      `<p>Changed your mind? <a href="${cancelUrl}">Cancel your booking</a>.</p>`,
+                      `</div>`,
+                    ].join(''),
+                    subject: 'Your booking — cancel any time',
+                    to: guest.email,
+                  })
+                  // eslint-disable-next-line no-console
+                  console.log(`[guest cancel link] ${cancelUrl}`)
+                }
+              } catch (err) {
+                req.payload.logger.warn({ err, msg: '[dev] guest cancel email failed' })
+              }
             },
           ],
           afterStatusChange: [

@@ -14,6 +14,7 @@ import { expandRequiredResources } from '../hooks/reservations/expandRequiredRes
 import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
+import { validateGuestBooking } from '../hooks/reservations/validateGuestBooking.js'
 import { validateStatusTransition } from '../hooks/reservations/validateStatusTransition.js'
 import { statusToI18nKey } from '../utilities/i18nUtils.js'
 import { makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
@@ -101,7 +102,47 @@ export function createReservationsCollection(
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldCustomer'),
         relationTo: config.slugs.customers as unknown as CollectionSlug,
-        required: true,
+        required: false,
+      },
+      {
+        name: 'guest',
+        type: 'group',
+        admin: {
+          description:
+            'Contact details for a booking made without a customer account. Leave empty when a customer is set.',
+        },
+        fields: [
+          {
+            name: 'name',
+            type: 'text',
+            label: 'Guest name',
+            maxLength: 200,
+          },
+          {
+            name: 'email',
+            type: 'email',
+            label: 'Guest email',
+          },
+          {
+            name: 'phone',
+            type: 'text',
+            label: 'Guest phone',
+            maxLength: 50,
+          },
+        ],
+        label: 'Guest',
+      },
+      {
+        name: 'cancellationToken',
+        type: 'text',
+        access: {
+          read: ({ req }) =>
+            Boolean(req.user) && req.user!.collection !== config.slugs.customers,
+        },
+        admin: {
+          hidden: true,
+        },
+        index: true,
       },
       {
         name: 'startTime',
@@ -220,6 +261,7 @@ export function createReservationsCollection(
       beforeChange: [
         createPluginHooksBeforeCreate(config.hooks),
         checkIdempotency(config),
+        validateGuestBooking(config),
         expandRequiredResources(config),
         calculateEndTime(config),
         validateConflicts(config),

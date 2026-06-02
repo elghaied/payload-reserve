@@ -11,6 +11,9 @@ importers:
       '@changesets/cli':
         specifier: ^2.30.0
         version: 2.30.0(@types/node@22.19.9)
+      '@elghaied/payload-plugin-sms':
+        specifier: ^0.3.0
+        version: 0.3.0(payload@3.79.0(graphql@16.12.0)(typescript@5.7.3))(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       '@eslint/eslintrc':
         specifier: ^3.2.0
         version: 3.3.3
@@ -256,6 +259,34 @@ packages:
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
+
+  '@elghaied/payload-plugin-sms@0.3.0':
+    resolution: {integrity: sha512-Km9RCjnayofN5Nu8j/MPg+wAA+NKac6VkslAXzDi1b+taeDwoOJBbmoLhQY4cY82Q49qbcUaAGgUQ13SX/puXA==}
+    engines: {node: ^18.20.2 || >=20.9.0, pnpm: ^9 || ^10}
+    peerDependencies:
+      '@aws-sdk/client-sns': ^3.0.0
+      '@vonage/server-sdk': ^3.0.0
+      payload: ^3.0.0
+      plivo: ^4.0.0
+      react: ^19.0.0
+      react-dom: ^19.0.0
+      telnyx: ^6.0.0
+      twilio: ^5.0.0
+    peerDependenciesMeta:
+      '@aws-sdk/client-sns':
+        optional: true
+      '@vonage/server-sdk':
+        optional: true
+      plivo:
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
+      telnyx:
+        optional: true
+      twilio:
+        optional: true
 
   '@emnapi/core@1.8.1':
     resolution: {integrity: sha512-AvT9QFpxK0Zd8J0jopedNm+w/2fIzvtPKPjqyw9jwvBaReTTqPBk9Hixaz7KbjimP+QNz605/XnjFcDAL2pqBg==}
@@ -5798,6 +5829,13 @@ snapshots:
       tslib: 2.8.1
 
   '@drizzle-team/brocli@0.10.2': {}
+
+  '@elghaied/payload-plugin-sms@0.3.0(payload@3.79.0(graphql@16.12.0)(typescript@5.7.3))(react-dom@19.2.1(react@19.2.1))(react@19.2.1)':
+    dependencies:
+      payload: 3.79.0(graphql@16.12.0)(typescript@5.7.3)
+    optionalDependencies:
+      react: 19.2.1
+      react-dom: 19.2.1(react@19.2.1)
 
   '@emnapi/core@1.8.1':
     dependencies:
