@@ -107,6 +107,10 @@ export interface Config {
   globals: {};
   globalsSelect: {};
   locale: null;
+  widgets: {
+    'reservation-todays-reservations': ReservationTodaysReservationsWidget;
+    collections: CollectionsWidget;
+  };
   user: User | Customer;
   jobs: {
     tasks: unknown;
@@ -215,6 +219,10 @@ export interface Service {
   price?: number | null;
   bufferTimeBefore?: number | null;
   bufferTimeAfter?: number | null;
+  /**
+   * Additional resource pools every booking of this service occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full.
+   */
+  requiredResources?: (string | Resource)[] | null;
   active?: boolean | null;
   updatedAt: string;
   createdAt: string;
@@ -228,11 +236,12 @@ export interface Resource {
   name: string;
   image?: (string | null) | Media;
   description?: string | null;
-  services: (string | Service)[];
+  services?: (string | Service)[] | null;
   active?: boolean | null;
   quantity: number;
   capacityMode?: ('per-reservation' | 'per-guest') | null;
   timezone?: string | null;
+  resourceType?: ('staff' | 'equipment' | 'room') | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -264,6 +273,8 @@ export interface Schedule {
   exceptions?:
     | {
         date: string;
+        endDate?: string | null;
+        type?: ('vacation' | 'sick' | 'personal' | 'closure' | 'other') | null;
         reason?: string | null;
         id?: string | null;
       }[]
@@ -506,6 +517,7 @@ export interface ServicesSelect<T extends boolean = true> {
   price?: T;
   bufferTimeBefore?: T;
   bufferTimeAfter?: T;
+  requiredResources?: T;
   active?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -523,6 +535,7 @@ export interface ResourcesSelect<T extends boolean = true> {
   quantity?: T;
   capacityMode?: T;
   timezone?: T;
+  resourceType?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -554,6 +567,8 @@ export interface SchedulesSelect<T extends boolean = true> {
     | T
     | {
         date?: T;
+        endDate?: T;
+        type?: T;
         reason?: T;
         id?: T;
       };
@@ -655,6 +670,26 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reservation-todays-reservations_widget".
+ */
+export interface ReservationTodaysReservationsWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collections_widget".
+ */
+export interface CollectionsWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

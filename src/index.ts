@@ -1,3 +1,4 @@
+export { provisionStaffResource, roleMatches } from './hooks/users/provisionStaffResource.js'
 export { payloadReserve } from './plugin.js'
 export {
   buildOverlapQuery,
@@ -13,8 +14,12 @@ export type {
   ReservationPluginConfig,
   ReservationPluginHooks,
   ResolvedReservationPluginConfig,
+  StaffProvisioningConfig,
   StatusMachineConfig,
 } from './types.js'
 export { DEFAULT_STATUS_MACHINE, VALID_STATUS_TRANSITIONS } from './types.js'
+export { mergeResourceIds } from './utilities/resolveRequiredResources.js'
 export type { ResolvedItem } from './utilities/resolveReservationItems.js'
 export { resolveReservationItems } from './utilities/resolveReservationItems.js'
+export { buildSelectOptions } from './utilities/selectOptions.js'
+export { intersectIntervals } from './utilities/slotUtils.js'

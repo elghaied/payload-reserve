@@ -15,6 +15,8 @@ import { createCheckAvailabilityEndpoint } from './endpoints/checkAvailability.j
 import { createBookingEndpoint } from './endpoints/createBooking.js'
 import { createCustomerSearchEndpoint } from './endpoints/customerSearch.js'
 import { createGetSlotsEndpoint } from './endpoints/getSlots.js'
+import { createResourceAvailabilityEndpoint } from './endpoints/resourceAvailability.js'
+import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
 import { translations } from './translations/index.js'
 
 export const payloadReserve =
@@ -114,7 +116,26 @@ export const payloadReserve =
       createBookingEndpoint(resolved),
       createCustomerSearchEndpoint(resolved),
       createGetSlotsEndpoint(resolved),
+      createResourceAvailabilityEndpoint(resolved),
     )
+
+    // Wire staff auto-provisioning onto the staff user collection
+    if (resolved.staffProvisioning) {
+      const staffUserSlug = resolved.staffProvisioning.userCollection
+      const staffCollection = config.collections.find((col) => col.slug === staffUserSlug)
+      if (!staffCollection) {
+        throw new Error(
+          `staffProvisioning.userCollection "${staffUserSlug}" was not found in config.collections`,
+        )
+      }
+      staffCollection.hooks = {
+        ...staffCollection.hooks,
+        afterChange: [
+          ...(staffCollection.hooks?.afterChange ?? []),
+          provisionStaffResource(resolved),
+        ],
+      }
+    }
 
     // Set up admin configuration
     if (!config.admin) {config.admin = {}}
