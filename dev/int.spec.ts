@@ -3157,5 +3157,44 @@ describe('resource-availability endpoint logic', () => {
     const monday = result.days.find((d) => d.date === '2026-06-08') // Monday → has a shift
     expect(monday?.shiftWindows.length).toBeGreaterThan(0)
     expect(result.busy.some((b) => new Date(b.start).toISOString() === '2026-06-08T10:00:00.000Z')).toBe(true)
+    const vacationDay = result.days.find((d) => d.date === '2026-06-15')
+    expect(vacationDay?.timeOff.length).toBeGreaterThan(0)
+    expect(vacationDay?.timeOff[0]?.type).toBe('vacation')
+  })
+
+  it('ignores inactive schedules (no time-off leak)', async () => {
+    const { buildResourceAvailability } = await import('../src/endpoints/resourceAvailability.js')
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'RA2 Svc', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'RA2 Stylist', active: true, quantity: 1, services: [service.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'RA2 inactive',
+        active: false,
+        exceptions: [{ type: 'vacation', date: '2026-07-06T00:00:00.000Z', reason: 'Off' }],
+        recurringSlots: [{ day: 'mon', endTime: '17:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+    const result = await buildResourceAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      end: new Date('2026-07-08T00:00:00.000Z'),
+      payload,
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      start: new Date('2026-07-06T00:00:00.000Z'),
+    })
+    const day = result.days.find((d) => d.date === '2026-07-06')
+    expect(day?.shiftWindows.length ?? 0).toBe(0)
+    expect(day?.timeOff.length ?? 0).toBe(0)
   })
 })

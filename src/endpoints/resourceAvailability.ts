@@ -54,7 +54,7 @@ export async function buildResourceAvailability(params: {
     collection: scheduleSlug,
     depth: 0,
     limit: 100,
-    where: { resource: { equals: resourceId } },
+    where: { and: [{ active: { equals: true } }, { resource: { equals: resourceId } }] },
   })
 
   type RawException = {
