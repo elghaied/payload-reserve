@@ -2685,3 +2685,165 @@ describe('isExceptionDate range-aware', () => {
     expect(resolveScheduleForDate(schedule, new Date('2026-06-17T00:00:00Z')).length).toBe(1)
   })
 })
+
+describe('provisionStaffResource hook', () => {
+  const baseConfig = {
+    resourceOwnerMode: { adminRoles: ['admin'], ownedServices: false, ownerField: 'owner' },
+    slugs: { resources: 'resources' },
+    staffProvisioning: {
+      nameFrom: 'name',
+      resourceType: 'staff',
+      roleField: 'role',
+      staffRoles: ['staff'],
+      userCollection: 'users',
+    },
+  }
+
+  const makeReq = (created: unknown[], existing: unknown[] = []) => ({
+    payload: {
+      create: (args: { data: unknown }) => {
+        created.push(args)
+        return Promise.resolve({ id: 'res1', ...(args.data as object) })
+      },
+      find: () => Promise.resolve({ docs: existing }),
+    },
+    transactionID: 'txn-1',
+    user: { id: 'admin1' },
+  })
+
+  it('provisions a resource owned by the new staff user on create (via impersonation)', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: Array<{
+      collection: string
+      data: Record<string, unknown>
+      req: { transactionID?: unknown; user?: { id?: unknown } }
+    }> = []
+    await hook({
+      context: {},
+      doc: { id: 'staff1', name: 'Alice', email: 'a@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(1)
+    expect(created[0].collection).toBe('resources')
+    expect(created[0].data.owner).toBe('staff1')
+    expect(created[0].data.resourceType).toBe('staff')
+    expect(created[0].data.name).toBe('Alice')
+    expect(created[0].req.user?.id).toBe('staff1')
+    expect(created[0].req.transactionID).toBe('txn-1')
+  })
+
+  it('falls back to email when nameFrom field is absent', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: Array<{ data: Record<string, unknown> }> = []
+    await hook({
+      context: {},
+      doc: { id: 'staff2', email: 'b@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created[0].data.name).toBe('b@x.com')
+  })
+
+  it('does nothing for a non-staff user', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'cust1', email: 'c@x.com', role: 'customer' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(0)
+  })
+
+  it('is idempotent — skips when a resource already owns the user', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'staff1', email: 'a@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created, [{ id: 'res-existing' }]) as never,
+    } as never)
+    expect(created).toHaveLength(0)
+  })
+
+  it('provisions on promotion (update into a staff role)', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'staff3', email: 'd@x.com', role: 'staff' },
+      operation: 'update',
+      previousDoc: { id: 'staff3', email: 'd@x.com', role: 'customer' },
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(1)
+  })
+
+  it('does NOT re-provision on an update that was already staff', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'staff3', email: 'd@x.com', role: 'staff' },
+      operation: 'update',
+      previousDoc: { id: 'staff3', email: 'd@x.com', role: 'staff' },
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(0)
+  })
+
+  it('runs beforeCreate to stamp custom fields', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const cfg = {
+      ...baseConfig,
+      staffProvisioning: {
+        ...baseConfig.staffProvisioning,
+        beforeCreate: ({ data }: { data: Record<string, unknown> }) => ({ ...data, tenant: 't-1' }),
+      },
+    }
+    const hook = provisionStaffResource(cfg as never)
+    const created: Array<{ data: Record<string, unknown> }> = []
+    await hook({
+      context: {},
+      doc: { id: 'staff4', name: 'Eve', email: 'e@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created[0].data.tenant).toBe('t-1')
+  })
+
+  it('respects context.skipReservationHooks', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: { skipReservationHooks: true },
+      doc: { id: 'staff1', email: 'a@x.com', role: 'staff' },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(0)
+  })
+
+  it('matches array-valued roles', async () => {
+    const { provisionStaffResource } = await import('../src/hooks/users/provisionStaffResource.js')
+    const hook = provisionStaffResource(baseConfig as never)
+    const created: unknown[] = []
+    await hook({
+      context: {},
+      doc: { id: 'staff5', email: 'f@x.com', role: ['customer', 'staff'] },
+      operation: 'create',
+      req: makeReq(created) as never,
+    } as never)
+    expect(created).toHaveLength(1)
+  })
+})
