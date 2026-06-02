@@ -2872,6 +2872,73 @@ describe('provisionStaffResource hook', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// Leave range removes availability end-to-end (Task 9)
+// ---------------------------------------------------------------------------
+describe('leave range removes availability end-to-end', () => {
+  it('returns no slots inside a vacation range and slots outside it', async () => {
+    const { getAvailableSlots } = await import('../src/services/index.js')
+
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Haircut LR', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Stylist LR', active: true, services: [service.id] },
+    })
+    // Vacation range 2026-06-08 (Mon) to 2026-06-12 (Fri)
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'Stylist LR shifts',
+        active: true,
+        exceptions: [{ date: '2026-06-08T00:00:00.000Z', endDate: '2026-06-12T00:00:00.000Z' }],
+        recurringSlots: [
+          { day: 'mon', endTime: '17:00', startTime: '09:00' },
+          { day: 'tue', endTime: '17:00', startTime: '09:00' },
+          { day: 'wed', endTime: '17:00', startTime: '09:00' },
+          { day: 'thu', endTime: '17:00', startTime: '09:00' },
+          { day: 'fri', endTime: '17:00', startTime: '09:00' },
+        ],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+
+    // 2026-06-10 (Wed) is inside the vacation range → no slots
+    // Use UTC midnight so toISOString().split('T')[0] === '2026-06-10'
+    const inRange = await getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: new Date('2026-06-10T00:00:00.000Z'),
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: service.id,
+      serviceSlug: 'services',
+    })
+    expect(inRange.length).toBe(0)
+
+    // 2026-06-17 (Wed) is outside the range → slots available
+    const outRange = await getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: new Date('2026-06-17T00:00:00.000Z'),
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: service.id,
+      serviceSlug: 'services',
+    })
+    expect(outRange.length).toBeGreaterThan(0)
+  })
+})
+
 describe('plugin wires staff provisioning', () => {
   const makeConfig = () => ({
     collections: [{ slug: 'users', auth: true, fields: [] as Field[], hooks: {} as Record<string, unknown> }],
