@@ -2592,10 +2592,9 @@ describe('Resources field changes', () => {
 })
 
 describe('resolveOwnerValue', () => {
-  it('forces req.user.id on create by default', async () => {
+  it('forces req.user.id on create', async () => {
     const { resolveOwnerValue } = await import('../src/collections/Resources.js')
     const out = resolveOwnerValue({
-      context: {},
       operation: 'create',
       req: { user: { id: 'admin1' } },
       value: 'someone-else',
@@ -2603,23 +2602,21 @@ describe('resolveOwnerValue', () => {
     expect(out).toBe('admin1')
   })
 
-  it('honours explicit value when context.allowExplicitOwner is set', async () => {
+  it('returns value unchanged on update', async () => {
     const { resolveOwnerValue } = await import('../src/collections/Resources.js')
     const out = resolveOwnerValue({
-      context: { allowExplicitOwner: true },
-      operation: 'create',
+      operation: 'update',
       req: { user: { id: 'admin1' } },
       value: 'staff-7',
     })
     expect(out).toBe('staff-7')
   })
 
-  it('returns value unchanged on update', async () => {
+  it('returns value unchanged when there is no req.user on create', async () => {
     const { resolveOwnerValue } = await import('../src/collections/Resources.js')
     const out = resolveOwnerValue({
-      context: {},
-      operation: 'update',
-      req: { user: { id: 'admin1' } },
+      operation: 'create',
+      req: { user: null },
       value: 'staff-7',
     })
     expect(out).toBe('staff-7')

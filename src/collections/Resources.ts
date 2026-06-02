@@ -7,23 +7,22 @@ import { makeResourceOwnerAccess } from '../utilities/ownerAccess.js'
 import { buildSelectOptions } from '../utilities/selectOptions.js'
 
 /**
- * Owner-field beforeChange logic. On create, defaults the owner to the
- * requesting user — UNLESS `context.allowExplicitOwner` is set by a trusted
- * server-side caller (e.g. staff provisioning), which lets the explicit value
- * (the new staff user's id) survive instead of being clobbered by the admin's id.
+ * Owner-field beforeChange logic, extracted for testability. On create the
+ * owner defaults to the requesting user; on other operations the existing
+ * value is preserved. Staff provisioning assigns the correct owner by creating
+ * the Resource AS the new staff user (impersonation in the provisioning hook),
+ * so this function needs no special-case branch.
  */
 export function resolveOwnerValue({
-  context,
   operation,
   req,
   value,
 }: {
-  context?: { allowExplicitOwner?: boolean }
-  operation: string
+  operation: string | undefined
   req: { user?: { id: unknown } | null }
   value: unknown
 }): unknown {
-  if (operation === 'create' && req.user && !context?.allowExplicitOwner) {
+  if (operation === 'create' && req.user) {
     return req.user.id
   }
   return value
@@ -45,8 +44,7 @@ export function createResourcesCollection(
         },
         hooks: {
           beforeChange: [
-            ({ context, operation, req, value }) =>
-              resolveOwnerValue({ context, operation, req, value }),
+            ({ operation, req, value }) => resolveOwnerValue({ operation, req, value }),
           ],
         },
         label: 'Owner',
