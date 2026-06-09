@@ -75,6 +75,7 @@
     "@payloadcms/db-sqlite": "3.79.0",
     "@payloadcms/eslint-config": "3.9.0",
     "@payloadcms/next": "3.79.0",
+    "@payloadcms/plugin-multi-tenant": "3.79.0",
     "@payloadcms/richtext-lexical": "3.79.0",
     "@payloadcms/translations": "3.79.0",
     "@payloadcms/ui": "3.79.0",
