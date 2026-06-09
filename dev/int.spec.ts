@@ -3656,3 +3656,27 @@ describe('resourceOwnerMode owner field relationTo', () => {
     expect(owner.relationTo).toBe('customers')
   })
 })
+
+describe('Reservation plugin - multi-tenant config', () => {
+  test('resolveConfig defaults the multiTenant option', () => {
+    const resolved = resolveConfig({})
+    expect(resolved.multiTenant).toEqual({ cookieName: 'payload-tenant', tenantField: 'tenant' })
+  })
+
+  test('resolveConfig honors overrides', () => {
+    const resolved = resolveConfig({ multiTenant: { cookieName: 'x-tenant', tenantField: 'org' } })
+    expect(resolved.multiTenant).toEqual({ cookieName: 'x-tenant', tenantField: 'org' })
+  })
+
+  test('resolveConfig falls back per-key on partial override', () => {
+    const resolved = resolveConfig({ multiTenant: { tenantField: 'org' } })
+    expect(resolved.multiTenant).toEqual({ cookieName: 'payload-tenant', tenantField: 'org' })
+  })
+
+  test('plugin publishes reservationTenant to admin.custom', () => {
+    expect(payload.config.admin.custom?.reservationTenant).toEqual({
+      cookieName: 'payload-tenant',
+      tenantField: 'tenant',
+    })
+  })
+})

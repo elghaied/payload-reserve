@@ -147,6 +147,7 @@ export const payloadReserve =
       ...resolved.slugs,
     }
     config.admin.custom.reservationStatusMachine = resolved.statusMachine
+    config.admin.custom.reservationTenant = resolved.multiTenant
 
     // Add dashboard widget
     if (!config.admin.dashboard) {

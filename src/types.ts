@@ -164,6 +164,13 @@ export type ReservationPluginConfig = {
   hooks?: ReservationPluginHooks
   /** Configurable leave/exception type vocabulary (default: vacation/sick/personal/closure/other) */
   leaveTypes?: string[]
+  /** Tenant scoping for the custom admin views (calendar, availability, dashboard). Applied only when the scoped collection has the tenant field AND the tenant cookie is set. */
+  multiTenant?: {
+    /** Cookie written by the tenant-selector (default 'payload-tenant'). */
+    cookieName?: string
+    /** Tenant field name on scoped collections (default 'tenant'). */
+    tenantField?: string
+  }
   /** Enable resource-owner multi-tenancy (opt-in) */
   resourceOwnerMode?: ResourceOwnerModeConfig
   /** Configurable resourceType vocabulary (default: staff/equipment/room) */
@@ -202,6 +209,10 @@ export type ResolvedReservationPluginConfig = {
   hooks: ReservationPluginHooks
   leaveTypes: string[]
   localized: boolean
+  multiTenant: {
+    cookieName: string
+    tenantField: string
+  }
   resourceOwnerMode: ResolvedResourceOwnerModeConfig | undefined
   resourceTypes: string[]
   slugs: {

@@ -113,6 +113,10 @@ export function resolveConfig(
     hooks: pluginOptions.hooks ?? {},
     leaveTypes: pluginOptions.leaveTypes ?? DEFAULT_LEAVE_TYPES,
     localized: false,
+    multiTenant: {
+      cookieName: pluginOptions.multiTenant?.cookieName ?? 'payload-tenant',
+      tenantField: pluginOptions.multiTenant?.tenantField ?? 'tenant',
+    },
     resourceOwnerMode: rom
       ? {
           adminRoles: rom.adminRoles ?? [],
