@@ -6,6 +6,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
 
+import { useTenantFilter } from '../../utilities/useTenantFilter.js'
 import styles from './AvailabilityOverview.module.css'
 
 type Resource = {
@@ -58,6 +59,10 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const slugs = config.admin?.custom?.reservationSlugs
   const statusMachine = config.admin?.custom?.reservationStatusMachine
   const blockingStatuses: string[] = statusMachine?.blockingStatuses ?? ['pending', 'confirmed']
+
+  const resourcesTenantParams = useTenantFilter(slugs?.resources ?? 'resources')
+  const schedulesTenantParams = useTenantFilter(slugs?.schedules ?? 'schedules')
+  const reservationsTenantParams = useTenantFilter(slugs?.reservations ?? 'reservations')
 
   const DAY_NAMES = useMemo(
     () => [
@@ -112,18 +117,28 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
       const blockingIn = blockingStatuses.join(',')
 
       try {
+        const resourcesParams = new URLSearchParams({
+          limit: '100',
+          'where[active][equals]': 'true',
+          ...resourcesTenantParams,
+        })
+        const schedulesParams = new URLSearchParams({
+          limit: '500',
+          'where[active][equals]': 'true',
+          ...schedulesTenantParams,
+        })
+        const reservationsParams = new URLSearchParams({
+          depth: '0',
+          limit: '500',
+          'where[startTime][greater_than_equal]': weekStart.toISOString(),
+          'where[startTime][less_than_equal]': weekEnd.toISOString(),
+          'where[status][in]': blockingIn,
+          ...reservationsTenantParams,
+        })
         const [resourcesRes, schedulesRes, reservationsRes] = await Promise.all([
-          fetch(`${apiBase}/${slugs.resources}?where[active][equals]=true&limit=100`),
-          fetch(`${apiBase}/${slugs.schedules}?where[active][equals]=true&limit=500`),
-          fetch(
-            `${apiBase}/${slugs.reservations}?${new URLSearchParams({
-              depth: '0',
-              limit: '500',
-              'where[startTime][greater_than_equal]': weekStart.toISOString(),
-              'where[startTime][less_than_equal]': weekEnd.toISOString(),
-              'where[status][in]': blockingIn,
-            })}`,
-          ),
+          fetch(`${apiBase}/${slugs.resources}?${resourcesParams}`),
+          fetch(`${apiBase}/${slugs.schedules}?${schedulesParams}`),
+          fetch(`${apiBase}/${slugs.reservations}?${reservationsParams}`),
         ])
 
         const [rData, sData, resData] = await Promise.all([
@@ -147,7 +162,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     // blockingStatuses is derived from config which is stable; stringify to
     // avoid object-reference churn causing infinite loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekStart, weekEnd, config.routes.api, config.serverURL, slugs, blockingStatuses.join(',')])
+  }, [weekStart, weekEnd, config.routes.api, config.serverURL, slugs, blockingStatuses.join(','), resourcesTenantParams, schedulesTenantParams, reservationsTenantParams])
 
   const navigateWeek = useCallback((direction: -1 | 1) => {
     setWeekStart((prev) => {
