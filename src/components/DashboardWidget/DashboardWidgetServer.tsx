@@ -3,6 +3,7 @@ import type { WidgetServerProps } from 'payload'
 import type { PluginT } from '../../translations/index.js'
 import type { StatusMachineConfig } from '../../types.js'
 
+import { collectionHasTenantField, readCookie, tenantWhereClause } from '../../utilities/tenantFilter.js'
 import styles from './DashboardWidget.module.css'
 
 export const DashboardWidgetServer = async (props: WidgetServerProps) => {
@@ -14,6 +15,19 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
   if (!slugs) {
     return null
   }
+
+  const tenantConfig =
+    (payload.config.admin?.custom?.reservationTenant as
+      | { cookieName?: string; tenantField?: string }
+      | undefined) ?? {}
+  const cookieName = tenantConfig.cookieName ?? 'payload-tenant'
+  const tenantField = tenantConfig.tenantField ?? 'tenant'
+  const reservationsCollection = payload.config.collections?.find((c) => c.slug === slugs.reservations)
+  const tenantWhere = tenantWhereClause({
+    hasField: collectionHasTenantField(reservationsCollection as { fields?: unknown[] } | undefined, tenantField),
+    tenantField,
+    tenantId: readCookie(req.headers.get('cookie'), cookieName),
+  })
 
   // Read status machine from config — never hardcode status values
   const statusMachine: StatusMachineConfig | undefined =
@@ -27,16 +41,21 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
 
+  const where: Parameters<typeof payload.find>[0]['where'] = {
+    startTime: {
+      greater_than_equal: startOfDay.toISOString(),
+      less_than: endOfDay.toISOString(),
+    },
+  }
+  if (tenantWhere) {
+    Object.assign(where, tenantWhere)
+  }
+
   const { docs: todayReservations } = await payload.find({
     collection: slugs.reservations,
     limit: 100,
     sort: 'startTime',
-    where: {
-      startTime: {
-        greater_than_equal: startOfDay.toISOString(),
-        less_than: endOfDay.toISOString(),
-      },
-    },
+    where,
   })
 
   const total = todayReservations.length
