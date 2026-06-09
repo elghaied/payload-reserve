@@ -21,7 +21,7 @@ export function collectionHasTenantField(collection: CollectionLike, fieldName: 
     return false
   }
   return collection.fields.some(
-    (f) => Boolean(f) && typeof f === 'object' && 'name' in f && (f as { name?: string }).name === fieldName,
+    (f) => typeof f === 'object' && f !== null && 'name' in f && (f as { name?: string }).name === fieldName,
   )
 }
 
