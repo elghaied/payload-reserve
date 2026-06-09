@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] - 2026-06-09
+
+Makes the plugin's custom Reservations admin views multi-tenant aware. Additive minor release — with no `multiTenant` option set and no tenant field on the collections, behavior is unchanged.
+
+### Fixed
+
+- **Cross-tenant data leak in the custom admin views.** The plugin replaces the built-in Reservations list view with a custom calendar and fetches its own data (REST in the client views, Local API in the dashboard widget), so `@payloadcms/plugin-multi-tenant`'s list-view `baseFilter` never applied — a super-admin with a single tenant selected saw **every** tenant's reservations, resources, and schedules. The calendar, pending count/list, availability grid, and dashboard widget now scope to the selected tenant (read from the `payload-tenant` cookie).
+
+### Added
+
+- **`multiTenant` plugin option** — opt-in tenant scoping for the custom admin views: `{ tenantField?: string (default 'tenant'); cookieName?: string (default 'payload-tenant') }`. Auto-detected at runtime: scoping is applied only when the scoped collection (resources, schedules, reservations) actually has the tenant field **and** the tenant cookie is set, so plain single-tenant installs are byte-for-byte unchanged. No peer dependency on `@payloadcms/plugin-multi-tenant` (it is detected, not required).
+
 ## [1.5.0] - 2026-06-02
 
 A large feature release: multi-resource availability, staff scheduling & auto-provisioning, an availability-aware calendar, guest (account-less) bookings, and full admin-UI internationalization. The plugin's public API and config surface remain **additive** — with no new options set, behavior is unchanged — so this is a minor release. However, there are behavioral and database-migration notes existing deployments should review before upgrading.
