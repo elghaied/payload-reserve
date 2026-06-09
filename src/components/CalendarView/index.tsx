@@ -10,6 +10,7 @@ import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { statusToI18nKey } from '../../utilities/i18nUtils.js'
 import { localDayKey } from '../../utilities/slotUtils.js'
+import { useTenantFilter } from '../../utilities/useTenantFilter.js'
 import styles from './CalendarView.module.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
 import { useResourceAvailability } from './useResourceAvailability.js'
@@ -70,6 +71,9 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const reservationSlug = slugs?.reservations ?? 'reservations'
   const apiUrl = `${config.serverURL ?? ''}${config.routes.api}/${reservationSlug}`
   const apiBase = `${config.serverURL ?? ''}${config.routes.api}`
+  const resourceSlug = slugs?.resources ?? 'resources'
+  const reservationTenantParams = useTenantFilter(reservationSlug)
+  const resourceTenantParams = useTenantFilter(resourceSlug)
 
   const statusMachine = config.admin?.custom?.reservationStatusMachine as
     | {
@@ -171,12 +175,12 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   useEffect(() => {
     const fetchResources = async () => {
       try {
-        const resourceSlug = slugs?.resources ?? 'resources'
         const params = new URLSearchParams({
           depth: '0',
           limit: '100',
           sort: 'name',
           'where[active][equals]': 'true',
+          ...resourceTenantParams,
         })
         const url = `${config.serverURL ?? ''}${config.routes.api}/${resourceSlug}?${params}`
         const response = await fetch(url)
@@ -188,7 +192,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       }
     }
     void fetchResources()
-  }, [config.routes.api, config.serverURL, slugs?.resources])
+  }, [config.routes.api, config.serverURL, resourceSlug, resourceTenantParams])
 
   const { rangeEnd, rangeStart } = useMemo(() => {
     const start = new Date(currentDate)
@@ -227,6 +231,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         sort: 'startTime',
         'where[startTime][greater_than_equal]': rangeStart.toISOString(),
         'where[startTime][less_than_equal]': rangeEnd.toISOString(),
+        ...reservationTenantParams,
       })
       const response = await fetch(`${apiUrl}?${params}`)
       const result = await response.json()
@@ -235,7 +240,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       setReservations([])
     }
     setLoading(false)
-  }, [rangeStart, rangeEnd, apiUrl])
+  }, [rangeStart, rangeEnd, apiUrl, reservationTenantParams])
 
   useEffect(() => {
     void fetchReservations()
@@ -247,6 +252,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       const params = new URLSearchParams({
         limit: '0',
         'where[status][equals]': defaultStatus,
+        ...reservationTenantParams,
       })
       const response = await fetch(`${apiUrl}?${params}`)
       const result = await response.json()
@@ -254,7 +260,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     } catch {
       // silently ignore
     }
-  }, [apiUrl, defaultStatus])
+  }, [apiUrl, defaultStatus, reservationTenantParams])
 
   useEffect(() => {
     void fetchPendingCount()
@@ -268,6 +274,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         limit: '500',
         sort: 'startTime',
         'where[status][equals]': defaultStatus,
+        ...reservationTenantParams,
       })
       const response = await fetch(`${apiUrl}?${params}`)
       const result = await response.json()
@@ -275,7 +282,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     } catch {
       setPendingReservations([])
     }
-  }, [apiUrl, defaultStatus])
+  }, [apiUrl, defaultStatus, reservationTenantParams])
 
   useEffect(() => {
     if (viewMode === 'pending') {
