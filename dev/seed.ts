@@ -16,6 +16,15 @@ export const seed = async (payload: Payload) => {
     })
   }
 
+  // Under multi-tenant mode the base salon/guest-booking demo entities have no
+  // `tenant` (the multi-tenant plugin makes that field required), so creating
+  // them would fail validation and abort onInit. Skip the base demo entirely and
+  // seed only the multi-tenant fixtures.
+  if (process.env.MT) {
+    await seedMultiTenant(payload)
+    return
+  }
+
   // ---- GUEST BOOKING DEMO (idempotent) ----
   // Minimal service + resource + schedule for the public /book page. Runs even
   // when the rest of the seed is skipped, so /book always has something to book.
@@ -441,4 +450,132 @@ export const seed = async (payload: Payload) => {
                   john@example.com / customer123
        Guest bookings seeded (next week): email + phone, for cancel testing
   `)
+
+}
+
+// ---- MULTI-TENANT DEMO (opt-in via MT env var) ----
+// Seeds two tenants, a super-admin dev user assigned to both, and one
+// service/resource/reservation per tenant. Runs instead of the base salon demo
+// because under multi-tenant the `tenant` field is required on those collections.
+const seedMultiTenant = async (payload: Payload) => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payloadAny = payload as any
+
+    // Ensure two tenants exist (idempotent by name)
+    const { docs: existingTenants } = await payloadAny.find({
+      collection: 'tenants',
+      where: { name: { in: ['Tenant A', 'Tenant B'] } },
+    })
+
+    const findOrCreateTenant = (name: string) => {
+      const existing = (existingTenants as Array<{ id: string; name: string }>).find(
+        (t) => t.name === name,
+      )
+      if (existing) {return Promise.resolve(existing)}
+      return payloadAny.create({ collection: 'tenants', data: { name } })
+    }
+
+    const tenantA = await findOrCreateTenant('Tenant A')
+    const tenantB = await findOrCreateTenant('Tenant B')
+
+    // Set the dev user as superAdmin with access to both tenants
+    const { docs: devUsers } = await payloadAny.find({
+      collection: 'users',
+      where: { email: { equals: devUser.email } },
+    })
+    if (devUsers.length > 0) {
+      await payloadAny.update({
+        id: devUsers[0].id,
+        collection: 'users',
+        data: {
+          superAdmin: true,
+          tenants: [{ tenant: tenantA.id }, { tenant: tenantB.id }],
+        },
+      })
+    }
+
+    // Create one service per tenant (find-or-create by name)
+    const findOrCreateService = async (name: string, tenantId: string) => {
+      const { docs } = await payloadAny.find({
+        collection: 'services',
+        where: { name: { equals: name } },
+      })
+      if (docs.length > 0) {return docs[0]}
+      return payloadAny.create({
+        collection: 'services',
+        data: {
+          name,
+          active: true,
+          duration: 30,
+          durationType: 'fixed',
+          price: 0,
+          tenant: tenantId,
+        },
+      })
+    }
+
+    const serviceA = await findOrCreateService('A Service', tenantA.id)
+    const serviceB = await findOrCreateService('B Service', tenantB.id)
+
+    // Create one resource per tenant (find-or-create by name)
+    const findOrCreateResource = async (name: string, tenantId: string) => {
+      const { docs } = await payloadAny.find({
+        collection: 'resources',
+        where: { name: { equals: name } },
+      })
+      if (docs.length > 0) {return docs[0]}
+      return payloadAny.create({
+        collection: 'resources',
+        data: { name, active: true, tenant: tenantId },
+      })
+    }
+
+    const resourceA = await findOrCreateResource('A Room', tenantA.id)
+    const resourceB = await findOrCreateResource('B Room', tenantB.id)
+
+    // Create one reservation per tenant (find-or-create by idempotencyKey)
+    const todayNoon = new Date()
+    todayNoon.setHours(12, 0, 0, 0)
+
+    const findOrCreateReservation = async (
+      idempotencyKey: string,
+      data: Record<string, unknown>,
+    ) => {
+      const { docs } = await payloadAny.find({
+        collection: 'reservations',
+        where: { idempotencyKey: { equals: idempotencyKey } },
+      })
+      if (docs.length > 0) {return docs[0]}
+      return payloadAny.create({
+        collection: 'reservations',
+        context: { skipReservationHooks: true },
+        data,
+      })
+    }
+
+    await findOrCreateReservation('mt-seed-tenant-a-001', {
+      idempotencyKey: 'mt-seed-tenant-a-001',
+      resource: resourceA.id,
+      service: serviceA.id,
+      startTime: todayNoon.toISOString(),
+      status: 'pending',
+      tenant: tenantA.id,
+    })
+
+    await findOrCreateReservation('mt-seed-tenant-b-001', {
+      idempotencyKey: 'mt-seed-tenant-b-001',
+      resource: resourceB.id,
+      service: serviceB.id,
+      startTime: todayNoon.toISOString(),
+      status: 'pending',
+      tenant: tenantB.id,
+    })
+
+    payload.logger.info(
+      '[MT] Multi-tenant seed complete: Tenant A + Tenant B with services, resources, and reservations.',
+    )
+  } catch (err) {
+    payload.logger.warn({ err, msg: '[MT] Multi-tenant seed failed — continuing without MT data' })
+  }
 }
