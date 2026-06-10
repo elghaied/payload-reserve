@@ -148,6 +148,7 @@ export const payloadReserve =
     }
     config.admin.custom.reservationStatusMachine = resolved.statusMachine
     config.admin.custom.reservationTenant = resolved.multiTenant
+    config.admin.custom.reservationTimezone = resolved.timezone
 
     // Add dashboard widget
     if (!config.admin.dashboard) {

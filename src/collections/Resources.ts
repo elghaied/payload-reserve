@@ -141,6 +141,8 @@ export function createResourcesCollection(
         name: 'timezone',
         type: 'text',
         admin: {
+          description:
+            'Deprecated — not used by the plugin. Schedule resolution uses the plugin-level `timezone` option.',
           position: 'sidebar',
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldTimezone'),

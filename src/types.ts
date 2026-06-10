@@ -188,6 +188,8 @@ export type ReservationPluginConfig = {
   staffProvisioning?: StaffProvisioningConfig
   /** Configurable status machine (defaults to current behavior) */
   statusMachine?: Partial<StatusMachineConfig>
+  /** IANA business timezone governing schedules and day boundaries (default 'UTC') */
+  timezone?: string
   /** Which existing auth collection to extend with customer fields */
   userCollection?: string
 }
@@ -225,6 +227,7 @@ export type ResolvedReservationPluginConfig = {
   }
   staffProvisioning: ResolvedStaffProvisioningConfig | undefined
   statusMachine: StatusMachineConfig
+  timezone: string
   userCollection: string | undefined
 }
 

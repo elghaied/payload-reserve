@@ -6,6 +6,7 @@ import type {
 } from './types.js'
 
 import { DEFAULT_STATUS_MACHINE } from './types.js'
+import { validateTimezone } from './utilities/timezoneUtils.js'
 
 function validateStatusMachine(sm: StatusMachineConfig): void {
   if (!sm.statuses.includes(sm.defaultStatus)) {
@@ -146,10 +147,12 @@ export function resolveConfig(
           transitions: userStatusMachine.transitions ?? DEFAULT_STATUS_MACHINE.transitions,
         }
       : { ...DEFAULT_STATUS_MACHINE },
+    timezone: pluginOptions.timezone ?? 'UTC',
     userCollection: pluginOptions.userCollection ?? undefined,
   }
 
   validateStatusMachine(resolved.statusMachine)
+  validateTimezone(resolved.timezone)
 
   return resolved
 }

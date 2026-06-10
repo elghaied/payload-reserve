@@ -122,6 +122,22 @@ describe('addDaysToDayKey', () => {
   })
 })
 
+import { resolveConfig } from '../src/defaults.js'
+
+describe('resolveConfig timezone option', () => {
+  it('defaults to UTC', () => {
+    expect(resolveConfig({}).timezone).toBe('UTC')
+  })
+
+  it('accepts a valid IANA name', () => {
+    expect(resolveConfig({ timezone: 'Europe/Paris' }).timezone).toBe('Europe/Paris')
+  })
+
+  it('throws at init for an invalid name', () => {
+    expect(() => resolveConfig({ timezone: 'Mars/Olympus' })).toThrow(/Invalid timezone/)
+  })
+})
+
 describe('pathological zones and input validation (review regression tests)', () => {
   it('handles half-hour and 45-minute offsets', () => {
     expect(combineDayKeyAndTime('2026-06-10', '09:00', 'Asia/Kolkata').toISOString()).toBe(
