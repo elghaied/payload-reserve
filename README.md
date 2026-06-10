@@ -240,6 +240,18 @@ payloadReserve({
 
 The first entry of `resourceTypes` becomes the default value for the `Resource.resourceType` field.
 
+### Business Timezone
+
+Set a plugin-level `timezone` (IANA name, default `'UTC'`) to govern all schedule resolution — what `HH:mm` schedule times mean, which calendar day a `date=YYYY-MM-DD` query maps to, exception-day matching, and full-day booking boundaries:
+
+```typescript
+payloadReserve({
+  timezone: 'America/New_York',  // default: 'UTC'
+})
+```
+
+Without this, day resolution mixes server-local and UTC semantics — on non-UTC servers the slots API can resolve the wrong calendar day. With `timezone` set, all server-side day math runs via the built-in `Intl` API (no extra dependency). `'UTC'` on a UTC server is identical to the previous behaviour. The configured timezone is exposed to admin components via `config.admin.custom.reservationTimezone`.
+
 ### Optional `Resource.services`
 
 The `services` relationship on Resources is now optional. This lets a freshly provisioned staff Resource exist before services are assigned, avoiding validation errors during auto-provisioning.
