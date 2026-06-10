@@ -25,7 +25,7 @@ export const onStatusChange =
       }
     }
 
-    if (next === 'confirmed' && config.hooks?.afterBookingConfirm) {
+    if (next === config.statusMachine.confirmStatus && config.hooks?.afterBookingConfirm) {
       for (const hook of config.hooks.afterBookingConfirm) {
         try {
           await hook({ doc: doc as Record<string, unknown>, req })
@@ -34,7 +34,7 @@ export const onStatusChange =
         }
       }
     }
-    if (next === 'cancelled' && config.hooks?.afterBookingCancel) {
+    if (next === config.statusMachine.cancelStatus && config.hooks?.afterBookingCancel) {
       for (const hook of config.hooks.afterBookingCancel) {
         try {
           await hook({ doc: doc as Record<string, unknown>, req })

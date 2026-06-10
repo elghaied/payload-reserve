@@ -45,6 +45,12 @@ function validateStatusMachine(sm: StatusMachineConfig): void {
   if (sm.terminalStatuses.includes(sm.defaultStatus)) {
     throw new Error(`statusMachine.defaultStatus "${sm.defaultStatus}" cannot be a terminal status`)
   }
+  if (!sm.statuses.includes(sm.confirmStatus)) {
+    throw new Error(`statusMachine.confirmStatus "${sm.confirmStatus}" is not in statuses array`)
+  }
+  if (!sm.statuses.includes(sm.cancelStatus)) {
+    throw new Error(`statusMachine.cancelStatus "${sm.cancelStatus}" is not in statuses array`)
+  }
 }
 
 export const DEFAULT_RESOURCE_TYPES = ['staff', 'equipment', 'room']
@@ -132,6 +138,8 @@ export function resolveConfig(
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,
     extraReservationFields: pluginOptions.extraReservationFields ?? [],
+    // Real value is set by the plugin once config.collections is known (C8)
+    hasMediaCollection: false,
     hooks: pluginOptions.hooks ?? {},
     leaveTypes: pluginOptions.leaveTypes ?? DEFAULT_LEAVE_TYPES,
     localized: false,
@@ -164,6 +172,8 @@ export function resolveConfig(
       ? {
           blockingStatuses:
             userStatusMachine.blockingStatuses ?? DEFAULT_STATUS_MACHINE.blockingStatuses,
+          cancelStatus: userStatusMachine.cancelStatus ?? DEFAULT_STATUS_MACHINE.cancelStatus,
+          confirmStatus: userStatusMachine.confirmStatus ?? DEFAULT_STATUS_MACHINE.confirmStatus,
           defaultStatus: userStatusMachine.defaultStatus ?? DEFAULT_STATUS_MACHINE.defaultStatus,
           statuses: userStatusMachine.statuses ?? DEFAULT_STATUS_MACHINE.statuses,
           terminalStatuses:

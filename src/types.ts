@@ -10,6 +10,10 @@ export type CapacityMode = 'per-guest' | 'per-reservation'
 
 export type StatusMachineConfig = {
   blockingStatuses: string[]
+  /** Status treated as "cancelled" — fires beforeBookingCancel/afterBookingCancel, the cancellation notice period, and the cancellationReason field. */
+  cancelStatus: string
+  /** Status treated as "confirmed" — fires beforeBookingConfirm/afterBookingConfirm. */
+  confirmStatus: string
   defaultStatus: string
   statuses: string[]
   terminalStatuses: string[]
@@ -18,6 +22,8 @@ export type StatusMachineConfig = {
 
 export const DEFAULT_STATUS_MACHINE: StatusMachineConfig = {
   blockingStatuses: ['pending', 'confirmed'],
+  cancelStatus: 'cancelled',
+  confirmStatus: 'confirmed',
   defaultStatus: 'pending',
   statuses: ['pending', 'confirmed', 'completed', 'cancelled', 'no-show'],
   terminalStatuses: ['completed', 'cancelled', 'no-show'],
@@ -236,6 +242,8 @@ export type ResolvedReservationPluginConfig = {
   defaultBufferTime: number
   disabled: boolean
   extraReservationFields: Field[]
+  /** Whether the media collection (`slugs.media`) exists — set by the plugin; gates the image upload fields. */
+  hasMediaCollection: boolean
   hooks: ReservationPluginHooks
   leaveTypes: string[]
   localized: boolean

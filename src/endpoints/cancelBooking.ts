@@ -51,7 +51,7 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         collection: config.slugs.reservations,
         data: {
           cancellationReason: reason,
-          status: 'cancelled',
+          status: config.statusMachine.cancelStatus,
         },
         // Authorization (owner / admin / matching token) is already enforced above.
         // overrideAccess lets the write proceed for anonymous guest cancellations,

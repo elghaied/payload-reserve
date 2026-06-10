@@ -78,12 +78,16 @@ export function createResourcesCollection(
         maxLength: 200,
         required: true,
       },
-      {
-        name: 'image',
-        type: 'upload',
-        label: ({ t }) => (t as PluginT)('reservation:fieldImage'),
-        relationTo: config.slugs.media as unknown as CollectionSlug,
-      },
+      ...(config.hasMediaCollection
+        ? [
+            {
+              name: 'image',
+              type: 'upload' as const,
+              label: ({ t }: { t: unknown }) => (t as PluginT)('reservation:fieldImage'),
+              relationTo: config.slugs.media as unknown as CollectionSlug,
+            },
+          ]
+        : []),
       {
         name: 'description',
         type: 'textarea',

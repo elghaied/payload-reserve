@@ -20,6 +20,37 @@ import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
 import { type PluginT, translations } from './translations/index.js'
 import { applyCollectionOverride } from './utilities/collectionOverrides.js'
 
+/**
+ * All named field paths reachable from a field list, descending through
+ * presentational containers (tabs, rows, collapsibles, unnamed groups) that
+ * don't create their own data nesting — so dedup catches a field declared
+ * inside one of them. Named groups/arrays DO nest data, so we don't recurse
+ * into them (a `name` inside a named group is a different path).
+ */
+function collectFieldNames(fields: Field[]): Set<string> {
+  const names = new Set<string>()
+  const walk = (list: Field[]): void => {
+    for (const field of list) {
+      if ('name' in field && field.name) {
+        names.add(field.name)
+      } else if ('tabs' in field && Array.isArray(field.tabs)) {
+        for (const tab of field.tabs) {
+          if ('name' in tab && tab.name) {
+            names.add(tab.name)
+          } else if (Array.isArray(tab.fields)) {
+            walk(tab.fields)
+          }
+        }
+      } else if ('fields' in field && Array.isArray(field.fields)) {
+        // row / collapsible / unnamed group
+        walk(field.fields)
+      }
+    }
+  }
+  walk(fields)
+  return names
+}
+
 export const payloadReserve =
   (pluginOptions: ReservationPluginConfig = {}) =>
   (config: Config): Config => {
@@ -50,22 +81,21 @@ export const payloadReserve =
       }
 
       {
-        // Collect existing field names for deduplication check
-        const existingFieldNames = new Set(
-          targetCollection.fields
-            .map((field) => ('name' in field ? field.name : undefined))
-            .filter(Boolean),
-        )
+        // Collect existing field names — descend into presentational containers
+        // (tabs/rows/collapsibles/groups) so a field nested there isn't
+        // re-injected at the top level (review C4).
+        const existingFieldNames = collectFieldNames(targetCollection.fields)
 
         // Fields to inject if not already present. `name` is added so that
         // admin.useAsTitle: 'name' works out of the box on the extended user
         // collection (matches the v1.0.0 behaviour documented in README/SKILL).
+        // It is NOT required — an existing users collection may have rows
+        // without a name, and forcing required would fail their next update (C4).
         const fieldsToAdd: Field[] = [
           {
             name: 'name',
             type: 'text',
             maxLength: 200,
-            required: true,
           },
           {
             name: 'phone',
@@ -116,6 +146,12 @@ export const payloadReserve =
         )
       }
     }
+
+    // Image upload fields are added only when the media collection actually
+    // exists, so installs without one don't hit an opaque init error (C8).
+    resolved.hasMediaCollection = config.collections.some(
+      (col) => col.slug === resolved.slugs.media,
+    )
 
     const ov = resolved.collectionOverrides
     config.collections.push(

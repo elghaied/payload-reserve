@@ -66,7 +66,7 @@ export const validateStatusTransition =
         }
 
         // Call beforeBookingConfirm plugin hooks
-        if (newStatus === 'confirmed' && config.hooks?.beforeBookingConfirm) {
+        if (newStatus === config.statusMachine.confirmStatus && config.hooks?.beforeBookingConfirm) {
           for (const hook of config.hooks.beforeBookingConfirm) {
             await hook({
               doc: { ...(originalDoc as Record<string, unknown>), ...(data as Record<string, unknown>) },
@@ -77,7 +77,7 @@ export const validateStatusTransition =
         }
 
         // Call beforeBookingCancel plugin hooks
-        if (newStatus === 'cancelled' && config.hooks?.beforeBookingCancel) {
+        if (newStatus === config.statusMachine.cancelStatus && config.hooks?.beforeBookingCancel) {
           for (const hook of config.hooks.beforeBookingCancel) {
             await hook({
               doc: { ...(originalDoc as Record<string, unknown>), ...(data as Record<string, unknown>) },

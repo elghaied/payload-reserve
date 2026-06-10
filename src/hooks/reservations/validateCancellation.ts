@@ -17,8 +17,9 @@ export const validateCancellation =
     const newStatus = data?.status
     const previousStatus = originalDoc?.status
 
-    // Only check when transitioning to cancelled
-    if (newStatus !== 'cancelled' || previousStatus === 'cancelled') {return data}
+    // Only check when transitioning to the cancel status
+    const cancelStatus = config.statusMachine.cancelStatus
+    if (newStatus !== cancelStatus || previousStatus === cancelStatus) {return data}
 
     const startTime = data?.startTime ?? originalDoc?.startTime
     if (!startTime) {return data}

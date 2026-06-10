@@ -162,3 +162,141 @@ describe('B3 parallel route: enforceCustomerOwnership', () => {
     expect((result as Record<string, unknown>).customer).toBe('someone')
   })
 })
+
+describe('C7: configurable confirm/cancel statuses', () => {
+  it('defaults confirmStatus/cancelStatus to confirmed/cancelled', () => {
+    const sm = resolveConfig({}).statusMachine
+    expect(sm.confirmStatus).toBe('confirmed')
+    expect(sm.cancelStatus).toBe('cancelled')
+  })
+
+  it('accepts a custom vocabulary and validates membership', () => {
+    const sm = resolveConfig({
+      statusMachine: {
+        blockingStatuses: ['booked'],
+        cancelStatus: 'voided',
+        confirmStatus: 'booked',
+        defaultStatus: 'requested',
+        statuses: ['requested', 'booked', 'done', 'voided'],
+        terminalStatuses: ['done', 'voided'],
+        transitions: {
+          booked: ['done', 'voided'],
+          done: [],
+          requested: ['booked', 'voided'],
+          voided: [],
+        },
+      },
+    }).statusMachine
+    expect(sm.confirmStatus).toBe('booked')
+    expect(sm.cancelStatus).toBe('voided')
+  })
+
+  it('throws when confirmStatus is not a known status', () => {
+    expect(() =>
+      resolveConfig({ statusMachine: { confirmStatus: 'nope' } }),
+    ).toThrow(/confirmStatus "nope" is not in statuses/)
+  })
+
+  it('throws when cancelStatus is not a known status', () => {
+    expect(() =>
+      resolveConfig({ statusMachine: { cancelStatus: 'nope' } }),
+    ).toThrow(/cancelStatus "nope" is not in statuses/)
+  })
+})
+
+describe('C8: image field gated on the media collection existing', () => {
+  const withCollections = (extra: Array<{ slug: string }>): Config =>
+    ({
+      collections: [{ slug: 'users', auth: true, fields: [] }, ...extra],
+    }) as unknown as Config
+
+  const hasField = (config: Config, slug: string, name: string): boolean => {
+    const c = config.collections!.find((x) => x.slug === slug)!
+    return c.fields.some((f) => 'name' in f && f.name === name)
+  }
+
+  it('omits the image field when no media collection is present', () => {
+    const config = payloadReserve({})(withCollections([]))
+    expect(hasField(config, 'services', 'image')).toBe(false)
+    expect(hasField(config, 'resources', 'image')).toBe(false)
+  })
+
+  it('adds the image field when a media collection exists', () => {
+    const config = payloadReserve({})(withCollections([{ slug: 'media' }]))
+    expect(hasField(config, 'services', 'image')).toBe(true)
+    expect(hasField(config, 'resources', 'image')).toBe(true)
+  })
+})
+
+describe('C4: userCollection field injection', () => {
+  it('injects name as NOT required and dedups against nested fields', () => {
+    const usersWithNestedName = {
+      slug: 'users',
+      auth: true,
+      fields: [
+        // name nested inside a row — must be detected and not re-injected
+        { type: 'row', fields: [{ name: 'name', type: 'text' }] },
+      ],
+    }
+    const config = payloadReserve({ userCollection: 'users' })({
+      collections: [usersWithNestedName],
+    } as unknown as Config)
+    const users = config.collections!.find((c) => c.slug === 'users')!
+    // top-level `name` not duplicated (it lives in the row)
+    const topLevelNames = users.fields.filter((f) => 'name' in f && f.name === 'name')
+    expect(topLevelNames).toHaveLength(0)
+    // phone/notes/bookings still injected at top level
+    expect(users.fields.some((f) => 'name' in f && f.name === 'phone')).toBe(true)
+  })
+
+  it('injects an optional name on a plain users collection', () => {
+    const config = payloadReserve({ userCollection: 'users' })({
+      collections: [{ slug: 'users', auth: true, fields: [] }],
+    } as unknown as Config)
+    const users = config.collections!.find((c) => c.slug === 'users')!
+    const nameField = users.fields.find((f) => 'name' in f && f.name === 'name') as
+      | Record<string, unknown>
+      | undefined
+    expect(nameField).toBeDefined()
+    expect(nameField!.required).toBeUndefined()
+  })
+})
+
+describe('C7: cancel endpoint uses the configured cancelStatus', () => {
+  it('writes statusMachine.cancelStatus, not a hardcoded "cancelled"', async () => {
+    const { createCancelBookingEndpoint } = await import('../src/endpoints/cancelBooking.js')
+    const config = resolveConfig({
+      statusMachine: {
+        blockingStatuses: ['booked'],
+        cancelStatus: 'voided',
+        confirmStatus: 'booked',
+        defaultStatus: 'requested',
+        statuses: ['requested', 'booked', 'done', 'voided'],
+        terminalStatuses: ['done', 'voided'],
+        transitions: {
+          booked: ['done', 'voided'],
+          done: [],
+          requested: ['booked', 'voided'],
+          voided: [],
+        },
+      },
+    })
+    const ep = createCancelBookingEndpoint(config)
+    let written: Record<string, unknown> | undefined
+    const req = {
+      json: () => Promise.resolve({ reservationId: 'r1' }),
+      payload: {
+        findByID: () => Promise.resolve({ id: 'r1', customer: 'cust-1' }),
+        update: (args: { data: Record<string, unknown> }) => {
+          written = args.data
+          return Promise.resolve({ id: 'r1', ...args.data })
+        },
+      },
+      user: { id: 'cust-1', collection: 'customers' },
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    expect(resp.status).toBe(200)
+    expect(written?.status).toBe('voided')
+  })
+})

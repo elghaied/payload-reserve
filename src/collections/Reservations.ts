@@ -192,7 +192,7 @@ export function createReservationsCollection(
         name: 'cancellationReason',
         type: 'textarea',
         admin: {
-          condition: (_, siblingData) => siblingData?.status === 'cancelled',
+          condition: (_, siblingData) => siblingData?.status === statusMachine.cancelStatus,
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldCancellationReason'),
       },
