@@ -7,6 +7,7 @@ import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { makeScheduleOwnerAccess } from '../utilities/ownerAccess.js'
 import { buildSelectOptions } from '../utilities/selectOptions.js'
+import { getDayKeyInTimezone } from '../utilities/timezoneUtils.js'
 
 const TIME_REGEX = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
@@ -208,8 +209,8 @@ export function createSchedulesCollection(
           const exceptions = (data?.exceptions as Array<{ date?: string; endDate?: string }>) ?? []
           for (const exc of exceptions) {
             if (exc.date && exc.endDate) {
-              const start = new Date(exc.date).toISOString().split('T')[0]
-              const end = new Date(exc.endDate).toISOString().split('T')[0]
+              const start = getDayKeyInTimezone(new Date(exc.date), config.timezone)
+              const end = getDayKeyInTimezone(new Date(exc.endDate), config.timezone)
               if (end < start) {
                 throw new ValidationError({
                   errors: [{ message: 'exception endDate must be on or after date', path: 'exceptions' }],

@@ -4,7 +4,7 @@ import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { getAvailableSlots } from '../services/AvailabilityService.js'
 import { extractId, mergeResourceIds } from '../utilities/resolveRequiredResources.js'
-import { getDayKeyInTimezone } from '../utilities/timezoneUtils.js'
+import { getDayKeyInTimezone, isValidDayKey } from '../utilities/timezoneUtils.js'
 
 export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
@@ -26,6 +26,12 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
       // `new Date('YYYY-MM-DD')` — that pins the day to UTC midnight.
       let dayKey: string
       if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        if (!isValidDayKey(date)) {
+          return Response.json(
+            { error: 'Invalid date format. Expected YYYY-MM-DD' },
+            { status: 400 },
+          )
+        }
         dayKey = date
       } else {
         const parsed = new Date(date)

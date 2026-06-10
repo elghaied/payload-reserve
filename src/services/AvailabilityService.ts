@@ -296,6 +296,9 @@ export async function getAvailableSlots(params: {
   }
 
   // 4. Candidate slot sizing
+  // NOTE: epoch-trick sizing is only meaningful for fixed/flexible durations.
+  // full-day services return early via the range-as-slot branch below and never
+  // consume slotDuration — keep it that way if reordering this function.
   const { endTime: slotEndOffset } = computeEndTime({
     durationType,
     serviceDuration: duration,

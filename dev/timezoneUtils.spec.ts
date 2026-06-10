@@ -7,6 +7,8 @@ import {
   endOfDayInTimezone,
   getDayKeyInTimezone,
   getDayOfWeekFromDayKey,
+  getHourInTimezone,
+  isValidDayKey,
   validateTimezone,
 } from '../src/utilities/timezoneUtils.js'
 
@@ -177,5 +179,33 @@ describe('pathological zones and input validation (review regression tests)', ()
     const b = getDayKeyInTimezone(new Date('2026-06-10T23:30:00.000Z'), 'Pacific/Kiritimati')
     expect(a).toBe(b)
     expect(a).toBe('2026-06-11')
+  })
+})
+
+describe('getHourInTimezone', () => {
+  it('extracts the wall-clock hour in the given timezone', () => {
+    const instant = new Date('2026-06-10T07:30:00.000Z')
+    expect(getHourInTimezone(instant, 'UTC')).toBe(7)
+    expect(getHourInTimezone(instant, 'Europe/Paris')).toBe(9)
+    expect(getHourInTimezone(instant, 'America/New_York')).toBe(3)
+  })
+
+  it('crosses day boundaries correctly', () => {
+    const instant = new Date('2026-06-10T23:30:00.000Z')
+    expect(getHourInTimezone(instant, 'Europe/Paris')).toBe(1)
+    expect(getHourInTimezone(instant, 'Pacific/Kiritimati')).toBe(13)
+  })
+})
+
+describe('isValidDayKey', () => {
+  it('accepts real calendar dates', () => {
+    expect(isValidDayKey('2026-06-10')).toBe(true)
+    expect(isValidDayKey('2028-02-29')).toBe(true)
+  })
+
+  it('rejects shape-valid but impossible dates and wrong shapes', () => {
+    expect(isValidDayKey('2026-13-45')).toBe(false)
+    expect(isValidDayKey('2026-02-30')).toBe(false)
+    expect(isValidDayKey('garbage')).toBe(false)
   })
 })

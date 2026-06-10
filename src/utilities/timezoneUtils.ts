@@ -42,6 +42,29 @@ function getWallClockFormatter(timeZone: string): Intl.DateTimeFormat {
 }
 
 /**
+ * Wall-clock hour (0-23) of an instant as seen in the given timezone.
+ */
+export function getHourInTimezone(date: Date, timeZone: string): number {
+  const parts = getWallClockFormatter(timeZone).formatToParts(date)
+  return Number(parts.find((p) => p.type === 'hour')?.value ?? '0')
+}
+
+/**
+ * True when the string is a real calendar date in YYYY-MM-DD form
+ * (round-trip check rejects shape-valid impossibilities like 2026-02-30).
+ */
+export function isValidDayKey(dayKey: string): boolean {
+  if (!DAY_KEY_RE.test(dayKey)) {
+    return false
+  }
+  try {
+    return new Date(`${dayKey}T00:00:00Z`).toISOString().slice(0, 10) === dayKey
+  } catch {
+    return false
+  }
+}
+
+/**
  * Throws when the given string is not a valid IANA timezone name.
  */
 export function validateTimezone(timeZone: string): void {
