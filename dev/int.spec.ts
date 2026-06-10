@@ -3727,4 +3727,296 @@ describe('Reservation plugin - partial updates (review A1)', () => {
     })
     expect(new Date(updated.endTime as string).toISOString()).toBe('2025-08-02T14:00:00.000Z')
   })
+
+  test('PATCH startTime onto an occupied slot is rejected', async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: {
+        name: 'A1 Move Service',
+        active: true,
+        bufferTimeAfter: 0,
+        bufferTimeBefore: 0,
+        duration: 60,
+      },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'A1 Move Resource', active: true, services: [service.id] },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'a1-move@example.com',
+        firstName: 'A1',
+        lastName: 'Move',
+        password: 'testpass123',
+      },
+    })
+
+    // Occupies 10:00–11:00
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: '2025-08-03T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+    // Free slot 14:00–15:00
+    const movable = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: '2025-08-03T14:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    await expect(
+      payload.update({
+        id: movable.id,
+        collection: col('reservations'),
+        data: { startTime: '2025-08-03T10:30:00.000Z' },
+      }),
+    ).rejects.toThrow()
+  })
+
+  test('PATCH guestCount over per-guest capacity is rejected', async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: {
+        name: 'A1 Guest Service',
+        active: true,
+        bufferTimeAfter: 0,
+        bufferTimeBefore: 0,
+        duration: 60,
+      },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: {
+        name: 'A1 Guest Resource (qty=4 per-guest)',
+        active: true,
+        capacityMode: 'per-guest',
+        quantity: 4,
+        services: [service.id],
+      },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'a1-guest@example.com',
+        firstName: 'A1',
+        lastName: 'Guest',
+        password: 'testpass123',
+      },
+    })
+
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        guestCount: 2,
+        resource: resource.id,
+        service: service.id,
+        startTime: '2025-08-04T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+    const second = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        guestCount: 2,
+        resource: resource.id,
+        service: service.id,
+        startTime: '2025-08-04T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    // 2 existing + 3 requested = 5 > quantity 4
+    await expect(
+      payload.update({
+        id: second.id,
+        collection: col('reservations'),
+        data: { guestCount: 3 },
+      }),
+    ).rejects.toThrow()
+  })
+
+  test('notes-only and status-only updates never re-validate (guard for the chosen design)', async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: {
+        name: 'A1 Stale Service',
+        active: true,
+        bufferTimeAfter: 0,
+        bufferTimeBefore: 0,
+        duration: 60,
+      },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'A1 Stale Resource', active: true, services: [service.id] },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'a1-stale@example.com',
+        firstName: 'A1',
+        lastName: 'Stale',
+        password: 'testpass123',
+      },
+    })
+
+    // Two valid back-to-back bookings: 10:00–11:00 and 11:00–12:00
+    const first = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: '2025-08-05T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: '2025-08-05T11:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    // Buffer added AFTER booking — re-validating either reservation would now
+    // fail (10:00–11:45 window overlaps the 11:00 neighbor). Benign updates
+    // must not be blocked by this.
+    await payload.update({
+      id: service.id,
+      collection: col('services'),
+      data: { bufferTimeAfter: 45 },
+    })
+
+    const withNotes = await payload.update({
+      id: first.id,
+      collection: col('reservations'),
+      data: { notes: 'customer arrived late' },
+    })
+    expect(withNotes.notes).toBe('customer arrived late')
+
+    const confirmed = await payload.update({
+      id: first.id,
+      collection: col('reservations'),
+      data: { status: 'confirmed' },
+    })
+    expect(confirmed.status).toBe('confirmed')
+
+    const completed = await payload.update({
+      id: first.id,
+      collection: col('reservations'),
+      data: { status: 'completed' },
+    })
+    expect(completed.status).toBe('completed')
+  })
+
+  test('moving a reservation within its own previous window is allowed (self-exclusion)', async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: {
+        name: 'A1 Self Service',
+        active: true,
+        bufferTimeAfter: 0,
+        bufferTimeBefore: 0,
+        duration: 60,
+      },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'A1 Self Resource', active: true, services: [service.id] },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'a1-self@example.com',
+        firstName: 'A1',
+        lastName: 'Self',
+        password: 'testpass123',
+      },
+    })
+
+    const reservation = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: '2025-08-06T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    const moved = await payload.update({
+      id: reservation.id,
+      collection: col('reservations'),
+      data: { startTime: '2025-08-06T10:15:00.000Z' },
+    })
+    expect(new Date(moved.endTime as string).toISOString()).toBe('2025-08-06T11:15:00.000Z')
+  })
+
+  test('flexible service: PATCH startTime past the old endTime is rejected (inverted window)', async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: {
+        name: 'A1 Flexible Service',
+        active: true,
+        bufferTimeAfter: 0,
+        bufferTimeBefore: 0,
+        duration: 60,
+        durationType: 'flexible',
+      },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'A1 Flexible Resource', active: true, services: [service.id] },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'a1-flexible@example.com',
+        firstName: 'A1',
+        lastName: 'Flexible',
+        password: 'testpass123',
+      },
+    })
+
+    const reservation = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        endTime: '2025-08-07T11:00:00.000Z',
+        resource: resource.id,
+        service: service.id,
+        startTime: '2025-08-07T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    // New start is after the kept endTime — must be rejected, not silently
+    // persisted as an inverted window invisible to overlap queries.
+    await expect(
+      payload.update({
+        id: reservation.id,
+        collection: col('reservations'),
+        data: { startTime: '2025-08-07T13:00:00.000Z' },
+      }),
+    ).rejects.toThrow()
+  })
 })

@@ -6,14 +6,39 @@ import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { checkAvailability } from '../../services/AvailabilityService.js'
-import { resolveReservationItems } from '../../utilities/resolveReservationItems.js'
+import { mergeReservationData, schedulingFieldsChanged } from '../../utilities/reservationChanges.js'
+import { extractId, resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 
 export const validateConflicts =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
   async ({ context, data, operation, originalDoc, req }) => {
     if (context?.skipReservationHooks) {return data}
 
-    const items = resolveReservationItems(data as Record<string, unknown>)
+    const isUpdate = operation === 'update'
+
+    // Skip when an update touches no scheduling-relevant field, so reservations
+    // booked under older buffers/schedules can still take benign edits.
+    if (
+      isUpdate &&
+      !schedulingFieldsChanged({
+        blockingStatuses: config.statusMachine.blockingStatuses,
+        data: data as Record<string, unknown>,
+        originalDoc: originalDoc as Record<string, unknown> | undefined,
+      })
+    ) {
+      return data
+    }
+
+    // Validate the merged document — Payload usually backfills update patches
+    // from originalDoc before beforeChange, but the hook must not rely on it.
+    const source = isUpdate
+      ? mergeReservationData(
+          data as Record<string, unknown>,
+          originalDoc as Record<string, unknown> | undefined,
+        )
+      : (data as Record<string, unknown>)
+
+    const items = resolveReservationItems(source)
 
     if (items.length === 0) {return data}
 
@@ -22,8 +47,7 @@ export const validateConflicts =
       if (!item.endTime) {continue}
 
       // Fetch buffer times from the item's own service (not just the primary)
-      const itemServiceId = item.service
-        ?? (typeof data?.service === 'object' ? data.service.id : data?.service)
+      const itemServiceId = item.service ?? extractId(source.service)
       let bufferBefore = config.defaultBufferTime
       let bufferAfter = config.defaultBufferTime
 
@@ -49,7 +73,7 @@ export const validateConflicts =
         bufferAfter,
         bufferBefore,
         endTime: new Date(item.endTime),
-        excludeReservationId: operation === 'update' ? originalDoc?.id : undefined,
+        excludeReservationId: isUpdate ? originalDoc?.id : undefined,
         guestCount: item.guestCount,
         payload: req.payload,
         req,

@@ -73,13 +73,13 @@ export const calculateEndTime =
             ],
           })
         }
-        // Validate customer-provided endTime (computeEndTime returns it back)
-        computeEndTime({
-          durationType: 'flexible',
-          endTime: new Date(merged.endTime as string),
-          serviceDuration: service.duration as number,
-          startTime: startDate,
-        })
+        // An inverted window would be invisible to overlap queries — reject it
+        // (computeEndTime performs no validation for flexible durations).
+        if (new Date(merged.endTime as string) <= startDate) {
+          throw new ValidationError({
+            errors: [{ message: 'endTime must be after startTime', path: 'endTime' }],
+          })
+        }
       } else {
         const result = computeEndTime({
           durationType,
@@ -89,9 +89,11 @@ export const calculateEndTime =
         data.endTime = result.endTime.toISOString()
       }
     } else {
-      // Multi-resource: only recompute when the patch itself carries items[].
-      // Rewriting originalDoc's items from a partial patch is multi-item span
-      // territory (review A4) and out of scope here.
+      // Multi-resource: recompute only when the patch carries items[]. In
+      // practice Payload backfills items from originalDoc on API updates, so
+      // this guard mainly protects direct programmatic invocation; the
+      // schedulingFieldsChanged gate above is the real skip for benign edits.
+      // Rewriting items from a partial patch is A4 territory and out of scope.
       if (isUpdate && !data.items) {
         return data
       }
