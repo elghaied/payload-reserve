@@ -1,5 +1,0 @@
----
-'payload-reserve': minor
----
-
-Add a plugin-level `timezone` option (IANA name, default `'UTC'`) that governs all schedule resolution: what `HH:mm` schedule times mean, which calendar day a `date=YYYY-MM-DD` query refers to, exception-day matching, and full-day booking boundaries. Previously, day resolution mixed server-local and UTC semantics — on non-UTC servers the slots API could resolve the wrong calendar day entirely, and the admin availability grid could disagree with the booking API about which day an exception blocks. All server-side day math now runs in the configured business timezone via the built-in Intl API (no new dependency). With the default `'UTC'` on a UTC server, behavior is unchanged. The `Resource.timezone` field is deprecated (it was never read) in favor of the plugin option. `resolveScheduleForDate` and `isExceptionDate` now accept an optional timezone argument and a `YYYY-MM-DD` day-key string in place of a `Date`; `getAvailableSlots` and `buildResourceAvailability` accept/require a timezone; the timezone is exposed to admin components via `config.admin.custom.reservationTimezone`.
