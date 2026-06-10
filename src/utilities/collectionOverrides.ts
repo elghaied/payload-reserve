@@ -23,8 +23,11 @@ export function applyCollectionOverride(
     return collection
   }
 
-  // Pull out the specially-handled keys; the rest shallow-merges.
-  const { slug: _ignoredSlug, access, fields, hooks, ...rest } = override
+  // Pull out the specially-handled keys; the rest shallow-merges. `slug` is
+  // omitted from CollectionOverride's type, but strip it defensively in case a
+  // caller cast around the type — the `slugs` option owns slugs.
+  const { access, fields, hooks, ...rest } = override
+  delete (rest as { slug?: unknown }).slug
 
   const mergedFields = fields ? fields({ defaultFields: collection.fields }) : collection.fields
 

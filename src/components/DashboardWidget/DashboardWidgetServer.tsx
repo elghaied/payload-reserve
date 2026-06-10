@@ -1,4 +1,4 @@
-import type { WidgetServerProps } from 'payload'
+import type { Where, WidgetServerProps } from 'payload'
 
 import type { PluginT } from '../../translations/index.js'
 import type { StatusMachineConfig } from '../../types.js'
@@ -50,7 +50,7 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
   const startOfDay = combineDayKeyAndTime(todayKey, '00:00', reservationTimezone)
   const endOfDay = combineDayKeyAndTime(addDaysToDayKey(todayKey, 1), '00:00', reservationTimezone)
 
-  const where: Parameters<typeof payload.find>[0]['where'] = {
+  const where: Where = {
     startTime: {
       greater_than_equal: startOfDay.toISOString(),
       less_than: endOfDay.toISOString(),
@@ -64,8 +64,7 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
   // so they stay accurate past 100 reservations/day (review D7).
   const blocking = Array.from(blockingSet)
   const terminalArr = Array.from(terminalSet)
-  const countWhere = (extra?: Record<string, unknown>): Record<string, unknown> =>
-    extra ? { and: [where, extra] } : where
+  const countWhere = (extra?: Where): Where => (extra ? { and: [where, extra] } : where)
 
   const [total, active, terminal, upcoming, nextResult] = await Promise.all([
     payload.count({ collection: slugs.reservations, where }).then((r) => r.totalDocs),
