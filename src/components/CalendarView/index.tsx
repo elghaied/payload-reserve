@@ -9,7 +9,7 @@ import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { statusToI18nKey } from '../../utilities/i18nUtils.js'
-import { localDayKey } from '../../utilities/slotUtils.js'
+import { getDayKeyInTimezone, getHourInTimezone } from '../../utilities/timezoneUtils.js'
 import { useTenantFilter } from '../../utilities/useTenantFilter.js'
 import styles from './CalendarView.module.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
@@ -74,6 +74,11 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const resourceSlug = slugs?.resources ?? 'resources'
   const reservationTenantParams = useTenantFilter(reservationSlug)
   const resourceTenantParams = useTenantFilter(resourceSlug)
+
+  const reservationTimezone =
+    ((config.admin?.custom as Record<string, unknown> | undefined)?.reservationTimezone as
+      | string
+      | undefined) ?? 'UTC'
 
   const statusMachine = config.admin?.custom?.reservationStatusMachine as
     | {
@@ -549,6 +554,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     const time = new Date(r.startTime).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: reservationTimezone,
     })
     const serviceName = getResName(r.service)
     if (compact) {
@@ -576,9 +582,14 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     const startStr = new Date(r.startTime).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: reservationTimezone,
     })
     const endStr = r.endTime
-      ? new Date(r.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      ? new Date(r.endTime).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: reservationTimezone,
+        })
       : '?'
     const customerName = getCustomerName(r.customer) || t('reservation:calendarUnknownCustomer')
     const resourceNames = getResourceNames(r)
@@ -673,7 +684,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     }
 
     const today = new Date()
-    const todayStr = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`
+    const todayStr = getDayKeyInTimezone(today, reservationTimezone)
 
     return (
       <div className={styles.monthGrid}>
@@ -691,16 +702,13 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           </div>
         ))}
         {days.map((day, i) => {
-          const dayStr = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`
-          const isToday = dayStr === todayStr
-          const isOtherMonth = day.getMonth() !== currentDate.getMonth()
+          const dayKey = getDayKeyInTimezone(day, reservationTimezone)
+          const isToday = dayKey === todayStr
+          const isOtherMonth =
+            dayKey.slice(0, 7) !== getDayKeyInTimezone(currentDate, reservationTimezone).slice(0, 7)
           const dayReservations = filteredReservations.filter((r) => {
-            const rDate = new Date(r.startTime)
-            return (
-              rDate.getFullYear() === day.getFullYear() &&
-              rDate.getMonth() === day.getMonth() &&
-              rDate.getDate() === day.getDate()
-            )
+            const rKey = getDayKeyInTimezone(new Date(r.startTime), reservationTimezone)
+            return rKey === dayKey
           })
 
           const clickDate = new Date(day)
@@ -751,7 +759,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     const daySlotMaps = availability
       ? new Map(
           weekDays.map((day) => {
-            const isoDay = localDayKey(day)
+            const isoDay = getDayKeyInTimezone(day, reservationTimezone)
             const dayAvail = availability.days.find((d) => d.date === isoDay)
             const dayStart = new Date(day)
             dayStart.setHours(gridStartHour, 0, 0, 0)
@@ -782,7 +790,12 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         <div className={styles.dayHeader} />
         {weekDays.map((d, i) => (
           <div className={styles.dayHeader} key={i}>
-            {d.toLocaleDateString([], { day: 'numeric', month: 'numeric', weekday: 'short' })}
+            {d.toLocaleDateString([], {
+              day: 'numeric',
+              month: 'numeric',
+              timeZone: reservationTimezone,
+              weekday: 'short',
+            })}
           </div>
         ))}
         {hours.map((hour) => (
@@ -791,20 +804,18 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               {hour.toString().padStart(2, '0')}:00
             </div>
             {weekDays.map((day, di) => {
+              const isoDay = getDayKeyInTimezone(day, reservationTimezone)
               const cellReservations = filteredReservations.filter((r) => {
                 const rDate = new Date(r.startTime)
                 return (
-                  rDate.getFullYear() === day.getFullYear() &&
-                  rDate.getMonth() === day.getMonth() &&
-                  rDate.getDate() === day.getDate() &&
-                  rDate.getHours() === hour
+                  getDayKeyInTimezone(rDate, reservationTimezone) === isoDay &&
+                  getHourInTimezone(rDate, reservationTimezone) === hour
                 )
               })
               const clickDate = new Date(day)
               clickDate.setHours(hour, 0, 0, 0)
 
               // Slot state (only when a resource is selected)
-              const isoDay = localDayKey(day)
               const slotMap = daySlotMaps?.get(isoDay)
               const slotInfo = slotMap?.get(clickDate.toISOString()) ?? null
 
@@ -891,9 +902,10 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     const gridStep = 60
 
     // Build slot-state map for the current day when a resource is selected
+    const currentDayKey = getDayKeyInTimezone(currentDate, reservationTimezone)
     let daySlotMap: Map<string, SlotInfo> | null = null
     if (availability) {
-      const isoDay = localDayKey(currentDate)
+      const isoDay = currentDayKey
       const dayAvail = availability.days.find((d) => d.date === isoDay)
       const dayStart = new Date(currentDate)
       dayStart.setHours(gridStartHour, 0, 0, 0)
@@ -921,10 +933,8 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           const hourReservations = filteredReservations.filter((r) => {
             const rDate = new Date(r.startTime)
             return (
-              rDate.getFullYear() === currentDate.getFullYear() &&
-              rDate.getMonth() === currentDate.getMonth() &&
-              rDate.getDate() === currentDate.getDate() &&
-              rDate.getHours() === hour
+              getDayKeyInTimezone(rDate, reservationTimezone) === currentDayKey &&
+              getHourInTimezone(rDate, reservationTimezone) === hour
             )
           })
           const clickDate = new Date(currentDate)
@@ -952,8 +962,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           }
 
           // Time-off label
-          const isoDay = localDayKey(currentDate)
-          const dayAvail = availability?.days.find((d) => d.date === isoDay)
+          const dayAvail = availability?.days.find((d) => d.date === currentDayKey)
           const timeOffEntry =
             slotInfo?.state === 'time-off'
               ? dayAvail?.timeOff.find(
@@ -1046,6 +1055,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         hour: '2-digit',
         minute: '2-digit',
         month: 'short',
+        timeZone: reservationTimezone,
         year: 'numeric',
       })
     }
@@ -1171,15 +1181,16 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
       const endOfWeek = new Date(startOfWeek)
       endOfWeek.setDate(endOfWeek.getDate() + 6)
-      return `${startOfWeek.toLocaleDateString([], { day: 'numeric', month: 'short' })} - ${endOfWeek.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}`
+      return `${startOfWeek.toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: reservationTimezone })} - ${endOfWeek.toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: reservationTimezone, year: 'numeric' })}`
     }
     return currentDate.toLocaleDateString([], {
       day: 'numeric',
       month: 'long',
+      timeZone: reservationTimezone,
       weekday: 'long',
       year: 'numeric',
     })
-  }, [currentDate, viewMode])
+  }, [currentDate, reservationTimezone, viewMode])
 
   const handleDrawerSave = useCallback(() => {
     void fetchReservations()
