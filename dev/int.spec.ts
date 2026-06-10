@@ -3680,3 +3680,51 @@ describe('Reservation plugin - multi-tenant config', () => {
     })
   })
 })
+
+describe('Reservation plugin - partial updates (review A1)', () => {
+  test('PATCH startTime recomputes endTime from the service duration', async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: {
+        name: 'A1 Recompute Service',
+        active: true,
+        bufferTimeAfter: 0,
+        bufferTimeBefore: 0,
+        duration: 60,
+      },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'A1 Recompute Resource', active: true, services: [service.id] },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'a1-recompute@example.com',
+        firstName: 'A1',
+        lastName: 'Recompute',
+        password: 'testpass123',
+      },
+    })
+
+    const reservation = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: '2025-08-02T09:00:00.000Z',
+        status: 'pending',
+      },
+    })
+    expect(new Date(reservation.endTime as string).toISOString()).toBe('2025-08-02T10:00:00.000Z')
+
+    // Partial update: only startTime. endTime must follow (today it stays stale).
+    const updated = await payload.update({
+      id: reservation.id,
+      collection: col('reservations'),
+      data: { startTime: '2025-08-02T13:00:00.000Z' },
+    })
+    expect(new Date(updated.endTime as string).toISOString()).toBe('2025-08-02T14:00:00.000Z')
+  })
+})

@@ -51,7 +51,8 @@ function itemsEqual(a: unknown, b: unknown): boolean {
       normalizeRelationship(itemA.service) === normalizeRelationship(itemB.service) &&
       normalizeDate(itemA.startTime) === normalizeDate(itemB.startTime) &&
       normalizeDate(itemA.endTime) === normalizeDate(itemB.endTime) &&
-      ((itemA.guestCount ?? null) as null | number) === ((itemB.guestCount ?? null) as null | number)
+      ((itemA.guestCount ?? null) as null | number) ===
+        ((itemB.guestCount ?? null) as null | number)
     )
   })
 }
