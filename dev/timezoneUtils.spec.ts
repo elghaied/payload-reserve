@@ -121,3 +121,46 @@ describe('addDaysToDayKey', () => {
     expect(addDaysToDayKey('2026-03-29', 1)).toBe('2026-03-30')
   })
 })
+
+describe('pathological zones and input validation (review regression tests)', () => {
+  it('handles half-hour and 45-minute offsets', () => {
+    expect(combineDayKeyAndTime('2026-06-10', '09:00', 'Asia/Kolkata').toISOString()).toBe(
+      '2026-06-10T03:30:00.000Z',
+    )
+    expect(combineDayKeyAndTime('2026-06-10', '09:00', 'Asia/Kathmandu').toISOString()).toBe(
+      '2026-06-10T03:15:00.000Z',
+    )
+    expect(combineDayKeyAndTime('2026-06-10', '09:00', 'Australia/Eucla').toISOString()).toBe(
+      '2026-06-10T00:15:00.000Z',
+    )
+  })
+
+  it('handles Lord Howe (30-minute DST shift)', () => {
+    // January = DST (+11), June = standard (+10:30)
+    expect(combineDayKeyAndTime('2026-01-10', '09:00', 'Australia/Lord_Howe').toISOString()).toBe(
+      '2026-01-09T22:00:00.000Z',
+    )
+    expect(combineDayKeyAndTime('2026-06-10', '09:00', 'Australia/Lord_Howe').toISOString()).toBe(
+      '2026-06-09T22:30:00.000Z',
+    )
+  })
+
+  it('rejects malformed time strings instead of rolling over', () => {
+    expect(() => combineDayKeyAndTime('2026-06-10', '25:99', 'UTC')).toThrow(/Invalid time "25:99"/)
+    expect(() => combineDayKeyAndTime('2026-06-10', 'abc', 'UTC')).toThrow(/Invalid time/)
+    expect(() => combineDayKeyAndTime('2026-06-10', '', 'UTC')).toThrow(/Invalid time/)
+  })
+
+  it('rejects malformed day keys in all day-key functions', () => {
+    expect(() => combineDayKeyAndTime('garbage', '09:00', 'UTC')).toThrow(/Invalid day key/)
+    expect(() => getDayOfWeekFromDayKey('garbage')).toThrow(/Invalid day key/)
+    expect(() => addDaysToDayKey('garbage', 1)).toThrow(/Invalid day key/)
+  })
+
+  it('formatter caching returns consistent results across repeated calls', () => {
+    const a = getDayKeyInTimezone(new Date('2026-06-10T23:30:00.000Z'), 'Pacific/Kiritimati')
+    const b = getDayKeyInTimezone(new Date('2026-06-10T23:30:00.000Z'), 'Pacific/Kiritimati')
+    expect(a).toBe(b)
+    expect(a).toBe('2026-06-11')
+  })
+})

@@ -4,6 +4,43 @@ const DAY_BY_UTC_INDEX: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri',
 
 const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
 
+const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+
+const dayKeyFormatters = new Map<string, Intl.DateTimeFormat>()
+const wallClockFormatters = new Map<string, Intl.DateTimeFormat>()
+
+function getDayKeyFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = dayKeyFormatters.get(timeZone)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      day: '2-digit',
+      month: '2-digit',
+      timeZone,
+      year: 'numeric',
+    })
+    dayKeyFormatters.set(timeZone, formatter)
+  }
+  return formatter
+}
+
+function getWallClockFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = wallClockFormatters.get(timeZone)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+      minute: '2-digit',
+      month: '2-digit',
+      second: '2-digit',
+      timeZone,
+      year: 'numeric',
+    })
+    wallClockFormatters.set(timeZone, formatter)
+  }
+  return formatter
+}
+
 /**
  * Throws when the given string is not a valid IANA timezone name.
  */
@@ -22,18 +59,16 @@ export function validateTimezone(timeZone: string): void {
  * en-CA locale formats dates as YYYY-MM-DD natively.
  */
 export function getDayKeyInTimezone(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone,
-    year: 'numeric',
-  }).format(date)
+  return getDayKeyFormatter(timeZone).format(date)
 }
 
 /**
  * Day of week for a calendar date — TZ-independent pure calendar math.
  */
 export function getDayOfWeekFromDayKey(dayKey: string): DayOfWeek {
+  if (!DAY_KEY_RE.test(dayKey)) {
+    throw new Error(`Invalid day key "${dayKey}" — expected YYYY-MM-DD`)
+  }
   return DAY_BY_UTC_INDEX[new Date(`${dayKey}T00:00:00Z`).getUTCDay()]
 }
 
@@ -42,16 +77,7 @@ export function getDayOfWeekFromDayKey(dayKey: string): DayOfWeek {
  * UTC timestamp — the difference to the instant is the zone's offset.
  */
 function offsetMs(timeZone: string, utcDate: Date): number {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    day: '2-digit',
-    hour: '2-digit',
-    hourCycle: 'h23',
-    minute: '2-digit',
-    month: '2-digit',
-    second: '2-digit',
-    timeZone,
-    year: 'numeric',
-  }).formatToParts(utcDate)
+  const parts = getWallClockFormatter(timeZone).formatToParts(utcDate)
   const get = (type: string): number =>
     Number(parts.find((p) => p.type === type)?.value ?? '0')
   const asUTC = Date.UTC(
@@ -67,13 +93,17 @@ function offsetMs(timeZone: string, utcDate: Date): number {
 
 /**
  * The UTC instant of wall-clock `HH:mm` on calendar day `dayKey` in `timeZone`.
- * Two-pass offset algorithm; DST-safe. Spring-forward gap times resolve to the
- * post-transition instant; fall-back ambiguous times resolve to one consistent
- * occurrence.
+ * Two-pass offset algorithm; DST-safe. Spring-forward gap times resolve to a
+ * nearby valid instant (for midnight-gap zones like America/Santiago this can be
+ * late on the prior calendar day); fall-back ambiguous times resolve to one
+ * consistent occurrence.
  */
 export function combineDayKeyAndTime(dayKey: string, time: string, timeZone: string): Date {
   if (!DAY_KEY_RE.test(dayKey)) {
     throw new Error(`Invalid day key "${dayKey}" — expected YYYY-MM-DD`)
+  }
+  if (!TIME_RE.test(time)) {
+    throw new Error(`Invalid time "${time}" — expected HH:mm`)
   }
   const [y, mo, d] = dayKey.split('-').map(Number)
   const [h, mi] = time.split(':').map(Number)
@@ -95,6 +125,9 @@ export function endOfDayInTimezone(date: Date, timeZone: string): Date {
  * Pure calendar arithmetic on day keys — DST-proof day iteration.
  */
 export function addDaysToDayKey(dayKey: string, days: number): string {
+  if (!DAY_KEY_RE.test(dayKey)) {
+    throw new Error(`Invalid day key "${dayKey}" — expected YYYY-MM-DD`)
+  }
   const base = new Date(`${dayKey}T00:00:00Z`)
   const shifted = new Date(base.getTime() + days * 86_400_000)
   return shifted.toISOString().slice(0, 10)
