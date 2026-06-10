@@ -77,6 +77,10 @@ export const validateConflicts =
         }
       }
 
+      // Other items of this same booking on the same resource count as occupancy
+      // so two items can't double-book one resource within one create (review A5).
+      const siblingItems = items.filter((other, j) => j !== i && other.resource === item.resource)
+
       const result = await checkAvailability({
         blockingStatuses: config.statusMachine.blockingStatuses,
         bufferAfter,
@@ -89,6 +93,8 @@ export const validateConflicts =
         reservationSlug: config.slugs.reservations,
         resourceId: item.resource,
         resourceSlug: config.slugs.resources,
+        servicesSlug: config.slugs.services,
+        siblingItems,
         startTime: new Date(item.startTime),
       })
 

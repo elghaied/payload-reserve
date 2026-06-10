@@ -4243,3 +4243,265 @@ describe('Endpoint security (review B1/B2/B3/B6/B8)', () => {
     expect(resp.status).toBe(200)
   })
 })
+
+describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
+  const iso = (s: string) => s
+
+  async function mkService(name: string, extra: Record<string, unknown> = {}) {
+    return payload.create({
+      collection: col('services'),
+      data: { name, active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60, ...extra },
+    })
+  }
+  async function mkResource(name: string, extra: Record<string, unknown> = {}) {
+    return payload.create({
+      collection: col('resources'),
+      data: { name, active: true, services: [], ...extra },
+    })
+  }
+  async function mkCustomer(email: string) {
+    return payload.create({
+      collection: col('customers'),
+      data: { email, firstName: 'CD', lastName: 'Test', password: 'testpass123' },
+    })
+  }
+
+  test('A3: a neighbor service bufferTimeAfter blocks a back-to-back booking', async () => {
+    const service = await mkService('A3 After Service', { bufferTimeAfter: 30 })
+    const resource = await mkResource('A3 After Resource', { services: [service.id] })
+    const customer = await mkCustomer('a3-after@example.com')
+
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: iso('2030-09-01T10:00:00.000Z'),
+        status: 'pending',
+      },
+    })
+
+    // 11:00 is inside the existing booking's 30-min after-buffer (until 11:30)
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          customer: customer.id,
+          resource: resource.id,
+          service: service.id,
+          startTime: iso('2030-09-01T11:00:00.000Z'),
+          status: 'pending',
+        },
+      }),
+    ).rejects.toThrow()
+
+    // 11:30 clears the buffer
+    const ok = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: iso('2030-09-01T11:30:00.000Z'),
+        status: 'pending',
+      },
+    })
+    expect(ok.id).toBeDefined()
+  })
+
+  test('A4: a multi-item booking only blocks each resource for its own item window', async () => {
+    const service = await mkService('A4 Service')
+    const roomA = await mkResource('A4 Room A', { services: [service.id] })
+    const roomB = await mkResource('A4 Room B', { services: [service.id] })
+    const customer = await mkCustomer('a4@example.com')
+
+    // package: room A 09:00-10:00, room B 14:00-15:00 (top-level span 09:00-15:00)
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        items: [
+          { resource: roomA.id, service: service.id, startTime: iso('2030-09-02T09:00:00.000Z') },
+          { resource: roomB.id, service: service.id, startTime: iso('2030-09-02T14:00:00.000Z') },
+        ],
+        resource: roomA.id,
+        service: service.id,
+        startTime: iso('2030-09-02T09:00:00.000Z'),
+        status: 'pending',
+      },
+    })
+
+    // room A at 12:00 is free (its item ended 10:00) — must be allowed
+    const ok = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: roomA.id,
+        service: service.id,
+        startTime: iso('2030-09-02T12:00:00.000Z'),
+        status: 'pending',
+      },
+    })
+    expect(ok.id).toBeDefined()
+
+    // room A at 09:30 overlaps its 09:00-10:00 item — must be rejected
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          customer: customer.id,
+          resource: roomA.id,
+          service: service.id,
+          startTime: iso('2030-09-02T09:30:00.000Z'),
+          status: 'pending',
+        },
+      }),
+    ).rejects.toThrow()
+  })
+
+  test('A5: two items in one create on the same resource cannot overlap', async () => {
+    const service = await mkService('A5 Service')
+    const resource = await mkResource('A5 Resource', { services: [service.id] })
+    const customer = await mkCustomer('a5@example.com')
+
+    // both items resource R, 10:00 and 10:30, 60-min service → overlap
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          customer: customer.id,
+          items: [
+            { resource: resource.id, service: service.id, startTime: iso('2030-09-03T10:00:00.000Z') },
+            { resource: resource.id, service: service.id, startTime: iso('2030-09-03T10:30:00.000Z') },
+          ],
+          resource: resource.id,
+          service: service.id,
+          startTime: iso('2030-09-03T10:00:00.000Z'),
+          status: 'pending',
+        },
+      }),
+    ).rejects.toThrow()
+
+    // non-overlapping siblings (10:00 and 11:00) are fine
+    const ok = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        items: [
+          { resource: resource.id, service: service.id, startTime: iso('2030-09-04T10:00:00.000Z') },
+          { resource: resource.id, service: service.id, startTime: iso('2030-09-04T11:00:00.000Z') },
+        ],
+        resource: resource.id,
+        service: service.id,
+        startTime: iso('2030-09-04T10:00:00.000Z'),
+        status: 'pending',
+      },
+    })
+    expect(ok.id).toBeDefined()
+  })
+
+  test('A5: overlapping siblings allowed when resource quantity covers them', async () => {
+    const service = await mkService('A5 Qty Service')
+    const resource = await mkResource('A5 Qty Resource', {
+      capacityMode: 'per-reservation',
+      quantity: 2,
+      services: [service.id],
+    })
+    const customer = await mkCustomer('a5-qty@example.com')
+
+    const ok = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        items: [
+          { resource: resource.id, service: service.id, startTime: iso('2030-09-05T10:00:00.000Z') },
+          { resource: resource.id, service: service.id, startTime: iso('2030-09-05T10:30:00.000Z') },
+        ],
+        resource: resource.id,
+        service: service.id,
+        startTime: iso('2030-09-05T10:00:00.000Z'),
+        status: 'pending',
+      },
+    })
+    expect(ok.id).toBeDefined()
+  })
+
+  test('back-to-back zero-buffer bookings are still allowed (regression)', async () => {
+    const service = await mkService('B2B Service')
+    const resource = await mkResource('B2B Resource', { services: [service.id] })
+    const customer = await mkCustomer('b2b-cd@example.com')
+
+    await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: iso('2030-09-06T10:00:00.000Z'),
+        status: 'pending',
+      },
+    })
+    const ok = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customer.id,
+        resource: resource.id,
+        service: service.id,
+        startTime: iso('2030-09-06T11:00:00.000Z'),
+        status: 'pending',
+      },
+    })
+    expect(ok.id).toBeDefined()
+  })
+
+  test('A11: an exception on one of a resource’s schedules blocks the whole resource that day', async () => {
+    const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
+    const service = await mkService('A11 Service')
+    const resource = await mkResource('A11 Resource', { services: [service.id] })
+
+    // recurring weekday schedule
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'A11 Recurring',
+        active: true,
+        recurringSlots: [{ day: 'wed', endTime: '17:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+    // separate schedule carrying a vacation exception for one Wednesday
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'A11 Exception Holder',
+        active: true,
+        exceptions: [{ date: '2030-09-11T00:00:00.000Z', type: 'vacation' }],
+        recurringSlots: [{ day: 'wed', endTime: '17:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+
+    const base = {
+      blockingStatuses: ['pending', 'confirmed'],
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: service.id,
+      serviceSlug: 'services',
+    }
+
+    // 2030-09-11 is a Wednesday AND the exception day → no slots
+    const blocked = await getAvailableSlots({ ...base, date: '2030-09-11' })
+    expect(blocked).toHaveLength(0)
+
+    // the following Wednesday is open
+    const open = await getAvailableSlots({ ...base, date: '2030-09-18' })
+    expect(open.length).toBeGreaterThan(0)
+  })
+})

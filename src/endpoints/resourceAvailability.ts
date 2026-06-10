@@ -117,32 +117,44 @@ export async function buildResourceAvailability(params: {
     const shiftWindows: DayAvailability['shiftWindows'] = []
     const timeOff: DayAvailability['timeOff'] = []
 
+    // A11: an exception on ANY of the resource's schedules makes the whole
+    // resource unavailable that day. Find the first matching exception (if any)
+    // — it suppresses all shift windows and marks the full day as time-off.
+    let dayException: RawException | undefined
     for (const sched of schedules as Array<Record<string, unknown>>) {
-      // resolveScheduleForDate accepts a Schedule-shaped object; cast through unknown
-      const ranges = resolveScheduleForDate(
-        sched as unknown as Parameters<typeof resolveScheduleForDate>[0],
-        date,
-        timeZone,
-      )
-      for (const r of ranges) {
-        shiftWindows.push({ end: r.end.toISOString(), start: r.start.toISOString() })
-      }
-
       const exceptions = (sched.exceptions as RawException[] | undefined) ?? []
       for (const exc of exceptions) {
         const excStart = getDayKeyInTimezone(new Date(exc.date), timeZone)
         const excEnd = exc.endDate ? getDayKeyInTimezone(new Date(exc.endDate), timeZone) : excStart
         if (date >= excStart && date <= excEnd) {
-          const dayStart = combineDayKeyAndTime(date, '00:00', timeZone)
-          const dayEnd = new Date(
-            combineDayKeyAndTime(date, '23:59', timeZone).getTime() + 59_999,
-          )
-          timeOff.push({
-            type: exc.type,
-            end: dayEnd.toISOString(),
-            reason: exc.reason,
-            start: dayStart.toISOString(),
-          })
+          dayException = exc
+          break
+        }
+      }
+      if (dayException) {
+        break
+      }
+    }
+
+    if (dayException) {
+      const dayStart = combineDayKeyAndTime(date, '00:00', timeZone)
+      const dayEnd = new Date(combineDayKeyAndTime(date, '23:59', timeZone).getTime() + 59_999)
+      timeOff.push({
+        type: dayException.type,
+        end: dayEnd.toISOString(),
+        reason: dayException.reason,
+        start: dayStart.toISOString(),
+      })
+    } else {
+      for (const sched of schedules as Array<Record<string, unknown>>) {
+        // resolveScheduleForDate accepts a Schedule-shaped object; cast through unknown
+        const ranges = resolveScheduleForDate(
+          sched as unknown as Parameters<typeof resolveScheduleForDate>[0],
+          date,
+          timeZone,
+        )
+        for (const r of ranges) {
+          shiftWindows.push({ end: r.end.toISOString(), start: r.start.toISOString() })
         }
       }
     }

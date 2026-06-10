@@ -2,9 +2,24 @@ import type { Payload, PayloadRequest, Where } from 'payload'
 
 import type { CapacityMode, DurationType, StatusMachineConfig } from '../types.js'
 
-import { resolveScheduleForDate } from '../utilities/scheduleUtils.js'
-import { addMinutes, computeBlockedWindow, intersectIntervals } from '../utilities/slotUtils.js'
+import type { ResolvedItem } from '../utilities/resolveReservationItems.js'
+
+import { resolveReservationItems } from '../utilities/resolveReservationItems.js'
+import { isExceptionDate, resolveScheduleForDate } from '../utilities/scheduleUtils.js'
+import {
+  addMinutes,
+  computeBlockedWindow,
+  doRangesOverlap,
+  intersectIntervals,
+} from '../utilities/slotUtils.js'
 import { endOfDayInTimezone } from '../utilities/timezoneUtils.js'
+
+/** A window during which a resource is occupied, expanded by buffer times. */
+export type Occupancy = { blockedEnd: Date; blockedStart: Date; units: number }
+
+/** Coarse pre-filter widen: covers any realistic neighbor buffer (buffers are
+ * minutes). The precise per-item overlap check runs in memory afterwards. */
+const COARSE_MARGIN_MS = 24 * 60 * 60 * 1000
 
 // --- Pure functions (no DB) ---
 
@@ -64,6 +79,94 @@ export function buildOverlapQuery(params: {
   return { and: conditions }
 }
 
+/**
+ * Coarse superset query: blocking reservations whose top-level (span) window
+ * comes within COARSE_MARGIN_MS of the candidate window and reference the
+ * resource at top level or in items[]. The precise per-item overlap is computed
+ * in memory afterwards — the top-level span is a superset of every item's
+ * window, so this never misses a real conflict (margin covers neighbor buffers).
+ */
+export function buildCoarseOverlapQuery(params: {
+  blockingStatuses: string[]
+  candidateEnd: Date
+  candidateStart: Date
+  excludeReservationId?: number | string
+  resourceId: number | string
+}): Where {
+  const { blockingStatuses, candidateEnd, candidateStart, excludeReservationId, resourceId } =
+    params
+  const windowStart = new Date(candidateStart.getTime() - COARSE_MARGIN_MS)
+  const windowEnd = new Date(candidateEnd.getTime() + COARSE_MARGIN_MS)
+
+  const conditions: Where[] = [
+    { status: { in: blockingStatuses } },
+    { startTime: { less_than: windowEnd.toISOString() } },
+    { endTime: { greater_than: windowStart.toISOString() } },
+    {
+      or: [{ resource: { equals: resourceId } }, { 'items.resource': { equals: resourceId } }],
+    },
+  ]
+
+  if (excludeReservationId) {
+    conditions.push({ id: { not_equals: excludeReservationId } })
+  }
+
+  return { and: conditions }
+}
+
+/**
+ * The occupancy windows a set of resolved items imposes on `resourceId`. Each
+ * matching item's [startTime, endTime) is expanded by that item's own service
+ * buffers (so neighbor buffers are enforced — review A3), and only the items
+ * that actually reference `resourceId` count (so a multi-resource booking blocks
+ * each resource only for its own item's window — review A4).
+ */
+export async function itemsToOccupancies(params: {
+  bufferFor: (serviceId: number | string | undefined) => Promise<{ after: number; before: number }>
+  capacityMode: CapacityMode
+  items: ResolvedItem[]
+  resourceId: number | string
+}): Promise<Occupancy[]> {
+  const { bufferFor, capacityMode, items, resourceId } = params
+  const occupancies: Occupancy[] = []
+
+  for (const item of items) {
+    if (String(item.resource) !== String(resourceId) || !item.endTime) {
+      continue
+    }
+    const { after, before } = await bufferFor(item.service)
+    const { effectiveEnd, effectiveStart } = computeBlockedWindow(
+      new Date(item.startTime),
+      new Date(item.endTime),
+      before,
+      after,
+    )
+    occupancies.push({
+      blockedEnd: effectiveEnd,
+      blockedStart: effectiveStart,
+      units: capacityMode === 'per-guest' ? item.guestCount : 1,
+    })
+  }
+
+  return occupancies
+}
+
+/** Occupancy a single fetched reservation imposes on `resourceId`. */
+export async function reservationOccupancies(params: {
+  bufferFor: (serviceId: number | string | undefined) => Promise<{ after: number; before: number }>
+  capacityMode: CapacityMode
+  reservation: Record<string, unknown>
+  resourceId: number | string
+}): Promise<Occupancy[]> {
+  const { bufferFor, capacityMode, reservation, resourceId } = params
+  return itemsToOccupancies({
+    bufferFor,
+    capacityMode,
+    items: resolveReservationItems(reservation),
+    resourceId,
+  })
+}
+
 export function isBlockingStatus(
   status: string,
   statusMachine: StatusMachineConfig,
@@ -103,6 +206,9 @@ export async function checkAvailability(params: {
   reservationSlug: string
   resourceId: number | string
   resourceSlug: string
+  servicesSlug: string
+  /** Other items from the same booking — counted as occupancy (review A5). */
+  siblingItems?: ResolvedItem[]
   startTime: Date
 }): Promise<{
   available: boolean
@@ -122,6 +228,8 @@ export async function checkAvailability(params: {
     reservationSlug,
     resourceId,
     resourceSlug,
+    servicesSlug,
+    siblingItems,
     startTime,
   } = params
 
@@ -136,59 +244,100 @@ export async function checkAvailability(params: {
   const quantity = (resource.quantity as number) ?? 1
   const capacityMode = ((resource.capacityMode as string) ?? 'per-reservation') as CapacityMode
 
-  // Compute effective window with buffers
-  const { effectiveEnd, effectiveStart } = computeBlockedWindow(
+  // Candidate window expanded by its own buffers
+  const { effectiveEnd: candidateEnd, effectiveStart: candidateStart } = computeBlockedWindow(
     startTime,
     endTime,
     bufferBefore,
     bufferAfter,
   )
 
-  // Build overlap query
-  const where = buildOverlapQuery({
-    blockingStatuses,
-    effectiveEnd,
-    effectiveStart,
-    excludeReservationId,
-    resourceId,
+  // Coarse superset fetch — precise per-item overlap is computed in memory below
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { docs } = await (payload.find as any)({
+    collection: reservationSlug,
+    depth: 0,
+    limit: 0,
+    req,
+    where: buildCoarseOverlapQuery({
+      blockingStatuses,
+      candidateEnd,
+      candidateStart,
+      excludeReservationId,
+      resourceId,
+    }),
   })
 
-  if (capacityMode === 'per-guest') {
-    // Must fetch docs to sum guestCount
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { docs } = await (payload.find as any)({
-      collection: reservationSlug,
-      depth: 0,
-      limit: 0,
-      req,
-      select: { guestCount: true },
-      where,
-    })
-    const currentGuests = docs.reduce(
-      (sum: number, doc: Record<string, unknown>) => sum + ((doc.guestCount as number) ?? 1),
-      0,
-    )
-    return {
-      available: currentGuests + guestCount <= quantity,
-      currentCount: currentGuests,
-      reason:
-        currentGuests + guestCount > quantity ? 'Guest capacity exceeded' : undefined,
-      totalCapacity: quantity,
+  // Per-call cache: fetch each distinct service's buffers at most once
+  const bufferCache = new Map<string, { after: number; before: number }>()
+  const bufferFor = async (
+    serviceId: number | string | undefined,
+  ): Promise<{ after: number; before: number }> => {
+    const key = serviceId === undefined ? '' : String(serviceId)
+    const cached = bufferCache.get(key)
+    if (cached) {
+      return cached
     }
+    let result = { after: 0, before: 0 }
+    if (serviceId !== undefined) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const service = await (payload.findByID as any)({
+          id: serviceId,
+          collection: servicesSlug,
+          depth: 0,
+          req,
+        })
+        if (service) {
+          result = {
+            after: (service.bufferTimeAfter as number) ?? 0,
+            before: (service.bufferTimeBefore as number) ?? 0,
+          }
+        }
+      } catch {
+        // service missing — no buffers
+      }
+    }
+    bufferCache.set(key, result)
+    return result
   }
 
-  // per-reservation mode: count is sufficient
-  // TODO: batch queries — linear per-item cost acceptable for 2-5 items
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { totalDocs } = await (payload.count as any)({
-    collection: reservationSlug,
-    req,
-    where,
-  })
+  const fetchedOccupancies = (
+    await Promise.all(
+      (docs as Array<Record<string, unknown>>).map((doc) =>
+        reservationOccupancies({ bufferFor, capacityMode, reservation: doc, resourceId }),
+      ),
+    )
+  ).flat()
+
+  // Sibling items from the same booking (review A5) — expanded with the same
+  // per-service buffers and capacity mode.
+  const siblingOccupancies = siblingItems
+    ? await itemsToOccupancies({ bufferFor, capacityMode, items: siblingItems, resourceId })
+    : []
+
+  const occupancies = [...fetchedOccupancies, ...siblingOccupancies]
+
+  // Sum the units of every occupancy whose buffered window overlaps the candidate
+  const currentUnits = occupancies.reduce(
+    (sum, occ) =>
+      doRangesOverlap(candidateStart, candidateEnd, occ.blockedStart, occ.blockedEnd)
+        ? sum + occ.units
+        : sum,
+    0,
+  )
+
+  const candidateUnits = capacityMode === 'per-guest' ? guestCount : 1
+  const available = currentUnits + candidateUnits <= quantity
+
   return {
-    available: totalDocs + 1 <= quantity,
-    currentCount: totalDocs,
-    reason: totalDocs + 1 > quantity ? 'All units are booked for this time' : undefined,
+    available,
+    currentCount: currentUnits,
+    reason: available
+      ? undefined
+      : capacityMode === 'per-guest'
+        ? 'Guest capacity exceeded'
+        : 'All units are booked for this time',
     totalCapacity: quantity,
   }
 }
@@ -268,6 +417,19 @@ export async function getAvailableSlots(params: {
     if (!schedules || schedules.length === 0) {
       continue
     }
+    // A11: an exception on ANY of the resource's schedules makes the whole
+    // resource unavailable that day — not just the schedule it's recorded on.
+    const exceptedToday = (schedules as Array<Record<string, unknown>>).some((s) =>
+      isExceptionDate(
+        date,
+        (s.exceptions as Array<{ date: string; endDate?: string }> | undefined) ?? [],
+        tz,
+      ),
+    )
+    if (exceptedToday) {
+      scheduleBearingWindowLists.push([])
+      continue
+    }
     const windows: Array<{ end: Date; start: Date }> = []
     for (const schedule of schedules) {
       windows.push(
@@ -327,6 +489,7 @@ export async function getAvailableSlots(params: {
         reservationSlug,
         resourceId: rid,
         resourceSlug,
+        servicesSlug: serviceSlug,
         startTime: start,
       })
       if (!result.available) {

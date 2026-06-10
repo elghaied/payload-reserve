@@ -1,0 +1,5 @@
+---
+'payload-reserve': minor
+---
+
+Fix conflict detection for buffers, multi-resource bookings, and same-booking items. Conflict checks now fetch the blocking reservations near the candidate window and compute each one's true occupancy of the target resource, instead of a single time-window count. As a result: a service's `bufferTimeBefore`/`bufferTimeAfter` is now enforced against *neighboring* reservations (previously only the candidate's own buffer was applied, so a back-to-back booking slipped past a cleanup buffer); a multi-resource booking blocks each resource only for that resource's item window rather than the whole span of the booking (a `[room 9–10, sauna 14–15]` package no longer makes the room look busy 9–15); two items in the same booking that target the same resource are now checked against each other; and per-guest capacity sums the matched item's `guestCount`. An exception (time-off) on any of a resource's schedules now makes the whole resource unavailable that day — both in availability/slot results and the admin availability grid — matching the documented behavior (previously it only blanked the schedule it was recorded on).
