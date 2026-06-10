@@ -219,6 +219,10 @@ const buildConfigWithMemoryDB = async () => {
     secret: process.env.PAYLOAD_SECRET || 'test-secret_key',
     sharp,
     typescript: {
+      // Never fire-and-forget a generate:types child on boot — they outlive the
+      // parent and pin the CPU (117 orphans observed after one test session).
+      // Regenerate types explicitly via `pnpm dev:generate-types`.
+      autoGenerate: false,
       outputFile: path.resolve(dirname, 'payload-types.ts'),
     },
   })

@@ -40,6 +40,9 @@ export async function buildTimezonePayload(): Promise<{
     plugins: [payloadReserve({ timezone: 'Europe/Paris' })],
     secret: 'tz-test-secret',
     sharp,
+    typescript: {
+      autoGenerate: false,
+    },
   })
 
   const payload = await getPayload({ config })

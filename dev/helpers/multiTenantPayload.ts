@@ -63,6 +63,9 @@ export async function buildMultiTenantPayload(): Promise<{
     ],
     secret: 'mt-test-secret',
     sharp,
+    typescript: {
+      autoGenerate: false,
+    },
   })
 
   const payload = await getPayload({ config })
