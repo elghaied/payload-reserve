@@ -252,6 +252,30 @@ payloadReserve({
 
 Without this, day resolution mixes server-local and UTC semantics — on non-UTC servers the slots API can resolve the wrong calendar day. With `timezone` set, all server-side day math runs via the built-in `Intl` API (no extra dependency). `'UTC'` on a UTC server is identical to the previous behaviour. The configured timezone is exposed to admin components via `config.admin.custom.reservationTimezone`.
 
+### Collection Overrides
+
+Customize any generated collection without forking the plugin via `collectionOverrides`. Each entry is a `Partial<CollectionConfig>` (minus `fields`/`slug`) plus a `fields` function that receives the plugin's default fields:
+
+```typescript
+payloadReserve({
+  collectionOverrides: {
+    services: {
+      // append a join field back to Resources (the inverse of Resources.services)
+      fields: ({ defaultFields }) => [
+        ...defaultFields,
+        { name: 'referencedResources', type: 'join', collection: 'resources', on: 'services' },
+      ],
+    },
+    reservations: {
+      admin: { group: 'Bookings' },               // shallow-merged
+      hooks: { afterChange: [sendConfirmationEmail] }, // MERGED with the plugin's hooks
+    },
+  },
+})
+```
+
+The plugin's load-bearing behavior is protected: supplied `hooks` are **merged** (the plugin's conflict-detection/status hooks always run, and run first — an override can add hooks but not remove them), `access` **composes** per operation (rules you omit keep the plugin's owner-mode/default behavior), and `slug` is ignored (use the `slugs` option). The `customers` override applies only when the standalone Customers collection is generated (ignored when `userCollection` is set — your auth collection is yours to edit directly). `collectionOverrides` supersedes the deprecated `extraReservationFields`.
+
 ### Optional `Resource.services`
 
 The `services` relationship on Resources is now optional. This lets a freshly provisioned staff Resource exist before services are assigned, avoiding validation errors during auto-provisioning.

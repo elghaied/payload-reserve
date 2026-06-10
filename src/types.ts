@@ -142,6 +142,16 @@ export type ResolvedStaffProvisioningConfig = {
 
 // --- Plugin configuration ---
 
+/**
+ * Per-collection override applied to a generated collection. `fields` is a
+ * function receiving the plugin's default fields so you can append/reorder/
+ * replace them; supplied `hooks` are merged with (not replacing) the plugin's;
+ * `access` composes per operation; `slug` is ignored (use the `slugs` option).
+ */
+export type CollectionOverride = {
+  fields?: (args: { defaultFields: Field[] }) => Field[]
+} & Omit<Partial<CollectionConfig>, 'fields' | 'slug'>
+
 export type ReservationPluginConfig = {
   /** Override access control per collection */
   access?: {
@@ -157,11 +167,19 @@ export type ReservationPluginConfig = {
   allowGuestBooking?: boolean
   /** Hours of notice required before cancellation */
   cancellationNoticePeriod?: number
+  /** Per-collection overrides applied to the generated collections (issue #4) */
+  collectionOverrides?: {
+    customers?: CollectionOverride
+    reservations?: CollectionOverride
+    resources?: CollectionOverride
+    schedules?: CollectionOverride
+    services?: CollectionOverride
+  }
   /** Default buffer time in minutes between reservations */
   defaultBufferTime?: number
   /** Disable the plugin entirely */
   disabled?: boolean
-  /** Extra fields to append to the Reservations collection */
+  /** @deprecated Use `collectionOverrides.reservations.fields` instead. Extra fields appended to Reservations. */
   extraReservationFields?: Field[]
   /** Plugin hooks for external integrations */
   hooks?: ReservationPluginHooks
@@ -208,6 +226,13 @@ export type ResolvedReservationPluginConfig = {
   adminGroup: string
   allowGuestBooking: boolean
   cancellationNoticePeriod: number
+  collectionOverrides: {
+    customers?: CollectionOverride
+    reservations?: CollectionOverride
+    resources?: CollectionOverride
+    schedules?: CollectionOverride
+    services?: CollectionOverride
+  }
   defaultBufferTime: number
   disabled: boolean
   extraReservationFields: Field[]

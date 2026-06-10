@@ -18,6 +18,7 @@ import { createGetSlotsEndpoint } from './endpoints/getSlots.js'
 import { createResourceAvailabilityEndpoint } from './endpoints/resourceAvailability.js'
 import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
 import { type PluginT, translations } from './translations/index.js'
+import { applyCollectionOverride } from './utilities/collectionOverrides.js'
 
 export const payloadReserve =
   (pluginOptions: ReservationPluginConfig = {}) =>
@@ -116,12 +117,17 @@ export const payloadReserve =
       }
     }
 
+    const ov = resolved.collectionOverrides
     config.collections.push(
-      createServicesCollection(resolved),
-      createResourcesCollection(resolved),
-      createSchedulesCollection(resolved),
-      createReservationsCollection(resolved),
-      ...(resolved.userCollection ? [] : [createCustomersCollection(resolved)]),
+      applyCollectionOverride(createServicesCollection(resolved), ov.services),
+      applyCollectionOverride(createResourcesCollection(resolved), ov.resources),
+      applyCollectionOverride(createSchedulesCollection(resolved), ov.schedules),
+      applyCollectionOverride(createReservationsCollection(resolved), ov.reservations),
+      // The customers override applies only in standalone mode; in userCollection
+      // mode the host owns that collection and can edit it directly.
+      ...(resolved.userCollection
+        ? []
+        : [applyCollectionOverride(createCustomersCollection(resolved), ov.customers)]),
     )
 
     // C3: collections are registered (above) even when disabled so the DB schema

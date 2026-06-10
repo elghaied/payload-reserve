@@ -128,6 +128,7 @@ export function resolveConfig(
     allowGuestBooking: pluginOptions.allowGuestBooking ?? DEFAULT_ALLOW_GUEST_BOOKING,
     cancellationNoticePeriod:
       pluginOptions.cancellationNoticePeriod ?? DEFAULT_CANCELLATION_NOTICE_PERIOD,
+    collectionOverrides: pluginOptions.collectionOverrides ?? {},
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,
     extraReservationFields: pluginOptions.extraReservationFields ?? [],
