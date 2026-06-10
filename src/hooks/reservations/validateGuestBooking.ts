@@ -102,10 +102,9 @@ export const validateGuestBooking =
       }
     }
 
-    // Generate a cancellation token the host project can deliver to the guest.
-    if (!data.cancellationToken) {
-      data.cancellationToken = randomUUID()
-    }
+    // Always server-generate the cancellation token the host project delivers
+    // to the guest — never honor a caller-supplied value (it's a secret).
+    data.cancellationToken = randomUUID()
 
     return data
   }

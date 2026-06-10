@@ -136,8 +136,12 @@ export function createReservationsCollection(
         name: 'cancellationToken',
         type: 'text',
         access: {
+          // Server-generated secret: never settable via the API (the
+          // validateGuestBooking hook stamps it), readable only by staff/admin.
+          create: () => false,
           read: ({ req }) =>
             Boolean(req.user) && req.user!.collection !== config.slugs.customers,
+          update: () => false,
         },
         admin: {
           hidden: true,
