@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { resolveConfig } from '../src/defaults.js'
 import {
   addDaysToDayKey,
   combineDayKeyAndTime,
@@ -121,8 +122,6 @@ describe('addDaysToDayKey', () => {
     expect(addDaysToDayKey('2026-03-29', 1)).toBe('2026-03-30')
   })
 })
-
-import { resolveConfig } from '../src/defaults.js'
 
 describe('resolveConfig timezone option', () => {
   it('defaults to UTC', () => {
