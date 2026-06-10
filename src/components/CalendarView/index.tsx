@@ -1280,6 +1280,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   ? resources.filter((r) => r.id === selectedResourceId)
                   : resources
               }
+              timeZone={reservationTimezone}
             />
           )}
         </>

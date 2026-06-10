@@ -6,7 +6,7 @@ import type { PluginT } from '../../translations/index.js'
 import type { SlotState } from '../../utilities/computeSlotStates.js'
 
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
-import { localDayKey } from '../../utilities/slotUtils.js'
+import { getDayKeyInTimezone } from '../../utilities/timezoneUtils.js'
 import styles from './CalendarView.module.css'
 import { useResourceAvailability } from './useResourceAvailability.js'
 
@@ -27,11 +27,13 @@ function Lane({
   day,
   onBook,
   resource,
+  timeZone,
 }: {
   apiBase: string
   day: Date
   onBook: (resourceId: string, startIso: string) => void
   resource: LaneResource
+  timeZone: string
 }) {
   const { t: _t } = useTranslation()
   const t = _t as PluginT
@@ -42,7 +44,7 @@ function Lane({
   dayEnd.setHours(HOUR_END, 0, 0, 0)
 
   const { data } = useResourceAvailability(apiBase, resource.id, dayStart, dayEnd)
-  const isoDay = localDayKey(day)
+  const isoDay = getDayKeyInTimezone(day, timeZone)
   const dayAvail = data?.days.find((d) => d.date === isoDay)
 
   const slots = dayAvail
@@ -73,7 +75,11 @@ function Lane({
                   ? styles.slotFull
                   : styles.slotFree
           const isFree = s.state === 'free'
-          const slotLabel = `${s.start.toLocaleTimeString()} — ${t(SLOT_STATE_KEYS[s.state])}`
+          const slotLabel = `${s.start.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone,
+          })} — ${t(SLOT_STATE_KEYS[s.state])}`
           return isFree ? (
             <div
               aria-label={slotLabel}
@@ -108,11 +114,13 @@ export function LaneTimelineView({
   day,
   onBook,
   resources,
+  timeZone,
 }: {
   apiBase: string
   day: Date
   onBook: (resourceId: string, startIso: string) => void
   resources: LaneResource[]
+  timeZone: string
 }) {
   const { t: _t } = useTranslation()
   const t = _t as PluginT
@@ -133,7 +141,14 @@ export function LaneTimelineView({
         </div>
       </div>
       {resources.map((r) => (
-        <Lane apiBase={apiBase} day={day} key={r.id} onBook={onBook} resource={r} />
+        <Lane
+          apiBase={apiBase}
+          day={day}
+          key={r.id}
+          onBook={onBook}
+          resource={r}
+          timeZone={timeZone}
+        />
       ))}
     </div>
   )

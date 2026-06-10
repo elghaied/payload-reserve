@@ -4,6 +4,11 @@ import type { PluginT } from '../../translations/index.js'
 import type { StatusMachineConfig } from '../../types.js'
 
 import { collectionHasTenantField, readCookie, tenantWhereClause } from '../../utilities/tenantFilter.js'
+import {
+  addDaysToDayKey,
+  combineDayKeyAndTime,
+  getDayKeyInTimezone,
+} from '../../utilities/timezoneUtils.js'
 import styles from './DashboardWidget.module.css'
 
 export const DashboardWidgetServer = async (props: WidgetServerProps) => {
@@ -37,9 +42,13 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
   const blockingSet = new Set(blockingStatuses)
   const terminalSet = new Set(terminalStatuses)
 
+  // "Today" is the business timezone's calendar day, not the server's
+  const reservationTimezone: string =
+    payload.config.admin?.custom?.reservationTimezone ?? 'UTC'
   const now = new Date()
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const todayKey = getDayKeyInTimezone(now, reservationTimezone)
+  const startOfDay = combineDayKeyAndTime(todayKey, '00:00', reservationTimezone)
+  const endOfDay = combineDayKeyAndTime(addDaysToDayKey(todayKey, 1), '00:00', reservationTimezone)
 
   const where: Parameters<typeof payload.find>[0]['where'] = {
     startTime: {
@@ -111,6 +120,7 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
             {new Date(nextAppointment.startTime as string).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
+              timeZone: reservationTimezone,
             })}
           </p>
           <p>

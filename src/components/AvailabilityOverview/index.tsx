@@ -6,6 +6,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
 
+import { getDayKeyInTimezone, getDayOfWeekFromDayKey } from '../../utilities/timezoneUtils.js'
 import { useTenantFilter } from '../../utilities/useTenantFilter.js'
 import styles from './AvailabilityOverview.module.css'
 
@@ -59,6 +60,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const slugs = config.admin?.custom?.reservationSlugs
   const statusMachine = config.admin?.custom?.reservationStatusMachine
   const blockingStatuses: string[] = statusMachine?.blockingStatuses ?? ['pending', 'confirmed']
+  const reservationTimezone: string = config.admin?.custom?.reservationTimezone ?? 'UTC'
 
   const resourcesTenantParams = useTenantFilter(slugs?.resources ?? 'resources')
   const schedulesTenantParams = useTenantFilter(slugs?.schedules ?? 'schedules')
@@ -89,6 +91,8 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Cells are browser-local midnights by design; every key derived from them
+  // (day keys, weekday matching) is computed in the business timezone.
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(weekStart)
@@ -186,15 +190,15 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     const resourceSchedules = schedules.filter(
       (s) => getResourceId(s.resource) === resourceId,
     )
-    const dateStr = day.toISOString().split('T')[0]
-    const dayOfWeek = day.getDay()
+    const dateStr = getDayKeyInTimezone(day, reservationTimezone)
+    const dayOfWeek = getDayOfWeekFromDayKey(dateStr)
 
     const slots: Array<{ label: string; type: 'available' | 'exception' }> = []
 
     for (const schedule of resourceSchedules) {
       // Check for exceptions
       const exception = schedule.exceptions?.find((e) => {
-        const excDate = new Date(e.date).toISOString().split('T')[0]
+        const excDate = getDayKeyInTimezone(new Date(e.date), reservationTimezone)
         return excDate === dateStr
       })
 
@@ -208,7 +212,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
 
       if (schedule.scheduleType === 'recurring') {
         for (const slot of schedule.recurringSlots ?? []) {
-          if (DAY_MAP[slot.day] === dayOfWeek) {
+          if (slot.day === dayOfWeek) {
             slots.push({
               type: 'available',
               label: `${slot.startTime}-${slot.endTime}`,
@@ -217,7 +221,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
         }
       } else if (schedule.scheduleType === 'manual') {
         for (const slot of schedule.manualSlots ?? []) {
-          const slotDate = new Date(slot.date).toISOString().split('T')[0]
+          const slotDate = getDayKeyInTimezone(new Date(slot.date), reservationTimezone)
           if (slotDate === dateStr) {
             slots.push({
               type: 'available',
@@ -233,13 +237,11 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
 
   /** Returns all blocking-status reservations for a resource on a given day. */
   const getBookingsForResourceDay = (resourceId: string, day: Date) => {
+    const dayKey = getDayKeyInTimezone(day, reservationTimezone)
     return reservations.filter((r) => {
-      const rDate = new Date(r.startTime)
       return (
         getResourceId(r.resource) === resourceId &&
-        rDate.getFullYear() === day.getFullYear() &&
-        rDate.getMonth() === day.getMonth() &&
-        rDate.getDate() === day.getDate()
+        getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === dayKey
       )
     })
   }
@@ -252,7 +254,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     return <div className={styles.loading}>{t('reservation:availabilityLoading')}</div>
   }
 
-  const weekLabel = `${weekDays[0].toLocaleDateString([], { day: 'numeric', month: 'short' })} - ${weekDays[6].toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}`
+  const weekLabel = `${weekDays[0].toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: reservationTimezone })} - ${weekDays[6].toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: reservationTimezone, year: 'numeric' })}`
 
   const gridColumns = `150px repeat(7, 1fr)`
 
@@ -278,11 +280,14 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
         <div className={styles.grid} style={{ gridTemplateColumns: gridColumns }}>
           {/* Header row */}
           <div className={styles.headerCell}>{t('reservation:availabilityResource')}</div>
-          {weekDays.map((day, i) => (
-            <div className={styles.headerCell} key={i}>
-              {DAY_NAMES[day.getDay()]} {day.getDate()}
-            </div>
-          ))}
+          {weekDays.map((day, i) => {
+            const dayKey = getDayKeyInTimezone(day, reservationTimezone)
+            return (
+              <div className={styles.headerCell} key={i}>
+                {DAY_NAMES[DAY_MAP[getDayOfWeekFromDayKey(dayKey)]]} {Number(dayKey.slice(8, 10))}
+              </div>
+            )
+          })}
 
           {/* Resource rows */}
           {resources.map((resource) => {
@@ -339,6 +344,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
                             {new Date(b.startTime).toLocaleTimeString([], {
                               hour: '2-digit',
                               minute: '2-digit',
+                              timeZone: reservationTimezone,
                             })}{' '}
                             {t('reservation:availabilityBooked')}
                           </div>
