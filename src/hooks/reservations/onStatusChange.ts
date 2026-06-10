@@ -4,9 +4,13 @@ import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 export const onStatusChange =
   (config: ResolvedReservationPluginConfig): CollectionAfterChangeHook =>
-  async ({ context, doc, previousDoc, req }) => {
+  async ({ context, doc, operation, previousDoc, req }) => {
     if (context?.skipReservationHooks) {return doc}
-    if (!previousDoc || previousDoc.status === doc.status) {return doc}
+    // On create Payload passes previousDoc: {} (not undefined) — there is no
+    // previous status, so status-change hooks must not fire (afterBookingCreate
+    // covers creation).
+    if (operation !== 'update') {return doc}
+    if (!previousDoc?.status || previousDoc.status === doc.status) {return doc}
 
     const prev = previousDoc.status as string
     const next = doc.status as string

@@ -41,7 +41,8 @@ function createPluginHooksBeforeCreate(
 function createPluginHooksAfterCreate(
   hooks: ReservationPluginHooks,
 ): CollectionAfterChangeHook {
-  return async ({ doc, operation, req }) => {
+  return async ({ context, doc, operation, req }) => {
+    if (context?.skipReservationHooks) {return doc}
     if (operation === 'create' && hooks.afterBookingCreate) {
       const docRecord = doc as Record<string, unknown>
       for (const hook of hooks.afterBookingCreate) {
@@ -264,8 +265,11 @@ export function createReservationsCollection(
         expandRequiredResources(config),
         calculateEndTime(config),
         validateConflicts(config),
-        validateStatusTransition(config),
+        // validateCancellation runs BEFORE validateStatusTransition so a cancel
+        // rejected by the notice period never fires the beforeBookingCancel
+        // plugin hooks (e.g. refund initiation) for an update that won't land.
         validateCancellation(config),
+        validateStatusTransition(config),
       ],
     },
     labels: {

@@ -1,0 +1,5 @@
+---
+'payload-reserve': patch
+---
+
+Fix plugin lifecycle hooks firing at the wrong times. `beforeBookingCreate` hooks fired twice for bookings made through `/api/reserve/book` (once in the endpoint, once in the collection hook) — payment or notification integrations ran twice per booking; they now fire exactly once. Note: on the `/api/reserve/book` path these hooks now run inside the collection `beforeChange` (after Payload field validation) rather than on the raw request body — a hook that stamped required fields into the body must now rely on the merged document instead. `afterStatusChange` (and `afterBookingConfirm` for confirmed-on-create) fired on every create with `previousStatus: undefined`; status-change hooks now fire only on real status transitions during updates. `beforeBookingCancel` hooks (e.g. refund initiation) fired before the cancellation notice period could reject the update, diverging external state from the database; cancellation validation now runs first, so a rejected cancel never triggers cancel hooks. `afterBookingCreate` now respects the `context.skipReservationHooks` escape hatch like every other hook.
