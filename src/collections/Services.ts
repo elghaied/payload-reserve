@@ -104,10 +104,13 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         min: 0,
       },
       {
+        // max < 24h keeps the conflict-detection coarse pre-filter
+        // (COARSE_MARGIN_MS = 24h) provably sufficient.
         name: 'bufferTimeBefore',
         type: 'number',
         defaultValue: 0,
         label: ({ t }) => (t as PluginT)('reservation:fieldBufferTimeBefore'),
+        max: 1439,
         min: 0,
       },
       {
@@ -115,6 +118,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         type: 'number',
         defaultValue: 0,
         label: ({ t }) => (t as PluginT)('reservation:fieldBufferTimeAfter'),
+        max: 1439,
         min: 0,
       },
       {

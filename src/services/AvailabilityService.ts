@@ -1,7 +1,6 @@
 import type { Payload, PayloadRequest, Where } from 'payload'
 
 import type { CapacityMode, DurationType, StatusMachineConfig } from '../types.js'
-
 import type { ResolvedItem } from '../utilities/resolveReservationItems.js'
 
 import { resolveReservationItems } from '../utilities/resolveReservationItems.js'
@@ -107,7 +106,7 @@ export function buildCoarseOverlapQuery(params: {
     },
   ]
 
-  if (excludeReservationId) {
+  if (excludeReservationId !== undefined) {
     conditions.push({ id: { not_equals: excludeReservationId } })
   }
 

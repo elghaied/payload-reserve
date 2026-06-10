@@ -4477,7 +4477,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
       data: {
         name: 'A11 Exception Holder',
         active: true,
-        exceptions: [{ date: '2030-09-11T00:00:00.000Z', type: 'vacation' }],
+        exceptions: [{ type: 'vacation', date: '2030-09-11T00:00:00.000Z' }],
         recurringSlots: [{ day: 'wed', endTime: '17:00', startTime: '09:00' }],
         resource: resource.id,
         scheduleType: 'recurring',
