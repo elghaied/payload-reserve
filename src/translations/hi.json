@@ -99,6 +99,7 @@
   "fieldCustomerCreateNew": "नया ग्राहक बनाएँ",
   "fieldCustomerClear": "चयन हटाएँ",
   "calendarPending": "लंबित",
+  "calendarShowingNofM": "{{total}} में से {{shown}} आरक्षण दिखाए जा रहे हैं — बाकी देखने के लिए सीमा कम करें या फ़िल्टर करें।",
   "pendingDateTime": "तारीख / समय",
   "pendingActions": "क्रियाएँ",
   "pendingSelectAll": "सभी चुनें",

@@ -99,6 +99,7 @@
   "fieldCustomerCreateNew": "Crear nuevo cliente",
   "fieldCustomerClear": "Borrar selección",
   "calendarPending": "Pendiente",
+  "calendarShowingNofM": "Mostrando {{shown}} de {{total}} reservas: reduce el rango o filtra para ver el resto.",
   "pendingDateTime": "Fecha / Hora",
   "pendingActions": "Acciones",
   "pendingSelectAll": "Seleccionar todo",

@@ -12,9 +12,6 @@ import { useResourceAvailability } from './useResourceAvailability.js'
 
 type LaneResource = { id: string; name: string }
 
-const HOUR_START = 7
-const HOUR_END = 20
-
 const SLOT_STATE_KEYS: Record<SlotState, string> = {
   free: 'reservation:slotFree',
   full: 'reservation:slotFull',
@@ -25,23 +22,27 @@ const SLOT_STATE_KEYS: Record<SlotState, string> = {
 function Lane({
   apiBase,
   day,
+  endHour,
   onBook,
   resource,
+  startHour,
   timeZone,
 }: {
   apiBase: string
   day: Date
+  endHour: number
   onBook: (resourceId: string, startIso: string) => void
   resource: LaneResource
+  startHour: number
   timeZone: string
 }) {
   const { t: _t } = useTranslation()
   const t = _t as PluginT
 
   const dayStart = new Date(day)
-  dayStart.setHours(HOUR_START, 0, 0, 0)
+  dayStart.setHours(startHour, 0, 0, 0)
   const dayEnd = new Date(day)
-  dayEnd.setHours(HOUR_END, 0, 0, 0)
+  dayEnd.setHours(endHour, 0, 0, 0)
 
   const { data } = useResourceAvailability(apiBase, resource.id, dayStart, dayEnd)
   const isoDay = getDayKeyInTimezone(day, timeZone)
@@ -112,14 +113,18 @@ function Lane({
 export function LaneTimelineView({
   apiBase,
   day,
+  endHour,
   onBook,
   resources,
+  startHour,
   timeZone,
 }: {
   apiBase: string
   day: Date
+  endHour: number
   onBook: (resourceId: string, startIso: string) => void
   resources: LaneResource[]
+  startHour: number
   timeZone: string
 }) {
   const { t: _t } = useTranslation()
@@ -127,7 +132,7 @@ export function LaneTimelineView({
   if (resources.length === 0) {
     return <p className={styles.hint}>{t('reservation:laneNoResources')}</p>
   }
-  const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i)
+  const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
   return (
     <div className={styles.lanes}>
       <div className={styles.laneHeader}>
@@ -144,9 +149,11 @@ export function LaneTimelineView({
         <Lane
           apiBase={apiBase}
           day={day}
+          endHour={endHour}
           key={r.id}
           onBook={onBook}
           resource={r}
+          startHour={startHour}
           timeZone={timeZone}
         />
       ))}

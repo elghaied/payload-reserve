@@ -99,6 +99,7 @@
   "fieldCustomerCreateNew": "新建客户",
   "fieldCustomerClear": "清除选择",
   "calendarPending": "待处理",
+  "calendarShowingNofM": "显示 {{total}} 个预约中的 {{shown}} 个 — 缩小范围或筛选以查看其余部分。",
   "pendingDateTime": "日期 / 时间",
   "pendingActions": "操作",
   "pendingSelectAll": "全选",

@@ -99,6 +99,7 @@
   "fieldCustomerCreateNew": "Neuen Kunden anlegen",
   "fieldCustomerClear": "Auswahl aufheben",
   "calendarPending": "Ausstehend",
+  "calendarShowingNofM": "{{shown}} von {{total}} Reservierungen werden angezeigt – Zeitraum eingrenzen oder filtern, um den Rest zu sehen.",
   "pendingDateTime": "Datum / Zeit",
   "pendingActions": "Aktionen",
   "pendingSelectAll": "Alle auswählen",

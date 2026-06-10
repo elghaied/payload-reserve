@@ -20,7 +20,7 @@ type Resource = {
 
 type Schedule = {
   active?: boolean
-  exceptions?: Array<{ date: string; reason?: string }>
+  exceptions?: Array<{ date: string; endDate?: string; reason?: string }>
   id: string
   manualSlots?: Array<{ date: string; endTime: string; startTime: string }>
   recurringSlots?: Array<{ day: string; endTime: string; startTime: string }>
@@ -111,6 +111,9 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   useEffect(() => {
     if (!slugs) {return}
 
+    // Ignore a slow earlier fetch if the week changed before it resolved (D5)
+    let stale = false
+
     const fetchData = async () => {
       setLoading(true)
       const apiBase = `${config.serverURL ?? ''}${config.routes.api}`
@@ -127,13 +130,13 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
           ...resourcesTenantParams,
         })
         const schedulesParams = new URLSearchParams({
-          limit: '500',
+          limit: '1000',
           'where[active][equals]': 'true',
           ...schedulesTenantParams,
         })
         const reservationsParams = new URLSearchParams({
           depth: '0',
-          limit: '500',
+          limit: '2000',
           'where[startTime][greater_than_equal]': weekStart.toISOString(),
           'where[startTime][less_than_equal]': weekEnd.toISOString(),
           'where[status][in]': blockingIn,
@@ -151,18 +154,23 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
           reservationsRes.json(),
         ])
 
+        if (stale) {return}
         setResources(rData.docs ?? [])
         setSchedules(sData.docs ?? [])
         setReservations(resData.docs ?? [])
       } catch {
+        if (stale) {return}
         setResources([])
         setSchedules([])
         setReservations([])
       }
-      setLoading(false)
+      if (!stale) {setLoading(false)}
     }
 
     void fetchData()
+    return () => {
+      stale = true
+    }
     // blockingStatuses is derived from config which is stable; stringify to
     // avoid object-reference churn causing infinite loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -196,10 +204,12 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     const slots: Array<{ label: string; type: 'available' | 'exception' }> = []
 
     for (const schedule of resourceSchedules) {
-      // Check for exceptions
+      // Check for exceptions — match the full [date, endDate] range inclusively
+      // (review D4), keyed in the business timezone, like the server does.
       const exception = schedule.exceptions?.find((e) => {
-        const excDate = getDayKeyInTimezone(new Date(e.date), reservationTimezone)
-        return excDate === dateStr
+        const start = getDayKeyInTimezone(new Date(e.date), reservationTimezone)
+        const end = e.endDate ? getDayKeyInTimezone(new Date(e.endDate), reservationTimezone) : start
+        return dateStr >= start && dateStr <= end
       })
 
       if (exception) {

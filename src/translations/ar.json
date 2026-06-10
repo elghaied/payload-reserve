@@ -99,6 +99,7 @@
   "fieldCustomerCreateNew": "إنشاء عميل جديد",
   "fieldCustomerClear": "مسح التحديد",
   "calendarPending": "قيد الانتظار",
+  "calendarShowingNofM": "عرض {{shown}} من {{total}} حجزًا — قم بتضييق النطاق أو التصفية لرؤية الباقي.",
   "pendingDateTime": "التاريخ / الوقت",
   "pendingActions": "الإجراءات",
   "pendingSelectAll": "تحديد الكل",

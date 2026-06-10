@@ -60,36 +60,52 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
     Object.assign(where, tenantWhere)
   }
 
-  const { docs: todayReservations } = await payload.find({
-    collection: slugs.reservations,
-    limit: 100,
-    sort: 'startTime',
-    where,
-  })
+  // Stats are computed with count queries rather than a capped fetch+filter,
+  // so they stay accurate past 100 reservations/day (review D7).
+  const blocking = Array.from(blockingSet)
+  const terminalArr = Array.from(terminalSet)
+  const countWhere = (extra?: Record<string, unknown>): Record<string, unknown> =>
+    extra ? { and: [where, extra] } : where
 
-  const total = todayReservations.length
-
-  // Active = reservations in blockingStatuses (they hold a slot, past or future)
-  const active = todayReservations.filter((r: Record<string, unknown>) =>
-    blockingSet.has(r.status as string),
-  ).length
-
-  // Upcoming = active (blocking) reservations that haven't started yet
-  const upcoming = todayReservations.filter(
-    (r: Record<string, unknown>) =>
-      blockingSet.has(r.status as string) && new Date(r.startTime as string) > now,
-  ).length
-
-  // Terminal = reservations in terminalStatuses (completed, cancelled, no-show, etc.)
-  const terminal = todayReservations.filter((r: Record<string, unknown>) =>
-    terminalSet.has(r.status as string),
-  ).length
+  const [total, active, terminal, upcoming, nextResult] = await Promise.all([
+    payload.count({ collection: slugs.reservations, where }).then((r) => r.totalDocs),
+    blocking.length
+      ? payload
+          .count({ collection: slugs.reservations, where: countWhere({ status: { in: blocking } }) })
+          .then((r) => r.totalDocs)
+      : Promise.resolve(0),
+    terminalArr.length
+      ? payload
+          .count({
+            collection: slugs.reservations,
+            where: countWhere({ status: { in: terminalArr } }),
+          })
+          .then((r) => r.totalDocs)
+      : Promise.resolve(0),
+    blocking.length
+      ? payload
+          .count({
+            collection: slugs.reservations,
+            where: countWhere({
+              and: [{ status: { in: blocking } }, { startTime: { greater_than: now.toISOString() } }],
+            }),
+          })
+          .then((r) => r.totalDocs)
+      : Promise.resolve(0),
+    blocking.length
+      ? payload.find({
+          collection: slugs.reservations,
+          limit: 1,
+          sort: 'startTime',
+          where: countWhere({
+            and: [{ status: { in: blocking } }, { startTime: { greater_than: now.toISOString() } }],
+          }),
+        })
+      : Promise.resolve({ docs: [] as Record<string, unknown>[] }),
+  ])
 
   // Next appointment = the earliest upcoming blocking reservation
-  const nextAppointment = todayReservations.find(
-    (r: Record<string, unknown>) =>
-      blockingSet.has(r.status as string) && new Date(r.startTime as string) > now,
-  )
+  const nextAppointment = nextResult.docs[0] as Record<string, unknown> | undefined
 
   return (
     <div className={styles.wrapper}>

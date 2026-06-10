@@ -99,6 +99,7 @@
   "fieldCustomerCreateNew": "Buat pelanggan baru",
   "fieldCustomerClear": "Hapus pilihan",
   "calendarPending": "Menunggu",
+  "calendarShowingNofM": "Menampilkan {{shown}} dari {{total}} reservasi — persempit rentang atau filter untuk melihat sisanya.",
   "pendingDateTime": "Tanggal / Waktu",
   "pendingActions": "Tindakan",
   "pendingSelectAll": "Pilih semua",

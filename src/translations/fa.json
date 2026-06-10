@@ -99,6 +99,7 @@
   "fieldCustomerCreateNew": "ایجاد مشتری جدید",
   "fieldCustomerClear": "پاک کردن انتخاب",
   "calendarPending": "در انتظار",
+  "calendarShowingNofM": "نمایش {{shown}} از {{total}} رزرو — برای دیدن بقیه بازه را محدود یا فیلتر کنید.",
   "pendingDateTime": "تاریخ / زمان",
   "pendingActions": "اقدامات",
   "pendingSelectAll": "انتخاب همه",

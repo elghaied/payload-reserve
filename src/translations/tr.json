@@ -99,6 +99,7 @@
   "fieldCustomerCreateNew": "Yeni müşteri oluştur",
   "fieldCustomerClear": "Seçimi temizle",
   "calendarPending": "Beklemede",
+  "calendarShowingNofM": "{{total}} rezervasyondan {{shown}} tanesi gösteriliyor — geri kalanını görmek için aralığı daraltın veya filtreleyin.",
   "pendingDateTime": "Tarih / Saat",
   "pendingActions": "İşlemler",
   "pendingSelectAll": "Tümünü seç",

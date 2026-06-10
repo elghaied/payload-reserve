@@ -33,6 +33,8 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
 
   const slugs = config.admin?.custom?.reservationSlugs
   const customersCollection: string = slugs?.customers ?? 'customers'
+  // Respect a custom API route / base path instead of hardcoding '/api' (review D6)
+  const apiBase = `${config.serverURL ?? ''}${config.routes?.api ?? '/api'}`
 
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<CustomerDoc[]>([])
@@ -59,7 +61,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
 
     const fetchCustomer = async () => {
       try {
-        const res = await fetch(`/api/${customersCollection}/${value}`)
+        const res = await fetch(`${apiBase}/${customersCollection}/${value}`)
         if (res.ok) {
           const doc = await res.json()
           setSelectedCustomer({
@@ -76,7 +78,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
       }
     }
     void fetchCustomer()
-  }, [value, customersCollection, selectedCustomer?.id])
+  }, [value, apiBase, customersCollection, selectedCustomer?.id])
 
   // Debounced search
   const doSearch = useCallback(
@@ -84,7 +86,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
       setLoading(true)
       try {
         const params = new URLSearchParams({ limit: '10', search: query })
-        const res = await fetch(`/api/reservation-customer-search?${params.toString()}`)
+        const res = await fetch(`${apiBase}/reservation-customer-search?${params.toString()}`)
         if (res.ok) {
           const data = await res.json()
           setResults(data.docs)
@@ -95,7 +97,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
         setLoading(false)
       }
     },
-    [],
+    [apiBase],
   )
 
   const handleSearchChange = useCallback(

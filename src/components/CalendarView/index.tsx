@@ -62,6 +62,40 @@ const BUILTIN_STATUS_COLORS: Record<string, string> = {
 // Palette for auto-assigning colors to custom statuses
 const CUSTOM_STATUS_PALETTE = ['#fde68a', '#c7d2fe', '#a7f3d0', '#fca5a5', '#fdba74']
 
+// Safe ceiling for list fetches; when totalDocs exceeds this we surface a
+// "showing N of M" notice rather than silently truncating (review D9).
+const MAX_LIST_LIMIT = 2000
+
+// Default visible-hour window for the week/day/lane grids; the actual window
+// expands to include any booking outside it so nothing is hidden (review D8).
+const DEFAULT_HOUR_START = 7
+const DEFAULT_HOUR_END = 20
+
+/**
+ * Visible-hour window covering `reservations` (in `timeZone`), never narrower
+ * than the default business window. Every booking's start hour gets a row, so a
+ * booking outside 7–20 is shown rather than silently dropped, and all three
+ * time views share one window.
+ */
+function computeHourWindow(
+  reservations: Reservation[],
+  timeZone: string,
+): { endHour: number; startHour: number } {
+  let startHour = DEFAULT_HOUR_START
+  let endHour = DEFAULT_HOUR_END
+  for (const r of reservations) {
+    if (!r.startTime) {continue}
+    const sh = getHourInTimezone(new Date(r.startTime), timeZone)
+    startHour = Math.min(startHour, sh)
+    endHour = Math.max(endHour, sh + 1)
+    if (r.endTime) {
+      // round the ending hour up so a slot that ends mid-hour still has a row
+      endHour = Math.max(endHour, getHourInTimezone(new Date(r.endTime), timeZone) + 1)
+    }
+  }
+  return { endHour: Math.min(endHour, 24), startHour: Math.max(startHour, 0) }
+}
+
 export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const { config } = useConfig()
   const { t: _t } = useTranslation()
@@ -145,6 +179,11 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(true)
+  // { shown, total } when a fetch hit its cap, else null — drives a non-silent notice (D9)
+  const [truncation, setTruncation] = useState<{ shown: number; total: number } | null>(null)
+  // Monotonic request counters so a slow earlier fetch can't overwrite a newer one (D5)
+  const reservationsSeq = useRef(0)
+  const pendingSeq = useRef(0)
   const [drawerDocId, setDrawerDocId] = useState<null | string>(null)
   const [initialData, setInitialData] = useState<Record<string, unknown> | undefined>(undefined)
 
@@ -206,8 +245,10 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     if (viewMode === 'month') {
       start.setDate(1)
       start.setDate(start.getDate() - start.getDay())
-      end.setMonth(end.getMonth() + 1, 0)
-      end.setDate(end.getDate() + (6 - end.getDay()))
+      // The grid always renders 42 cells (6 weeks) from `start`; fetch the same
+      // span so trailing weeks aren't silently empty (review D1).
+      end.setTime(start.getTime())
+      end.setDate(start.getDate() + 41)
     } else if (viewMode === 'week') {
       const dayOfWeek = start.getDay()
       start.setDate(start.getDate() - dayOfWeek)
@@ -228,11 +269,12 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   )
 
   const fetchReservations = useCallback(async () => {
+    const seq = ++reservationsSeq.current
     setLoading(true)
     try {
       const params = new URLSearchParams({
         depth: '1',
-        limit: '500',
+        limit: String(MAX_LIST_LIMIT),
         sort: 'startTime',
         'where[startTime][greater_than_equal]': rangeStart.toISOString(),
         'where[startTime][less_than_equal]': rangeEnd.toISOString(),
@@ -240,11 +282,16 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       })
       const response = await fetch(`${apiUrl}?${params}`)
       const result = await response.json()
-      setReservations(result.docs ?? [])
+      if (seq !== reservationsSeq.current) {return} // a newer fetch superseded this one
+      const docs = result.docs ?? []
+      setReservations(docs)
+      const total = result.totalDocs ?? docs.length
+      setTruncation(total > docs.length ? { shown: docs.length, total } : null)
     } catch {
+      if (seq !== reservationsSeq.current) {return}
       setReservations([])
     }
-    setLoading(false)
+    if (seq === reservationsSeq.current) {setLoading(false)}
   }, [rangeStart, rangeEnd, apiUrl, reservationTenantParams])
 
   useEffect(() => {
@@ -254,8 +301,11 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   // Fetch pending count (always, for badge) — uses defaultStatus from config
   const fetchPendingCount = useCallback(async () => {
     try {
+      // limit:1 + depth:0 returns totalDocs (the full count) without downloading
+      // every pending doc — limit:0 in Payload means "no limit" (review D9).
       const params = new URLSearchParams({
-        limit: '0',
+        depth: '0',
+        limit: '1',
         'where[status][equals]': defaultStatus,
         ...reservationTenantParams,
       })
@@ -273,18 +323,21 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
 
   // Fetch pending reservations when tab is active — uses defaultStatus from config
   const fetchPendingReservations = useCallback(async () => {
+    const seq = ++pendingSeq.current
     try {
       const params = new URLSearchParams({
         depth: '1',
-        limit: '500',
+        limit: String(MAX_LIST_LIMIT),
         sort: 'startTime',
         'where[status][equals]': defaultStatus,
         ...reservationTenantParams,
       })
       const response = await fetch(`${apiUrl}?${params}`)
       const result = await response.json()
+      if (seq !== pendingSeq.current) {return}
       setPendingReservations(result.docs ?? [])
     } catch {
+      if (seq !== pendingSeq.current) {return}
       setPendingReservations([])
     }
   }, [apiUrl, defaultStatus, reservationTenantParams])
@@ -749,10 +802,16 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       weekDays.push(d)
     }
 
-    const hours = Array.from({ length: 12 }, (_, i) => i + 7)
-    // Grid bounds: hour 7 to hour 19 (end of last slot), step 60 min
-    const gridStartHour = 7
-    const gridEndHour = gridStartHour + hours.length // 19
+    // Visible-hour window derived from the week's bookings (review D8)
+    const weekReservations = filteredReservations.filter((r) => {
+      const k = getDayKeyInTimezone(new Date(r.startTime), reservationTimezone)
+      return weekDays.some((d) => getDayKeyInTimezone(d, reservationTimezone) === k)
+    })
+    const { endHour: gridEndHour, startHour: gridStartHour } = computeHourWindow(
+      weekReservations,
+      reservationTimezone,
+    )
+    const hours = Array.from({ length: gridEndHour - gridStartHour }, (_, i) => i + gridStartHour)
     const gridStep = 60
 
     // Build per-day slot-state maps when a resource is selected
@@ -895,14 +954,19 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   }
 
   const renderDayView = () => {
-    const hours = Array.from({ length: 14 }, (_, i) => i + 7)
-    // Grid bounds: hour 7 to hour 21 (end of last slot), step 60 min
-    const gridStartHour = 7
-    const gridEndHour = gridStartHour + hours.length // 21
-    const gridStep = 60
-
     // Build slot-state map for the current day when a resource is selected
     const currentDayKey = getDayKeyInTimezone(currentDate, reservationTimezone)
+
+    // Visible-hour window derived from this day's bookings (review D8)
+    const dayReservations = filteredReservations.filter(
+      (r) => getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === currentDayKey,
+    )
+    const { endHour: gridEndHour, startHour: gridStartHour } = computeHourWindow(
+      dayReservations,
+      reservationTimezone,
+    )
+    const hours = Array.from({ length: gridEndHour - gridStartHour }, (_, i) => i + gridStartHour)
+    const gridStep = 60
     let daySlotMap: Map<string, SlotInfo> | null = null
     if (availability) {
       const isoDay = currentDayKey
@@ -1246,6 +1310,14 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         </div>
       </div>
       {viewMode !== 'pending' && renderStatusLegend()}
+      {viewMode !== 'pending' && truncation && (
+        <div className={styles.truncationNotice} role="status">
+          {t('reservation:calendarShowingNofM', {
+            shown: String(truncation.shown),
+            total: String(truncation.total),
+          })}
+        </div>
+      )}
       {resources.length > 1 && (
         <div className={styles.filterBar}>
           <select
@@ -1270,19 +1342,32 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
           {viewMode === 'month' && renderMonthView()}
           {viewMode === 'week' && renderWeekView()}
           {viewMode === 'day' && renderDayView()}
-          {viewMode === 'lanes' && (
-            <LaneTimelineView
-              apiBase={apiBase}
-              day={currentDate}
-              onBook={handleLaneBook}
-              resources={
-                selectedResourceId
-                  ? resources.filter((r) => r.id === selectedResourceId)
-                  : resources
-              }
-              timeZone={reservationTimezone}
-            />
-          )}
+          {viewMode === 'lanes' &&
+            (() => {
+              const laneDayKey = getDayKeyInTimezone(currentDate, reservationTimezone)
+              const { endHour, startHour } = computeHourWindow(
+                filteredReservations.filter(
+                  (r) =>
+                    getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === laneDayKey,
+                ),
+                reservationTimezone,
+              )
+              return (
+                <LaneTimelineView
+                  apiBase={apiBase}
+                  day={currentDate}
+                  endHour={endHour}
+                  onBook={handleLaneBook}
+                  resources={
+                    selectedResourceId
+                      ? resources.filter((r) => r.id === selectedResourceId)
+                      : resources
+                  }
+                  startHour={startHour}
+                  timeZone={reservationTimezone}
+                />
+              )
+            })()}
         </>
       )}
       {viewMode === 'pending' && renderPendingView()}

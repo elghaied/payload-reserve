@@ -461,6 +461,15 @@
   margin-bottom: 12px;
 }
 
+.truncationNotice {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--theme-warning-100, #fef3c7);
+  color: var(--theme-warning-700, #92400e);
+  font-size: 0.85rem;
+}
+
 .resourceFilter {
   appearance: none;
   background: var(--theme-bg);

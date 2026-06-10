@@ -99,6 +99,7 @@
   "fieldCustomerCreateNew": "Создать нового клиента",
   "fieldCustomerClear": "Очистить выбор",
   "calendarPending": "Ожидает",
+  "calendarShowingNofM": "Показано {{shown}} из {{total}} броней — сузьте диапазон или примените фильтр, чтобы увидеть остальные.",
   "pendingDateTime": "Дата / Время",
   "pendingActions": "Действия",
   "pendingSelectAll": "Выбрать все",

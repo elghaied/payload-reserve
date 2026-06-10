@@ -48,8 +48,10 @@ async function busyFor(args: {
       { or: [{ resource: { equals: resourceId } }, { 'items.resource': { equals: resourceId } }] },
     ],
   }
+  // limit:0 = all matching — bounded by the endpoint's 90-day range cap, so this
+  // can't run away, and the grid no longer silently drops busy intervals (D9).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { docs } = await (payload.find as any)({ collection: reservationSlug, depth: 0, limit: 500, where })
+  const { docs } = await (payload.find as any)({ collection: reservationSlug, depth: 0, limit: 0, where })
   return (docs as Array<Record<string, unknown>>)
     .filter((r) => r.startTime && r.endTime)
     .map((r) => ({
