@@ -922,7 +922,7 @@ describe('Reservation plugin - durationType on Services', () => {
     expect(new Date(res.endTime as string).getTime()).toBe(expectedEnd.getTime())
   })
 
-  it('full-day durationType: endTime is set to local end-of-day (23:59:59)', async () => {
+  it('full-day durationType: endTime is set to UTC end-of-day (23:59:59.999Z)', async () => {
     const service = await payload.create({
       collection: col('services'),
       data: {
@@ -937,23 +937,24 @@ describe('Reservation plugin - durationType on Services', () => {
       data: { name: 'Full Day Resource', active: true, services: [service.id] },
     })
 
-    // Use local-time midnight as startTime to ensure same-day behaviour
-    const startLocal = new Date(2030, 4, 15, 8, 0, 0, 0) // May 15 2030 08:00 local
+    // Dev config has no `timezone` set → defaults to UTC.
+    // startTime is May 15 2030 08:00 UTC; endTime must be UTC end-of-day.
     const res = await payload.create({
       collection: col('reservations'),
       data: {
         customer: customerId,
         resource: fullDayResource.id,
         service: service.id,
-        startTime: startLocal.toISOString(),
+        startTime: '2030-05-15T08:00:00.000Z',
         status: 'pending',
       },
     })
 
     const endTime = new Date(res.endTime as string)
-    // computeEndTime for full-day uses setHours(23,59,59,999) (local time)
-    expect(endTime.getHours()).toBe(23)
-    expect(endTime.getMinutes()).toBe(59)
+    // computeEndTime for full-day uses endOfDayInTimezone with the plugin's
+    // configured timezone (UTC by default) — so end must be 23:59:59.999Z on
+    // the same UTC calendar day.
+    expect(endTime.toISOString()).toBe('2030-05-15T23:59:59.999Z')
   })
 
   it('flexible durationType: endTime comes from the submitted endTime field', async () => {
@@ -1028,10 +1029,9 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
   let resourceId: string
   let customerId: string
 
-  // Build a Monday date using local-time constructor (month is 0-indexed).
-  // April 8 2030 is a confirmed Monday. Using new Date(y,m,d) ensures getDay()
-  // returns 1 (Monday) regardless of the host timezone.
-  const MONDAY_LOCAL = new Date(2030, 3, 8) // Mon Apr 08 2030 00:00:00 (local)
+  // April 8 2030 is a confirmed Monday. Pass a day-key string so resolution is
+  // TZ-independent (avoids server-local new Date(y,m,d) midnight ambiguity).
+  const MONDAY_LOCAL = '2030-04-08'
 
   beforeAll(async () => {
     const service = await payload.create({
@@ -1621,7 +1621,7 @@ describe('Reservation plugin - slot generation with buffers', () => {
       data: { email: 'step-size@example.com', firstName: 'Step', lastName: 'Size', password: 'testpass123' },
     })
 
-    const MONDAY_LOCAL = new Date(2030, 5, 17) // Mon Jun 17 2030 local
+    const MONDAY_LOCAL = '2030-06-17' // Mon Jun 17 2030 — day-key string, TZ-independent
     const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
 
     // Get initial slots and book the first one (09:00-10:00)
@@ -1665,7 +1665,8 @@ describe('Reservation plugin - slot generation with buffers', () => {
 
     // With smaller step size, we should find 10:30 as the first available slot
     // (10:00 is blocked by bufferBefore=30 overlapping with existing 09:00-10:00)
-    const afterStartMinutes = afterSlots.map((s) => s.start.getHours() * 60 + s.start.getMinutes())
+    // Slots are UTC instants; use getUTCHours/getUTCMinutes to avoid server-TZ drift.
+    const afterStartMinutes = afterSlots.map((s) => s.start.getUTCHours() * 60 + s.start.getUTCMinutes())
     const tenThirtyMinutes = 10 * 60 + 30
     expect(afterStartMinutes).toContain(tenThirtyMinutes)
   })
@@ -1746,12 +1747,12 @@ describe('AvailabilityService - pure functions', () => {
     expect(result.durationMinutes).toBe(90)
   })
 
-  it('computeEndTime: full-day returns end of the same day (23:59:59)', async () => {
+  it('computeEndTime: full-day returns end of the same UTC day (23:59:59.999Z)', async () => {
     const { computeEndTime } = await import('../src/services/AvailabilityService.js')
     const start = new Date('2030-01-01T06:00:00.000Z')
     const result = computeEndTime({ durationType: 'full-day', serviceDuration: 0, startTime: start })
-    expect(result.endTime.getHours()).toBe(23)
-    expect(result.endTime.getMinutes()).toBe(59)
+    // Default timeZone is UTC — end must be the UTC end of the same calendar day.
+    expect(result.endTime.toISOString()).toBe('2030-01-01T23:59:59.999Z')
   })
 
   it('computeEndTime: flexible uses the provided endTime directly', async () => {

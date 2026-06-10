@@ -4,6 +4,7 @@ import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { getAvailableSlots } from '../services/AvailabilityService.js'
 import { extractId, mergeResourceIds } from '../utilities/resolveRequiredResources.js'
+import { getDayKeyInTimezone } from '../utilities/timezoneUtils.js'
 
 export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
@@ -20,12 +21,21 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
         )
       }
 
-      const parsedDate = new Date(date)
-      if (isNaN(parsedDate.getTime())) {
-        return Response.json(
-          { error: 'Invalid date format. Expected YYYY-MM-DD' },
-          { status: 400 },
-        )
+      // YYYY-MM-DD is taken as a business-TZ calendar day verbatim; any other
+      // parseable date is re-keyed into the business timezone. Never
+      // `new Date('YYYY-MM-DD')` — that pins the day to UTC midnight.
+      let dayKey: string
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        dayKey = date
+      } else {
+        const parsed = new Date(date)
+        if (isNaN(parsed.getTime())) {
+          return Response.json(
+            { error: 'Invalid date format. Expected YYYY-MM-DD' },
+            { status: 400 },
+          )
+        }
+        dayKey = getDayKeyInTimezone(parsed, config.timezone)
       }
 
       const guestCount = Math.max(Number(url.searchParams.get('guestCount') ?? '1'), 1)
@@ -48,7 +58,7 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
 
       const slots = await getAvailableSlots({
         blockingStatuses: config.statusMachine.blockingStatuses,
-        date: parsedDate,
+        date: dayKey,
         guestCount,
         payload: req.payload,
         req,
@@ -58,6 +68,7 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
         scheduleSlug: config.slugs.schedules,
         serviceId: service,
         serviceSlug: config.slugs.services,
+        timeZone: config.timezone,
       })
 
       return Response.json({

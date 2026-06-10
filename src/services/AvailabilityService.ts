@@ -4,6 +4,7 @@ import type { CapacityMode, DurationType, StatusMachineConfig } from '../types.j
 
 import { resolveScheduleForDate } from '../utilities/scheduleUtils.js'
 import { addMinutes, computeBlockedWindow, intersectIntervals } from '../utilities/slotUtils.js'
+import { endOfDayInTimezone } from '../utilities/timezoneUtils.js'
 
 // --- Pure functions (no DB) ---
 
@@ -12,12 +13,12 @@ export function computeEndTime(params: {
   endTime?: Date
   serviceDuration: number
   startTime: Date
+  timeZone?: string
 }): { durationMinutes: number; endTime: Date } {
   const { durationType, serviceDuration, startTime } = params
 
   if (durationType === 'full-day') {
-    const end = new Date(startTime)
-    end.setHours(23, 59, 59, 999)
+    const end = endOfDayInTimezone(startTime, params.timeZone ?? 'UTC')
     const durationMinutes = Math.round((end.getTime() - startTime.getTime()) / 60_000)
     return { durationMinutes, endTime: end }
   }
@@ -194,7 +195,7 @@ export async function checkAvailability(params: {
 
 export async function getAvailableSlots(params: {
   blockingStatuses: string[]
-  date: Date
+  date: Date | string
   guestCount?: number
   payload: Payload
   req: PayloadRequest
@@ -205,6 +206,7 @@ export async function getAvailableSlots(params: {
   scheduleSlug: string
   serviceId: number | string
   serviceSlug: string
+  timeZone?: string
 }): Promise<Array<{ end: Date; start: Date }>> {
   const {
     blockingStatuses,
@@ -219,7 +221,10 @@ export async function getAvailableSlots(params: {
     scheduleSlug,
     serviceId,
     serviceSlug,
+    timeZone,
   } = params
+
+  const tz = timeZone ?? 'UTC'
 
   // Resolve the set of resources to intersect (single-resource callers still work)
   const ids =
@@ -269,6 +274,7 @@ export async function getAvailableSlots(params: {
         ...resolveScheduleForDate(
           schedule as unknown as Parameters<typeof resolveScheduleForDate>[0],
           date,
+          tz,
         ),
       )
     }
@@ -294,6 +300,7 @@ export async function getAvailableSlots(params: {
     durationType,
     serviceDuration: duration,
     startTime: new Date(0),
+    timeZone: tz,
   })
   const slotDuration = Math.round(slotEndOffset.getTime() / 60_000)
   const effectiveDuration = durationType === 'fixed' ? duration : slotDuration

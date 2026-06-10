@@ -42,22 +42,19 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
     })
 
     // 2026-06-10 is a Wednesday; Paris is UTC+2 in June.
-    const slots = await getAvailableSlots(
-      // @ts-expect-error -- red until Task 4 threads timeZone (date accepts string, timeZone added)
-      {
-        blockingStatuses: ['pending', 'confirmed'],
-        date: '2026-06-10',
-        payload,
-        req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
-        reservationSlug: 'reservations',
-        resourceId: resource.id,
-        resourceSlug: 'resources',
-        scheduleSlug: 'schedules',
-        serviceId: service.id,
-        serviceSlug: 'services',
-        timeZone: 'Europe/Paris',
-      },
-    )
+    const slots = await getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: '2026-06-10',
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: service.id,
+      serviceSlug: 'services',
+      timeZone: 'Europe/Paris',
+    })
 
     expect(slots.length).toBeGreaterThan(0)
     expect(slots[0].start.toISOString()).toBe('2026-06-10T07:00:00.000Z')
@@ -99,11 +96,9 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
       timeZone: 'Europe/Paris',
     }
 
-    // @ts-expect-error -- red until Task 4 threads timeZone (date accepts string, timeZone added)
     const blocked = await getAvailableSlots({ ...base, date: '2026-06-17' })
     expect(blocked).toHaveLength(0)
 
-    // @ts-expect-error -- red until Task 4 threads timeZone (date accepts string, timeZone added)
     const open = await getAvailableSlots({ ...base, date: '2026-06-24' })
     expect(open.length).toBeGreaterThan(0)
   })

@@ -85,6 +85,7 @@ export const calculateEndTime =
           durationType,
           serviceDuration: (service.duration as number) ?? 0,
           startTime: startDate,
+          timeZone: config.timezone,
         })
         data.endTime = result.endTime.toISOString()
       }
@@ -136,6 +137,7 @@ export const calculateEndTime =
             durationType,
             serviceDuration: (service.duration as number) ?? 0,
             startTime: new Date(item.startTime as string),
+            timeZone: config.timezone,
           })
           item.endTime = result.endTime.toISOString()
         }

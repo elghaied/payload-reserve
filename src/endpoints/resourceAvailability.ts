@@ -103,13 +103,13 @@ export async function buildResourceAvailability(params: {
     const date = localDayKey(d)
     const shiftWindows: DayAvailability['shiftWindows'] = []
     const timeOff: DayAvailability['timeOff'] = []
-    const localMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate())
 
     for (const sched of schedules as Array<Record<string, unknown>>) {
       // resolveScheduleForDate accepts a Schedule-shaped object; cast through unknown
+      // Pass the pre-computed day key string so resolution is TZ-independent.
       const ranges = resolveScheduleForDate(
         sched as unknown as Parameters<typeof resolveScheduleForDate>[0],
-        localMidnight,
+        date,
       )
       for (const r of ranges) {
         shiftWindows.push({ end: r.end.toISOString(), start: r.start.toISOString() })
