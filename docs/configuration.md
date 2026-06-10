@@ -11,8 +11,18 @@ import { payloadReserve } from 'payload-reserve'
 import type { ReservationPluginConfig } from 'payload-reserve'
 
 payloadReserve({
-  // Disable the plugin entirely while keeping the config type-safe
+  // Disable the plugin's behavior while keeping the config type-safe.
+  // A disabled plugin still REGISTERS its collections (so the DB schema stays
+  // stable — toggling this no longer drops tables) but strips collection-level
+  // hooks and skips endpoints, admin components, and staff provisioning. A
+  // disabled plugin with an invalid sub-config no longer throws at boot.
   disabled: false,
+
+  // IANA timezone governing all schedule resolution: what HH:mm schedule times
+  // mean, which calendar day a date=YYYY-MM-DD query maps to, exception-day
+  // matching, and full-day boundaries. UTC servers behave as before; non-UTC
+  // servers now resolve the correct day. Validated at init (invalid name throws).
+  timezone: 'UTC',
 
   // Admin group label for all reservation collections
   adminGroup: 'Reservations',
@@ -75,7 +85,26 @@ payloadReserve({
     ],
   },
 
-  // Extra fields appended to the Reservations collection
+  // Per-collection overrides for the generated collections. Each entry is
+  // Omit<Partial<CollectionConfig>, 'fields' | 'slug'> with a `fields` function:
+  //   - `fields({ defaultFields })` returns the final field list (append/reorder/replace)
+  //   - supplied `hooks` MERGE with the plugin's (plugin hooks always run, first)
+  //   - `access` composes per operation (omitted operations keep the plugin's rules)
+  //   - `slug` is ignored (use `slugs` instead)
+  // The `customers` override applies only in standalone mode (no `userCollection`).
+  // This supersedes the deprecated `extraReservationFields`.
+  collectionOverrides: {
+    reservations: {
+      admin: { defaultColumns: ['service', 'startTime', 'status'] },
+      fields: ({ defaultFields }) => [
+        ...defaultFields,
+        { name: 'paymentReminderSent', type: 'checkbox', defaultValue: false },
+      ],
+    },
+  },
+
+  // DEPRECATED — use `collectionOverrides.reservations.fields` instead.
+  // Still works: extra fields appended to the Reservations collection.
   extraReservationFields: [
     { name: 'paymentReminderSent', type: 'checkbox', defaultValue: false },
   ],
@@ -97,6 +126,10 @@ payloadReserve({
     // Roles that bypass ownership scoping and see all records.
     // Default: anyone whose req.user.collection is the admin collection.
     adminRoles: ['admin'],
+    // User field consulted for admin detection. Defaults to
+    // staffProvisioning.roleField, then 'role'. Set this when your users store
+    // roles in a `roles: string[]` field so they aren't mis-detected.
+    roleField: 'role',
     // Also add an owner field to Services (default: false — Services are platform-managed).
     ownedServices: false,
     // Field name for the owner relationship on Resources (default: 'owner').
@@ -132,7 +165,8 @@ payloadReserve({
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `disabled` | `boolean` | `false` | Disable plugin functionality |
+| `disabled` | `boolean` | `false` | Disable plugin behavior. Collections still register (schema stays stable), but collection hooks are stripped and endpoints/admin/provisioning are skipped; an invalid sub-config no longer throws at boot |
+| `timezone` | `string` | `'UTC'` | IANA timezone governing schedule resolution, day boundaries, exception matching, and full-day windows. Invalid name throws at init |
 | `adminGroup` | `string` | `'Reservations'` | Admin panel group label |
 | `defaultBufferTime` | `number` | `0` | Default buffer between bookings (minutes) |
 | `cancellationNoticePeriod` | `number` | `24` | Minimum hours notice for cancellation |
@@ -145,12 +179,14 @@ payloadReserve({
 | `slugs.media` | `string` | `'media'` | Media collection slug (used by image fields) |
 | `statusMachine` | `Partial<StatusMachineConfig>` | Default 5-status machine | Custom status machine (validated at init) |
 | `hooks` | `ReservationPluginHooks` | `{}` | Plugin hook callbacks |
-| `extraReservationFields` | `Field[]` | `[]` | Extra Payload fields appended to the Reservations collection |
+| `collectionOverrides` | `Record<collection, CollectionOverride>` | `{}` | Per-collection overrides (`services`/`resources`/`schedules`/`reservations`/`customers`). `fields` is a function `({ defaultFields }) => Field[]`; `hooks` merge with the plugin's (plugin first); `access` composes per operation; `slug` ignored. `customers` applies only in standalone mode |
+| `extraReservationFields` | `Field[]` | `[]` | **Deprecated** — use `collectionOverrides.reservations.fields`. Still appends extra Payload fields to the Reservations collection |
 | `allowGuestBooking` | `boolean` | `false` | Allow bookings without a customer account (per-service override available) |
 | `resourceTypes` | `string[]` | `['staff', 'equipment', 'room']` | Option list for `Resource.resourceType`; first entry is the field default. Empty array throws |
 | `leaveTypes` | `string[]` | `['vacation', 'sick', 'personal', 'closure', 'other']` | Option list for `Schedule.exceptions[].type`. Empty array throws |
 | `resourceOwnerMode` | `ResourceOwnerModeConfig` | `undefined` | Opt-in resource-owner multi-tenancy (see sub-options below) |
 | `resourceOwnerMode.adminRoles` | `string[]` | `[]` | Roles that bypass ownership scoping; falls back to admin-collection check |
+| `resourceOwnerMode.roleField` | `string` | `staffProvisioning.roleField` ?? `'role'` | User field consulted for admin detection (supports `roles: string[]` fields) |
 | `resourceOwnerMode.ownedServices` | `boolean` | `false` | Also add an owner field to Services |
 | `resourceOwnerMode.ownerField` | `string` | `'owner'` | Owner relationship field name on Resources |
 | `resourceOwnerMode.ownerCollection` | `string` | `staffProvisioning.userCollection` ?? `slugs.customers` | Collection the owner field relates to |

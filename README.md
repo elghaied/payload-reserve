@@ -17,15 +17,16 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **5 Domain Collections** — Services, Resources, Schedules, Reservations, and Customers (standalone or user-collection extension)
 - **User Collection Extension** — Optionally extend your existing auth collection with booking fields; set `userCollection: undefined` (default) to use a standalone Customers collection
 - **Resource Owner Multi-Tenancy** — Opt-in `resourceOwnerMode` wires ownership access control so each resource owner (host) sees only their own listings and reservations
-- **Configurable Status Machine** — Define your own statuses, transitions, blocking states, and terminal states
-- **Double-Booking Prevention** — Server-side conflict detection with per-item buffer times; respects capacity modes
+- **Configurable Status Machine** — Define your own statuses, transitions, blocking states, terminal states, and the `confirmStatus`/`cancelStatus` that drive the confirm/cancel hooks and cancellation policy
+- **Double-Booking Prevention** — Server-side conflict detection that enforces both bookings' buffer times and checks each resource only for its own item window; respects capacity modes
+- **Business Timezone** — Set a plugin-level `timezone` (IANA, default `'UTC'`) so schedules, day boundaries, and the admin calendar resolve in your business's timezone regardless of server location
 - **Auto End Time** — Calculates `endTime` from `startTime + service.duration` automatically
 - **Three Duration Types** — `fixed` (service duration), `flexible` (customer-specified end), and `full-day` bookings
 - **Multi-Resource Bookings** — Single reservation that spans multiple resources simultaneously via the `items` array
 - **Capacity and Inventory** — `quantity > 1` allows multiple concurrent bookings per resource; `capacityMode` (`per-reservation` | `per-guest`) controls how capacity is counted
 - **Guest Bookings** — Account-less reservations with inline contact details (name + email/phone); `allowGuestBooking` plugin option and per-service `inherit`/`enabled`/`disabled` override; guests receive a `cancellationToken` via the `afterBookingCreate` hook for cancel-link delivery
 - **Idempotency** — Optional `idempotencyKey` prevents duplicate submissions
-- **Extra Reservation Fields** — Inject custom fields into the Reservations collection via `extraReservationFields` without forking the plugin
+- **Collection Overrides** — Customize any generated collection (add fields like a `join`, tweak admin options, attach your own hooks) via `collectionOverrides` without forking — the plugin's hooks and access are merged, not clobbered (supersedes the deprecated `extraReservationFields`)
 - **Cancellation Policy** — Configurable minimum notice period enforcement
 - **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems
 - **Availability Service** — Pure functions and DB helpers for slot generation (15-min step) and conflict checking with guest-count-aware filtering

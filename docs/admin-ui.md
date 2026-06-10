@@ -22,6 +22,14 @@ Replaces the default Reservations list view with a CSS Grid-based calendar. No e
 - Current time indicator (red line) in Week and Day views
 - Status legend below the toolbar
 
+All views key days, bucket reservations, and render times in the configured business `timezone` (read from `config.admin.custom.reservationTimezone`), not the browser's local zone.
+
+**Data correctness:**
+- **Month** view fetches the full 6-week (42-cell) span it renders, so trailing weeks are never silently empty.
+- **Week / Day / Lanes** derive their visible-hour window from the day's bookings rather than a fixed window — a booking outside business hours is still shown, and the three time views agree on the same window (never narrower than the default 7–20 business window).
+- Reservation fetches are guarded against stale responses, so rapid navigation can't let a slow earlier fetch overwrite a newer one.
+- List fetches are capped; when the total exceeds the cap, a "showing N of M" notice is surfaced rather than silently truncating.
+
 Status colors are derived from the status machine configuration exposed via `config.admin.custom.reservationStatusMachine`.
 
 ### Availability shading and click-to-book
@@ -72,6 +80,10 @@ A Payload modular dashboard widget (React Server Component) showing today's book
 
 Stat definitions are driven by the configured status machine's `blockingStatuses` and `terminalStatuses` — no status values are hardcoded. The widget uses the Payload Local API server-side — no HTTP round-trip. It respects the configured `reservations` slug.
 
+Stats are computed with `count` queries rather than a capped fetch, so they stay accurate past 100 reservations in a day. "Today" is the business-timezone day (derived from `config.admin.custom.reservationTimezone`), not the server's local day.
+
+> **Note:** The widget is registered as an *available* dashboard widget. Payload only renders it if it appears in the dashboard's default or saved layout — if you don't see it, add it to your dashboard layout.
+
 **Widget slug:** `reservation-todays-reservations`
 
 **Import path (if you need the component directly):**
@@ -94,7 +106,7 @@ A custom admin view registered at `/admin/reservation-availability`. Displays a 
 - **Single-unit resources** — list individual booking start times for that day
 - **Multi-unit resources (`quantity > 1`)** — show an "X / Y booked" capacity badge with graduated color (low / mid / full)
 
-Only reservations in a blocking status count toward bookings. Navigate between weeks with previous/next buttons.
+Only reservations in a blocking status count toward bookings. Exceptions honor the `date`–`endDate` range — a multi-day time-off block marks every day in the range unavailable, not just the start date. Days are keyed in the configured business `timezone`. Navigate between weeks with previous/next buttons.
 
 **Import path (if you need the component directly):**
 
@@ -116,6 +128,14 @@ config.admin.custom.reservationSlugs
 // Status machine (for color coding, transitions, etc.)
 config.admin.custom.reservationStatusMachine
 // { statuses, defaultStatus, terminalStatuses, blockingStatuses, transitions }
+
+// Business timezone (for keying days and rendering times)
+config.admin.custom.reservationTimezone
+// e.g. 'UTC' or 'America/New_York'
+
+// Tenant scoping (when multiTenant is configured)
+config.admin.custom.reservationTenant
+// { tenantField, cookieName }
 ```
 
 ---

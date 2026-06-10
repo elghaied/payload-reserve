@@ -30,16 +30,19 @@ Override any or all properties via the `statusMachine` option. Unset keys fall b
 ```typescript
 payloadReserve({
   statusMachine: {
-    statuses: ['requested', 'approved', 'in-progress', 'done', 'cancelled'],
+    statuses: ['requested', 'booked', 'done', 'voided'],
     defaultStatus: 'requested',
-    terminalStatuses: ['done', 'cancelled'],
-    blockingStatuses: ['approved', 'in-progress'],
+    // Decouple confirm/cancel logic from the literal status names.
+    // A custom vocabulary MUST set these (see below).
+    confirmStatus: 'booked',
+    cancelStatus: 'voided',
+    terminalStatuses: ['done', 'voided'],
+    blockingStatuses: ['requested', 'booked'],
     transitions: {
-      requested: ['approved', 'cancelled'],
-      approved: ['in-progress', 'cancelled'],
-      'in-progress': ['done', 'cancelled'],
+      requested: ['booked', 'voided'],
+      booked: ['done', 'voided'],
       done: [],
-      cancelled: [],
+      voided: [],
     },
   },
 })
@@ -48,9 +51,32 @@ payloadReserve({
 - The `statuses` array drives the select field options in the admin UI
 - The `transitions` map controls which updates `validateStatusTransition` allows
 - The `blockingStatuses` array determines which statuses occupy the slot in conflict detection
+- The `confirmStatus` (default `'confirmed'`) and `cancelStatus` (default `'cancelled'`) decouple the confirm/cancel logic from the literal status names. They drive the `beforeBookingConfirm`/`afterBookingConfirm`/`beforeBookingCancel`/`afterBookingCancel` plugin hooks, the cancellation notice-period rule, and the `cancellationReason` admin field condition
 - The resolved status machine is stored in `config.admin.custom.reservationStatusMachine` for admin component access
 
-**Config validation:** The status machine is validated at plugin initialization. Invalid configs — such as a `defaultStatus` not in `statuses`, `blockingStatuses` or `terminalStatuses` referencing unknown statuses, or transition keys/targets pointing to non-existent statuses — throw an error at startup rather than causing silent runtime failures.
+> **A custom status vocabulary MUST set `confirmStatus` and `cancelStatus`.** They default to `'confirmed'` and `'cancelled'` — if your statuses don't include those literals, the confirm/cancel hooks, the cancellation notice period, and the `cancellationReason` field condition silently won't fire. The example above sets `confirmStatus: 'booked'` and `cancelStatus: 'voided'`.
+
+The full `StatusMachineConfig` type:
+
+```typescript
+type StatusMachineConfig = {
+  blockingStatuses: string[]   // statuses that occupy a resource slot
+  cancelStatus: string         // status treated as "cancelled" (default 'cancelled')
+  confirmStatus: string        // status treated as "confirmed" (default 'confirmed')
+  defaultStatus: string        // status assigned on create
+  statuses: string[]           // all valid status values
+  terminalStatuses: string[]   // statuses from which no transition is allowed
+  transitions: Record<string, string[]>  // allowed next statuses per current status
+}
+```
+
+**Config validation:** The status machine is validated at plugin initialization (skipped when the plugin is `disabled`). Invalid configs throw an error at startup rather than causing silent runtime failures. The checks are:
+
+- `defaultStatus` must be in `statuses` (and must not be terminal — a reservation is born in `defaultStatus`)
+- `blockingStatuses` and `terminalStatuses` must reference only known statuses
+- transition keys and targets must point to existing statuses
+- a terminal status must have no outgoing transitions
+- `confirmStatus` and `cancelStatus` must be in `statuses`
 
 ## Business Logic Hooks
 

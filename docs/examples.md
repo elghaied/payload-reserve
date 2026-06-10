@@ -127,6 +127,31 @@ payloadReserve({
 })
 ```
 
+### Custom Confirm / Cancel Vocabulary
+
+The status machine's `confirmStatus` and `cancelStatus` map your custom vocabulary onto the booking lifecycle: `confirmStatus` fires the `beforeBookingConfirm` / `afterBookingConfirm` hooks, and `cancelStatus` fires `beforeBookingCancel` / `afterBookingCancel`, the cancellation notice period, and exposes the `cancellationReason` field. Set them when your statuses aren't named `confirmed` / `cancelled`.
+
+```typescript
+payloadReserve({
+  statusMachine: {
+    statuses: ['requested', 'booked', 'done', 'voided'],
+    defaultStatus: 'requested',
+    confirmStatus: 'booked', // treated as "confirmed"
+    cancelStatus: 'voided', // treated as "cancelled"
+    blockingStatuses: ['requested', 'booked'],
+    terminalStatuses: ['done', 'voided'],
+    transitions: {
+      requested: ['booked', 'voided'],
+      booked: ['done', 'voided'],
+      done: [],
+      voided: [],
+    },
+  },
+})
+```
+
+`statusMachine` is a partial override — any keys you omit fall back to the defaults.
+
 ### Staff Scheduling with Auto-Provisioning
 
 Every staff user automatically gets a paired bookable Resource they own. Opt in with `staffProvisioning` (requires `resourceOwnerMode`). When a user is created or updated with a staff role, a Resource is created and owned by that user — idempotently, and never auto-deleted on demotion.
@@ -229,6 +254,30 @@ await payload.create({
 ```
 
 If any required pool is fully booked at that time, the create fails with a conflict error that identifies the offending item (e.g. `items.1.startTime`).
+
+### Customizing a Collection (`collectionOverrides`)
+
+Use `collectionOverrides` to extend a generated collection without forking the plugin. The `fields` function receives the plugin's default fields so you can append your own. This example (issue #4) adds a reverse `join` field on Services that surfaces the Resources offering each service.
+
+```typescript
+payloadReserve({
+  collectionOverrides: {
+    services: {
+      fields: ({ defaultFields }) => [
+        ...defaultFields,
+        {
+          name: 'offeredBy',
+          type: 'join',
+          collection: 'resources',
+          on: 'services', // the Resources field that references Services
+        },
+      ],
+    },
+  },
+})
+```
+
+Supplied `hooks` are merged with the plugin's (plugin hooks run first), `access` composes per operation, and `slug` is ignored — see [Advanced → Collection Overrides](./advanced.md#collection-overrides).
 
 ### Configurable Vocabularies (Resource Types & Leave Types)
 

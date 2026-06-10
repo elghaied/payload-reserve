@@ -20,7 +20,9 @@ Each hook type is an array — hooks fire sequentially.
 
 ## beforeBookingCreate
 
-Fires before a new reservation is saved via the `POST /api/reserve/book` endpoint. Can modify the booking data.
+Fires before a new reservation is saved via the `POST /api/reserve/book` endpoint. Can modify the booking data. It fires **exactly once** per booking (it is registered as a collection `beforeChange` hook; the endpoint no longer runs it a second time).
+
+On the `/api/reserve/book` endpoint it therefore runs **inside** the collection `beforeChange` — after Payload's field validation — rather than against the raw request body. A hook that needs to stamp a *required* field should read it off the merged document at that point rather than assume it can inject it before validation runs.
 
 ```typescript
 type beforeBookingCreate = Array<
@@ -51,7 +53,7 @@ hooks: {
 
 ## beforeBookingConfirm
 
-Fires before a reservation transitions to `confirmed`. Throw an error to block the transition.
+Fires before a reservation transitions to the configured `statusMachine.confirmStatus` (default `'confirmed'`). Throw an error to block the transition. If you use a custom status vocabulary, set `confirmStatus` in the status machine and the hook fires on that status.
 
 The `doc` contains the merged document (`{ ...originalDoc, ...incomingData }`), so fields like `status` reflect the **new** value being set.
 
@@ -83,7 +85,9 @@ hooks: {
 
 ## beforeBookingCancel
 
-Fires before a reservation transitions to `cancelled`. Throw an error to block the cancellation.
+Fires before a reservation transitions to the configured `statusMachine.cancelStatus` (default `'cancelled'`). Throw an error to block the cancellation. If you use a custom status vocabulary, set `cancelStatus` in the status machine and the hook fires on that status.
+
+It fires **only after** the cancellation notice period is validated (`validateCancellation` runs before `validateStatusTransition`). A cancellation rejected by the notice period never reaches this hook — so refund/side-effect hooks do not run for a cancel that won't land.
 
 The `doc` contains the merged document (`{ ...originalDoc, ...incomingData }`). The `reason` is passed as a separate parameter from the incoming cancellation data.
 
@@ -111,7 +115,7 @@ hooks: {
 
 ## afterBookingCreate
 
-Fires after a new reservation is saved to the database.
+Fires after a new reservation is saved to the database. Respects `context.skipReservationHooks` — a create that sets the escape hatch (seeds, migrations) does not fire it.
 
 ```typescript
 type afterBookingCreate = Array<
@@ -137,7 +141,7 @@ hooks: {
 
 ## afterBookingConfirm
 
-Fires after a reservation transitions to `confirmed`. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
+Fires after a reservation transitions to the configured `statusMachine.confirmStatus` (default `'confirmed'`). Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
 
 ```typescript
 type afterBookingConfirm = Array<
@@ -163,7 +167,7 @@ hooks: {
 
 ## afterBookingCancel
 
-Fires after a reservation transitions to `cancelled`. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
+Fires after a reservation transitions to the configured `statusMachine.cancelStatus` (default `'cancelled'`). Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
 
 ```typescript
 type afterBookingCancel = Array<
@@ -190,6 +194,8 @@ hooks: {
 ## afterStatusChange
 
 Generic hook that fires on every status transition. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
+
+It fires **only on a real transition during an update** — never on create. (Previously it fired spuriously on every create with `previousStatus: undefined`; use `afterBookingCreate` for creation side-effects.)
 
 ```typescript
 type afterStatusChange = Array<
@@ -222,7 +228,7 @@ Separate from the booking-lifecycle hooks above, when `staffProvisioning` is con
 On user **create** — or on an **update** that promotes a user into a staff role — it provisions a paired Resource owned by that user:
 
 - **Role match** — fires only when the user's `roleField` (default `'role'`) value intersects `staffRoles`. Demoting a user never deletes their Resource.
-- **Idempotent** — skips if a Resource already owns that user, so re-saving never creates a duplicate.
+- **Idempotent** — idempotency comes from a dedup-by-owner query (not an early "was already staff" return): it skips only when a Resource already owns that user, so re-saving never creates a duplicate. Because the check is query-based, a pre-existing staff user (granted a staff role after the fact) and a user whose Resource was deleted are both (re)provisioned on their next save.
 - **Impersonation-based ownership** — the Resource is created with a `req` whose `user` is the new staff user, so the owner field resolves to them (not the admin who triggered the save); no bypass flag is used.
 - **Non-blocking** — provisioning failures are caught and logged; they never block the user create/update.
 - **Respects `context.skipReservationHooks`** — exits immediately when set.

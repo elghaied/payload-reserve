@@ -1,6 +1,6 @@
 # Booking Features
 
-Covers duration types, multi-resource bookings, and capacity/inventory management.
+Covers duration types, multi-resource bookings, capacity/inventory management, exceptions/time off, and how updates are re-validated.
 
 ## Duration Types
 
@@ -19,7 +19,7 @@ The standard appointment mode. The service duration is fixed and always applied.
 
 ### Flexible
 
-`endTime` is provided by the caller in the booking request. The service `duration` field acts as the minimum; if the provided `endTime` results in less than `duration` minutes the booking is rejected.
+`endTime` is provided by the caller in the booking request. The service `duration` field acts as the minimum; if the provided `endTime` results in less than `duration` minutes the booking is rejected. An inverted window — `endTime` at or before `startTime` — is rejected on both create and update.
 
 Used for open-ended services where the customer specifies how long they need — workspace rentals, recording studios, vehicle bays.
 
@@ -96,7 +96,11 @@ Each item in the `items` array has its own `resource`, optional `service`, optio
 - Duplicate `(resource, startTime)` pairs within the same booking are rejected.
 - Conflict errors include the item index (e.g., `items.2.startTime`) so you know which item failed.
 
-**Conflict detection** runs independently for each resource in the `items` array. Each item's own service determines its buffer times (`bufferTimeBefore`/`bufferTimeAfter`), so different items can have different buffer windows.
+**Conflict detection** runs independently for each resource in the `items` array. Each resource is blocked only for **its own item's** time window — not the whole span of the booking. A `[room 9:00–10:00, sauna 14:00–15:00]` package leaves the room free between 10:00 and 15:00, since the room item only occupies 9:00–10:00.
+
+Each item's own service determines its buffer times (`bufferTimeBefore`/`bufferTimeAfter`), so different items can have different buffer windows. Buffers are enforced **symmetrically** between neighbors: the gap required between two bookings on the same resource is the later booking's `bufferTimeBefore` plus the earlier booking's `bufferTimeAfter` (previously only the candidate booking's own buffers applied). Service buffer fields are capped at 1439 minutes.
+
+Two items in the **same** booking that target the same resource are also checked against each other, so a single create can't double-book one resource across two of its own items.
 
 ### Auto-expanded required resources
 
@@ -150,7 +154,7 @@ quantity: 5 allows 5 simultaneous bookings
 Booking with guestCount: 3 still occupies 1 slot
 ```
 
-**`per-guest`:** Each booking occupies `guestCount` units. Use this for group venues, yoga classes, boat tours, or any resource with a total people capacity.
+**`per-guest`:** Each booking occupies `guestCount` units. Capacity is counted by summing the `guestCount` of every matched item that lands on the resource for the overlapping window. Use this for group venues, yoga classes, boat tours, or any resource with a total people capacity.
 
 ```typescript
 await payload.create({
@@ -170,6 +174,26 @@ await payload.create({
 ### Guest counts
 
 `guestCount` on a reservation (or per item) records how many people the booking is for. It only affects capacity math when the resource uses `capacityMode: 'per-guest'` (above); in `per-reservation` mode it is informational. Items inherit the parent `guestCount` when omitted, defaulting to `1`. The availability endpoints (`/api/reserve/availability`, `/api/reserve/slots`) accept a `guestCount` query param so slot listings reflect per-guest capacity.
+
+---
+
+## Exceptions and Time Off
+
+A resource's schedules can declare `exceptions` — days the resource is unavailable (vacation, sick leave, closures). An exception recorded on **any** of a resource's schedules makes the **whole** resource unavailable that day, not just the schedule it was recorded on. So a part-time resource with separate morning and afternoon schedules is fully off-limits if either schedule has an exception for that date.
+
+Exception `date`–`endDate` ranges are honored inclusively — every calendar day from `date` to `endDate` (both ends included) is blocked.
+
+All day and time resolution — matching a date to a schedule, expanding `HH:mm` slots, and evaluating exceptions — runs in the business `timezone` (the plugin-level `timezone` option), so wall-clock schedules behave correctly regardless of server timezone.
+
+See [Collections → Schedules](./collections.md#schedules) for the exception field shape.
+
+---
+
+## Updating Reservations
+
+Editing an existing reservation re-validates conflicts and recomputes `endTime` only when a **scheduling-relevant** field actually changed: `startTime`, `endTime`, `resource`, `service`, `items`, `guestCount`, or a status transition that enters a blocking status. Benign edits — changing `notes`, or moving status **out** of a blocking status — skip conflict and `endTime` validation entirely.
+
+This means a reservation booked under an older buffer or schedule configuration can still take benign edits even if the buffers or schedules have since changed in a way that would make the original slot conflict. Only genuine scheduling changes are re-checked against current rules.
 
 ---
 

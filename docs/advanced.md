@@ -45,6 +45,44 @@ CREATE INDEX reservation_conflict_lookup
 
 ---
 
+## Collection Overrides
+
+The `collectionOverrides` option customizes any of the generated collections without forking the plugin. Each entry is keyed by collection (`services`, `resources`, `schedules`, `reservations`, `customers`) and accepts `Omit<Partial<CollectionConfig>, 'fields' | 'slug'> & { fields?: ({ defaultFields }) => Field[] }`. The plugin protects its load-bearing behavior:
+
+- **`fields`** — a function receiving the plugin's default fields, returning the final list (append / reorder / replace).
+- **`hooks`** — merged per event array; the plugin's hooks always run first, then yours. An override can add hooks but never clobber conflict detection or status hooks.
+- **`access`** — composed per operation; rules the override omits survive.
+- **`slug`** — ignored (the `slugs` option owns slugs).
+- Everything else (`admin`, `labels`, `custom`, …) is shallow-merged.
+
+Example (issue #4): add a reverse `join` field on Services pointing back at the Resources that offer them.
+
+```typescript
+payloadReserve({
+  collectionOverrides: {
+    services: {
+      fields: ({ defaultFields }) => [
+        ...defaultFields,
+        {
+          name: 'offeredBy',
+          type: 'join',
+          collection: 'resources',
+          on: 'services',
+        },
+      ],
+    },
+  },
+})
+```
+
+---
+
+## Disabling the Plugin
+
+Setting `disabled: true` keeps all collections **registered** so the database schema stays stable — it does not drop tables/collections. Only the behavior goes inert: hooks, endpoints, admin components, and staff provisioning are removed. This matters for migrations and DB tooling: a disabled install still owns the same schema, so toggling `disabled` does not require a migration.
+
+---
+
 ## Reconciliation Job
 
 For high-concurrency deployments, rare race conditions between two simultaneous bookings can slip past the hook-level conflict check. A background reconciliation job can detect and flag these after the fact.
@@ -121,6 +159,7 @@ Mitigations:
 
 When a service has `requiredResources`, the plugin expands them into `items[]` and conflict-checks each item independently against its own service's buffer times.
 
+- Conflict detection fetches the blocking reservations via a coarse superset query, then computes **true per-item occupancy** in memory: each occupying item's `[startTime, endTime)` window is expanded by *that item's own* service buffers. Multi-item bookings therefore no longer over-block (only the windows their items actually occupy count), and a neighbor's buffer is enforced against the candidate.
 - Conflict detection matches reservations that reference a resource **either** at the top level (`resource`) **or** inside another booking's `items[]` — a resource held only in another booking's items is not invisible.
 - A partial overbooking is possible if the primary resource is free but a required pool is full; the create is rejected atomically per booking. The reconciliation job should iterate `items[]` (not just the top-level `resource`) when grouping reservations by resource.
 

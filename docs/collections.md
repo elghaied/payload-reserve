@@ -2,6 +2,8 @@
 
 Schemas for all five collections created by the plugin.
 
+Any of these collections can be customized — fields, hooks, access — via the `collectionOverrides` plugin option (for example, adding a `join` field on Services back to Resources). See [Configuration → `collectionOverrides`](./configuration.md) and [Advanced](./advanced.md).
+
 ## Services
 
 **Slug:** `services`
@@ -11,16 +13,16 @@ Defines what can be booked (e.g., "Haircut", "Consultation", "Massage").
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | Text | Yes | Service name (max 200 chars) |
-| `image` | Upload | No | Service image |
+| `image` | Upload | No | Service image. Only added when a media collection (`slugs.media`, default `'media'`) exists in the Payload config — installs without one simply omit this field (no init error) |
 | `description` | Textarea | No | Service description |
 | `duration` | Number | Yes | Duration in minutes (min: 1) |
 | `durationType` | Select | Yes | `'fixed'`, `'flexible'`, or `'full-day'` (default: `'fixed'`) |
 | `price` | Number | No | Price (min: 0, step: 0.01) |
-| `bufferTimeBefore` | Number | No | Buffer minutes before the slot (default: 0) |
-| `bufferTimeAfter` | Number | No | Buffer minutes after the slot (default: 0) |
+| `bufferTimeBefore` | Number | No | Buffer minutes before the slot (default: 0, max: 1439) |
+| `bufferTimeAfter` | Number | No | Buffer minutes after the slot (default: 0, max: 1439) |
 | `requiredResources` | Relationship | No | Extra resource pools (hasMany) auto-expanded into the reservation `items[]` at booking time |
 | `allowGuestBooking` | Select | No | `'inherit'`, `'enabled'`, or `'disabled'` (default: `'inherit'`). Controls whether anonymous guest bookings are permitted for this service |
-| `owner` | Relationship | Yes* | *Only present when `resourceOwnerMode.ownedServices` is enabled.* Owner of this service (sidebar). Defaults to the requesting user on create |
+| `owner` | Relationship | Yes* | *Only present when `resourceOwnerMode.ownedServices` is enabled.* Owner of this service (sidebar). Defaults to the requesting user on create. Relates to `resourceOwnerMode.ownerCollection ?? staffProvisioning.userCollection ?? customers` (not a hardcoded customers slug) |
 | `active` | Checkbox | No | Whether service is bookable (default: true) |
 
 ```typescript
@@ -51,13 +53,13 @@ Who or what performs the service (a stylist, a room, a machine, a yoga instructo
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | Text | Yes | Resource name (max 200 chars) |
-| `image` | Upload | No | Resource photo |
+| `image` | Upload | No | Resource photo. Only added when a media collection (`slugs.media`, default `'media'`) exists in the Payload config — installs without one simply omit this field (no init error) |
 | `description` | Textarea | No | Resource description |
 | `services` | Relationship | No | Services this resource can perform (hasMany). Optional so freshly provisioned staff resources can exist before services are assigned |
 | `active` | Checkbox | No | Whether resource accepts bookings (default: true) |
 | `quantity` | Number | Yes | How many concurrent bookings allowed (default: 1) |
 | `capacityMode` | Select | No | `'per-reservation'` or `'per-guest'` — shown only when `quantity > 1` |
-| `timezone` | Text | No | IANA timezone for display purposes |
+| `timezone` | Text | No | **Deprecated / unused** — schedule resolution uses the plugin-level `timezone` option, not this field |
 | `resourceType` | Select | No | Descriptive resource category. Options come from the `resourceTypes` config (default `['staff','equipment','room']`); defaults to the first entry (`'staff'`). Drives no logic |
 | `owner` | Relationship | Yes* | *Only present when `resourceOwnerMode` is enabled.* Owner of this resource (sidebar). Defaults to the requesting user on create. Relates to `resourceOwnerMode.ownerCollection ?? staffProvisioning.userCollection ?? customers` |
 
@@ -133,9 +135,9 @@ A dedicated auth collection with `auth: true` for customer JWT login. Has `acces
 
 ### User Collection Mode (`userCollection` set)
 
-The plugin injects `name`, `phone`, `notes`, and a `bookings` join field into your existing auth collection. No new collection is created. The resolved `slugs.customers` points at the user collection so all downstream code uses the correct slug.
+The plugin injects `name`, `phone`, `notes`, and a `bookings` join field into your existing auth collection — each only if a field with that name isn't already present. No new collection is created. The resolved `slugs.customers` points at the user collection so all downstream code uses the correct slug. Note: the injected `name` is **not** required here, so existing users without a name can still be updated.
 
-Field deduplication prevents double-injection — the plugin checks each field's `name` before injecting, so if your collection already defines `name` (or any of the others) the existing field config wins.
+Field deduplication prevents double-injection — the plugin checks each field's `name` before injecting, so if your collection already defines `name` (or any of the others) the existing field config wins. Deduplication descends into presentational containers (tabs, rows, collapsibles, unnamed groups), so a `name` nested inside one of them won't be re-injected at the top level.
 
 ### Fields
 
@@ -144,7 +146,7 @@ Field deduplication prevents double-injection — the plugin checks each field's
 | `email` | Email | Customer email (from Payload auth) |
 | `firstName` | Text | First name (standalone mode only) |
 | `lastName` | Text | Last name (standalone mode only) |
-| `name` | Text | Customer name (max 200 chars, required). Injected into the user collection so `admin.useAsTitle: 'name'` works out of the box |
+| `name` | Text | Customer name (max 200 chars; required in standalone mode, optional when injected into a user collection). Injected into the user collection so `admin.useAsTitle: 'name'` works out of the box |
 | `phone` | Text | Phone number (max 50 chars) |
 | `notes` | Textarea | Internal notes visible only to admins |
 | `bookings` | Join | Virtual field — all reservations for this customer |
@@ -163,7 +165,7 @@ The core booking records. Each reservation links a service performed by a resour
 | `resource` | Relationship | Yes | Resource performing the service |
 | `customer` | Relationship | No | Customer making the booking. Optional — bookings may instead capture an anonymous `guest`. Uses a custom CustomerField admin component with inline create/edit |
 | `guest` | Group | No | Anonymous guest details: `name` (text, max 200), `email` (email), `phone` (text, max 50). Used when no `customer` is set |
-| `cancellationToken` | Text | No | Hidden, indexed token for self-service (guest) cancellation. Read access restricted to non-customer users (admins/staff); never returned by the public API |
+| `cancellationToken` | Text | No | Hidden, indexed token for self-service (guest) cancellation. Server-generated only — create and update access are denied, so it can never be set via the API. Read access restricted to staff/admin (non-customer users); never returned by the public API |
 | `startTime` | Date | Yes | Appointment start (availability-aware slot picker) |
 | `endTime` | Date | No | Auto-calculated from service duration (read-only) |
 | `status` | Select | No | Workflow status (default: `'pending'`) |
