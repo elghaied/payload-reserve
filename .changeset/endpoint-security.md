@@ -1,0 +1,5 @@
+---
+'payload-reserve': patch
+---
+
+Harden the public endpoints. `GET /api/reserve/resource-availability` (the admin grid's data source) now requires a staff/admin user (401 anonymous, 403 customers — same gate as customer search; single-collection installs must configure `resourceOwnerMode.adminRoles` or `staffProvisioning.staffRoles`), caps the date range at 90 days, and returns 404 for unknown resources instead of leaking every reservation's busy window to anonymous callers. `POST /api/reserve/book` no longer allows booking on behalf of arbitrary customers: anonymous callers may not set `customer` (403 — the guest flow covers them), authenticated customers are always booked as themselves, staff/admin may book for anyone; caller-supplied `cancellationToken` values are discarded. The slots/availability endpoints reject non-numeric `guestCount` with a 400 (previously NaN silently produced an empty slot list) and return 404 for unknown or malformed service/resource ids instead of 500. Customer search falls back to default pagination for non-numeric `limit`/`page`.

@@ -4024,3 +4024,222 @@ describe('Reservation plugin - partial updates (review A1)', () => {
     ).rejects.toThrow()
   })
 })
+
+describe('Endpoint security (review B1/B2/B3/B6/B8)', () => {
+  const futureIso = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
+  let secService: { id: number | string }
+  let secResource: { id: number | string }
+  let secCustomerA: { id: number | string }
+  let secCustomerB: { id: number | string }
+
+  beforeAll(async () => {
+    secService = await payload.create({
+      collection: col('services'),
+      data: {
+        name: 'Security Service',
+        active: true,
+        bufferTimeAfter: 0,
+        bufferTimeBefore: 0,
+        duration: 60,
+      },
+    })
+    secResource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Security Resource', active: true, services: [secService.id] },
+    })
+    secCustomerA = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'security-a@example.com',
+        firstName: 'Sec',
+        lastName: 'A',
+        password: 'testpass123',
+      },
+    })
+    secCustomerB = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'security-b@example.com',
+        firstName: 'Sec',
+        lastName: 'B',
+        password: 'testpass123',
+      },
+    })
+  })
+
+  const availabilityReq = (query: string, user?: Record<string, unknown>) => ({
+    payload,
+    url: `http://local/api/reserve/resource-availability?${query}`,
+    user,
+  })
+
+  test('resource-availability requires authentication (B1)', async () => {
+    const { createResourceAvailabilityEndpoint } = await import(
+      '../src/endpoints/resourceAvailability.js'
+    )
+    const ep = createResourceAvailabilityEndpoint(resolveConfig({}))
+    const query = `resource=${secResource.id}&start=2031-01-01&end=2031-01-08`
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anon = await ep.handler(availabilityReq(query) as any)
+    expect(anon.status).toBe(401)
+
+    const asCustomer = await ep.handler(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      availabilityReq(query, { id: secCustomerA.id, collection: 'customers' }) as any,
+    )
+    expect(asCustomer.status).toBe(403)
+
+    const asAdmin = await ep.handler(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      availabilityReq(query, { id: 'admin-1', collection: 'users' }) as any,
+    )
+    expect(asAdmin.status).toBe(200)
+  })
+
+  test('resource-availability clamps the date range and 404s unknown resources (B2/B8)', async () => {
+    const { createResourceAvailabilityEndpoint } = await import(
+      '../src/endpoints/resourceAvailability.js'
+    )
+    const ep = createResourceAvailabilityEndpoint(resolveConfig({}))
+    const admin = { id: 'admin-1', collection: 'users' }
+
+    const oversized = await ep.handler(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      availabilityReq(`resource=${secResource.id}&start=2031-01-01&end=2032-01-01`, admin) as any,
+    )
+    expect(oversized.status).toBe(400)
+
+    const inverted = await ep.handler(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      availabilityReq(`resource=${secResource.id}&start=2031-01-08&end=2031-01-01`, admin) as any,
+    )
+    expect(inverted.status).toBe(400)
+
+    const missing = await ep.handler(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      availabilityReq('resource=65f000000000000000000000&start=2031-01-01&end=2031-01-08', admin) as any,
+    )
+    expect(missing.status).toBe(404)
+
+    const malformed = await ep.handler(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      availabilityReq('resource=not-an-id&start=2031-01-01&end=2031-01-08', admin) as any,
+    )
+    expect(malformed.status).toBe(404)
+  })
+
+  test('anonymous bookings cannot set a customer (B3)', async () => {
+    const ep = createBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () =>
+        Promise.resolve({
+          customer: secCustomerA.id,
+          resource: secResource.id,
+          service: secService.id,
+          startTime: futureIso(200),
+        }),
+      payload,
+      t: (k: string) => k,
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    expect(resp.status).toBe(403)
+  })
+
+  test('authenticated customers are forced to book for themselves (B3)', async () => {
+    const ep = createBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () =>
+        Promise.resolve({
+          cancellationToken: 'attacker-chosen-token',
+          customer: secCustomerB.id,
+          resource: secResource.id,
+          service: secService.id,
+          startTime: futureIso(240),
+          status: 'pending',
+        }),
+      payload,
+      t: (k: string) => k,
+      user: { id: secCustomerA.id, collection: 'customers' },
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    expect(resp.status).toBe(201)
+    const json = (await resp.json()) as Record<string, unknown>
+
+    const created = await payload.findByID({
+      id: json.id as string,
+      collection: col('reservations'),
+      depth: 0,
+    })
+    expect(String(created.customer)).toBe(String(secCustomerA.id))
+    expect(created.cancellationToken).not.toBe('attacker-chosen-token')
+  })
+
+  test('staff may book on behalf of any customer (B3 control)', async () => {
+    const ep = createBookingEndpoint(resolveConfig({}))
+    const req = {
+      json: () =>
+        Promise.resolve({
+          customer: secCustomerB.id,
+          resource: secResource.id,
+          service: secService.id,
+          startTime: futureIso(280),
+          status: 'pending',
+        }),
+      payload,
+      t: (k: string) => k,
+      user: { id: 'admin-1', collection: 'users' },
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await ep.handler(req as any)
+    expect(resp.status).toBe(201)
+    const json = (await resp.json()) as Record<string, unknown>
+    const created = await payload.findByID({
+      id: json.id as string,
+      collection: col('reservations'),
+      depth: 0,
+    })
+    expect(String(created.customer)).toBe(String(secCustomerB.id))
+  })
+
+  test('slots endpoint rejects non-numeric guestCount and 404s unknown ids (B6/B8)', async () => {
+    const { createGetSlotsEndpoint } = await import('../src/endpoints/getSlots.js')
+    const ep = createGetSlotsEndpoint(resolveConfig({}))
+    const mkReq = (query: string) => ({
+      payload,
+      url: `http://local/api/reserve/slots?${query}`,
+    })
+
+    const badGuest = await ep.handler(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mkReq(`date=2031-01-06&resource=${secResource.id}&service=${secService.id}&guestCount=abc`) as any,
+    )
+    expect(badGuest.status).toBe(400)
+
+    const badService = await ep.handler(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mkReq(`date=2031-01-06&resource=${secResource.id}&service=not-an-id`) as any,
+    )
+    expect(badService.status).toBe(404)
+
+    const badResource = await ep.handler(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mkReq(`date=2031-01-06&resource=not-an-id&service=${secService.id}`) as any,
+    )
+    expect(badResource.status).toBe(404)
+  })
+
+  test('customer search tolerates non-numeric pagination (B6)', async () => {
+    const { createCustomerSearchEndpoint } = await import('../src/endpoints/customerSearch.js')
+    const ep = createCustomerSearchEndpoint(resolveConfig({}))
+    const resp = await ep.handler({
+      payload,
+      url: 'http://local/api/reservation-customer-search?search=Sec&limit=abc&page=xyz',
+      user: { id: 'admin-1', collection: 'users' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    expect(resp.status).toBe(200)
+  })
+})

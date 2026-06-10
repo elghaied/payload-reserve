@@ -2,10 +2,30 @@ import type { Endpoint } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { isPrivilegedUser } from '../utilities/userRoles.js'
+
 export function createBookingEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
     handler: async (req) => {
       const data = (await req.json?.()) as Record<string, unknown>
+
+      // Cancellation tokens are server-generated secrets — never accept one
+      // from the request body.
+      delete data.cancellationToken
+
+      // Who may book for whom: staff/admin for anyone (walk-ins); an
+      // authenticated customer only for themselves; anonymous callers never
+      // for an existing customer record (the guest flow covers them).
+      if (!isPrivilegedUser(req.user, config)) {
+        if (req.user) {
+          data.customer = req.user.id
+        } else if (data.customer) {
+          return Response.json(
+            { error: 'Anonymous bookings cannot set a customer' },
+            { status: 403 },
+          )
+        }
+      }
 
       // Create via Payload Local API — collection hooks handle conflict detection,
       // endTime calculation, status transitions, AND the beforeBookingCreate

@@ -46,7 +46,11 @@ export function createCheckAvailabilityEndpoint(
         dayKey = getDayKeyInTimezone(parsed, config.timezone)
       }
 
-      const guestCount = Math.max(Number(url.searchParams.get('guestCount') ?? '1'), 1)
+      const guestCountRaw = Number(url.searchParams.get('guestCount') ?? '1')
+      if (!Number.isFinite(guestCountRaw)) {
+        return Response.json({ error: 'Invalid guestCount' }, { status: 400 })
+      }
+      const guestCount = Math.max(Math.floor(guestCountRaw), 1)
 
       // Resolve required resource set: caller resource(s) ∪ service.requiredResources
       const explicit = url.searchParams.get('resources')
@@ -58,7 +62,23 @@ export function createCheckAvailabilityEndpoint(
         collection: config.slugs.services,
         depth: 0,
         req,
-      })
+      }).catch(() => null)
+      if (!svcDoc) {
+        return Response.json({ error: 'Service not found' }, { status: 404 })
+      }
+
+      // Validate the primary resource id up front — a malformed id in a query
+      // surfaces as an adapter cast error (500) instead of a clean 404.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const resourceDoc = await (req.payload.findByID as any)({
+        id: resource,
+        collection: config.slugs.resources,
+        depth: 0,
+        req,
+      }).catch(() => null)
+      if (!resourceDoc) {
+        return Response.json({ error: 'Resource not found' }, { status: 404 })
+      }
       const requiredIds = ((svcDoc?.requiredResources as unknown[]) ?? [])
         .map((r) => extractId(r))
         .filter((r): r is number | string => r !== undefined)

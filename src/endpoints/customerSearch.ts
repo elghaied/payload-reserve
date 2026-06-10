@@ -36,8 +36,11 @@ export function createCustomerSearchEndpoint(
 
       const url = new URL(req.url!)
       const search = url.searchParams.get('search') ?? ''
-      const limit = Math.min(Number(url.searchParams.get('limit') ?? '10'), 50)
-      const page = Math.max(Number(url.searchParams.get('page') ?? '1'), 1)
+      const limitRaw = Number(url.searchParams.get('limit') ?? '10')
+      const pageRaw = Number(url.searchParams.get('page') ?? '1')
+      // Non-numeric input falls back to defaults instead of passing NaN to the DB
+      const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(Math.floor(limitRaw), 1), 50) : 10
+      const page = Number.isFinite(pageRaw) ? Math.max(Math.floor(pageRaw), 1) : 1
 
       // Detect which fields exist on the target collection at runtime
       const collectionConfig = req.payload.collections[config.slugs.customers as unknown as CollectionSlug]?.config

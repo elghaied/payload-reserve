@@ -8,6 +8,9 @@ import {
   combineDayKeyAndTime,
   getDayKeyInTimezone,
 } from '../utilities/timezoneUtils.js'
+import { isPrivilegedUser } from '../utilities/userRoles.js'
+
+const MAX_RANGE_MS = 90 * 86_400_000
 
 type DayAvailability = {
   date: string
@@ -66,7 +69,7 @@ export async function buildResourceAvailability(params: {
   scheduleSlug: string
   start: Date
   timeZone: string
-}): Promise<ResourceAvailability> {
+}): Promise<null | ResourceAvailability> {
   const {
     blockingStatuses,
     end,
@@ -85,7 +88,10 @@ export async function buildResourceAvailability(params: {
     id: resourceId,
     collection: resourceSlug,
     depth: 1,
-  })
+  }).catch(() => null)
+  if (!resource) {
+    return null
+  }
   const quantity = (resource?.quantity as number) ?? 1
   const capacityMode = (resource?.capacityMode as 'per-guest' | 'per-reservation') ?? 'per-reservation'
 
@@ -204,6 +210,15 @@ export function createResourceAvailabilityEndpoint(
 ): Endpoint {
   return {
     handler: async (req) => {
+      // The grid data (every reservation's busy window) is staff/admin-only —
+      // same gate as customer search.
+      if (!req.user) {
+        return Response.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      if (!isPrivilegedUser(req.user, config)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
       const url = new URL(req.url!)
       const resource = url.searchParams.get('resource')
       const start = url.searchParams.get('start')
@@ -221,6 +236,13 @@ export function createResourceAvailabilityEndpoint(
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         return Response.json({ error: 'Invalid start/end date' }, { status: 400 })
       }
+      if (endDate <= startDate) {
+        return Response.json({ error: 'end must be after start' }, { status: 400 })
+      }
+      // Unbounded ranges turn the per-day resolution loop into a CPU sink
+      if (endDate.getTime() - startDate.getTime() > MAX_RANGE_MS) {
+        return Response.json({ error: 'Date range too large (max 90 days)' }, { status: 400 })
+      }
 
       const result = await buildResourceAvailability({
         blockingStatuses: config.statusMachine.blockingStatuses,
@@ -233,6 +255,10 @@ export function createResourceAvailabilityEndpoint(
         start: startDate,
         timeZone: config.timezone,
       })
+
+      if (!result) {
+        return Response.json({ error: 'Resource not found' }, { status: 404 })
+      }
 
       return Response.json(result)
     },

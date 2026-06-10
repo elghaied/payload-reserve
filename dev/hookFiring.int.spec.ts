@@ -75,6 +75,8 @@ describe('Plugin hook firing (review A6/A7/A8/A15)', () => {
         }),
       payload,
       t: (k: string) => k,
+      // Staff user: anonymous callers may no longer set `customer` (review B3)
+      user: { id: 'admin-1', collection: 'users' },
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resp = await ep.handler(req as any)
