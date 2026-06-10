@@ -3,7 +3,11 @@ import type { Endpoint, Payload, Where } from 'payload'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { resolveScheduleForDate } from '../utilities/scheduleUtils.js'
-import { localDayKey } from '../utilities/slotUtils.js'
+import {
+  addDaysToDayKey,
+  combineDayKeyAndTime,
+  getDayKeyInTimezone,
+} from '../utilities/timezoneUtils.js'
 
 type DayAvailability = {
   date: string
@@ -61,6 +65,7 @@ export async function buildResourceAvailability(params: {
   resourceSlug: string
   scheduleSlug: string
   start: Date
+  timeZone: string
 }): Promise<ResourceAvailability> {
   const {
     blockingStatuses,
@@ -71,6 +76,7 @@ export async function buildResourceAvailability(params: {
     resourceSlug,
     scheduleSlug,
     start,
+    timeZone,
   } = params
 
   // depth 1 so `services` are populated (their `requiredResources` come back as ids)
@@ -99,17 +105,18 @@ export async function buildResourceAvailability(params: {
   }
 
   const days: DayAvailability[] = []
-  for (let d = new Date(start); d < end; d = new Date(d.getTime() + 86_400_000)) {
-    const date = localDayKey(d)
+  const startKey = getDayKeyInTimezone(start, timeZone)
+  const lastKey = getDayKeyInTimezone(new Date(end.getTime() - 1), timeZone)
+  for (let date = startKey; date <= lastKey; date = addDaysToDayKey(date, 1)) {
     const shiftWindows: DayAvailability['shiftWindows'] = []
     const timeOff: DayAvailability['timeOff'] = []
 
     for (const sched of schedules as Array<Record<string, unknown>>) {
       // resolveScheduleForDate accepts a Schedule-shaped object; cast through unknown
-      // Pass the pre-computed day key string so resolution is TZ-independent.
       const ranges = resolveScheduleForDate(
         sched as unknown as Parameters<typeof resolveScheduleForDate>[0],
         date,
+        timeZone,
       )
       for (const r of ranges) {
         shiftWindows.push({ end: r.end.toISOString(), start: r.start.toISOString() })
@@ -117,16 +124,18 @@ export async function buildResourceAvailability(params: {
 
       const exceptions = (sched.exceptions as RawException[] | undefined) ?? []
       for (const exc of exceptions) {
-        const excStart = localDayKey(new Date(exc.date))
-        const excEnd = exc.endDate ? localDayKey(new Date(exc.endDate)) : excStart
+        const excStart = getDayKeyInTimezone(new Date(exc.date), timeZone)
+        const excEnd = exc.endDate ? getDayKeyInTimezone(new Date(exc.endDate), timeZone) : excStart
         if (date >= excStart && date <= excEnd) {
-          const localStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
-          const localEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
+          const dayStart = combineDayKeyAndTime(date, '00:00', timeZone)
+          const dayEnd = new Date(
+            combineDayKeyAndTime(date, '23:59', timeZone).getTime() + 59_999,
+          )
           timeOff.push({
             type: exc.type,
-            end: localEnd.toISOString(),
+            end: dayEnd.toISOString(),
             reason: exc.reason,
-            start: localStart.toISOString(),
+            start: dayStart.toISOString(),
           })
         }
       }
@@ -222,6 +231,7 @@ export function createResourceAvailabilityEndpoint(
         resourceSlug: config.slugs.resources,
         scheduleSlug: config.slugs.schedules,
         start: startDate,
+        timeZone: config.timezone,
       })
 
       return Response.json(result)

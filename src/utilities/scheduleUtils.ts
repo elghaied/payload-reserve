@@ -28,7 +28,8 @@ export function getDayOfWeek(date: Date): DayOfWeek {
 }
 
 /**
- * Check if a date string (ISO) matches a DayOfWeek.
+ * @deprecated Server-TZ-dependent legacy helper — no longer used by the plugin's
+ * own resolution path. Use timezoneUtils (getDayOfWeekFromDayKey / combineDayKeyAndTime).
  */
 export function dateMatchesDay(date: Date, day: DayOfWeek): boolean {
   return date.getDay() === DAY_MAP[day]

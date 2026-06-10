@@ -3459,6 +3459,7 @@ describe('resource-availability endpoint logic', () => {
       resourceSlug: 'resources',
       scheduleSlug: 'schedules',
       start: new Date('2026-06-08T00:00:00.000Z'),
+      timeZone: 'UTC',
     })
 
     expect(result.quantity).toBe(1)
@@ -3500,6 +3501,7 @@ describe('resource-availability endpoint logic', () => {
       resourceSlug: 'resources',
       scheduleSlug: 'schedules',
       start: new Date('2026-07-06T00:00:00.000Z'),
+      timeZone: 'UTC',
     })
     const day = result.days.find((d) => d.date === '2026-07-06')
     expect(day?.shiftWindows.length ?? 0).toBe(0)
@@ -3605,6 +3607,7 @@ describe('resource-availability requiredPools', () => {
       resourceSlug: 'resources',
       scheduleSlug: 'schedules',
       start: new Date('2026-06-08T00:00:00.000Z'),
+      timeZone: 'UTC',
     })
 
     expect(result.requiredPools.length).toBe(1)

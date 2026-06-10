@@ -139,4 +139,54 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
       '2026-06-10T21:59:59.999Z',
     )
   })
+
+  test('resource-availability grid keys days and time-off in Paris', async () => {
+    const { buildResourceAvailability } = await import('../src/endpoints/resourceAvailability.js')
+
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'TZ Grid Service', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'TZ Grid Resource', active: true, services: [service.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'TZ Grid Schedule',
+        active: true,
+        exceptions: [{ date: '2026-07-01T00:00:00.000Z' }],
+        recurringSlots: [{ day: 'wed', endTime: '17:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+
+    const result = await buildResourceAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      end: new Date('2026-07-02T00:00:00.000Z'),
+      payload,
+      reservationSlug: 'reservations',
+      resourceId: resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      start: new Date('2026-06-29T00:00:00.000Z'),
+      timeZone: 'Europe/Paris',
+    })
+
+    const keys = result.days.map((d) => d.date)
+    expect(keys).toContain('2026-07-01')
+
+    // July 1 2026 is a Wednesday AND an exception: no shift windows, time-off covers the Paris day
+    const july1 = result.days.find((d) => d.date === '2026-07-01')!
+    expect(july1.shiftWindows).toHaveLength(0)
+    expect(july1.timeOff.length).toBeGreaterThan(0)
+    // Paris midnight July 1 = 22:00Z June 30
+    expect(july1.timeOff[0].start).toBe('2026-06-30T22:00:00.000Z')
+
+    // June 30 (Tuesday, not exception): no shift windows but also NOT time-off
+    const june30 = result.days.find((d) => d.date === '2026-06-30')!
+    expect(june30.timeOff).toHaveLength(0)
+  })
 })
