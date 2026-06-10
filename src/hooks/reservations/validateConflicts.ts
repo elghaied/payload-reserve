@@ -6,13 +6,18 @@ import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { checkAvailability } from '../../services/AvailabilityService.js'
-import { mergeReservationData, schedulingFieldsChanged } from '../../utilities/reservationChanges.js'
+import {
+  mergeReservationData,
+  schedulingFieldsChanged,
+} from '../../utilities/reservationChanges.js'
 import { extractId, resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 
 export const validateConflicts =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
   async ({ context, data, operation, originalDoc, req }) => {
-    if (context?.skipReservationHooks) {return data}
+    if (context?.skipReservationHooks) {
+      return data
+    }
 
     const isUpdate = operation === 'update'
 
@@ -40,11 +45,15 @@ export const validateConflicts =
 
     const items = resolveReservationItems(source)
 
-    if (items.length === 0) {return data}
+    if (items.length === 0) {
+      return data
+    }
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
-      if (!item.endTime) {continue}
+      if (!item.endTime) {
+        continue
+      }
 
       // Fetch buffer times from the item's own service (not just the primary)
       const itemServiceId = item.service ?? extractId(source.service)
