@@ -33,17 +33,22 @@ export const payloadReserve =
       config.collections = []
     }
 
-    if (resolved.disabled) {
-      return config
-    }
-
     if (resolved.userCollection) {
       // Extend the existing auth collection with customer fields
       const targetCollection = config.collections.find(
         (col) => col.slug === resolved.userCollection,
       )
 
-      if (targetCollection) {
+      if (!targetCollection) {
+        // Fail loudly rather than silently skipping field injection and pointing
+        // the customers slug at a collection that doesn't exist (review C2).
+        throw new Error(
+          `payload-reserve: userCollection "${resolved.userCollection}" was not found in config.collections. ` +
+            `Define it before payloadReserve() runs, or correct the slug.`,
+        )
+      }
+
+      {
         // Collect existing field names for deduplication check
         const existingFieldNames = new Set(
           targetCollection.fields
@@ -89,23 +94,46 @@ export const payloadReserve =
       // Point the customers slug at the user collection so other parts of the
       // plugin (endpoints, hooks) reference the correct collection
       resolved.slugs.customers = resolved.userCollection
+    }
 
-      // Push only the 4 domain collections (no standalone Customers)
-      config.collections.push(
-        createServicesCollection(resolved),
-        createResourcesCollection(resolved),
-        createSchedulesCollection(resolved),
-        createReservationsCollection(resolved),
-      )
-    } else {
-      // Default behaviour: push all 5 collections including standalone Customers
-      config.collections.push(
-        createServicesCollection(resolved),
-        createResourcesCollection(resolved),
-        createSchedulesCollection(resolved),
-        createReservationsCollection(resolved),
-        createCustomersCollection(resolved),
-      )
+    // The slugs this plugin is about to register (Customers only in standalone mode)
+    const slugsToRegister = [
+      resolved.slugs.services,
+      resolved.slugs.resources,
+      resolved.slugs.schedules,
+      resolved.slugs.reservations,
+      ...(resolved.userCollection ? [] : [resolved.slugs.customers]),
+    ]
+
+    // C11: fail with a clear, actionable error on slug collision instead of
+    // Payload's generic DuplicateCollection throw.
+    for (const slug of slugsToRegister) {
+      if (config.collections.some((col) => col.slug === slug)) {
+        throw new Error(
+          `payload-reserve: a collection with slug "${slug}" already exists. ` +
+            `Override the plugin's slug via the \`slugs\` option.`,
+        )
+      }
+    }
+
+    config.collections.push(
+      createServicesCollection(resolved),
+      createResourcesCollection(resolved),
+      createSchedulesCollection(resolved),
+      createReservationsCollection(resolved),
+      ...(resolved.userCollection ? [] : [createCustomersCollection(resolved)]),
+    )
+
+    // C3: collections are registered (above) even when disabled so the DB schema
+    // stays stable; behavior (hooks, endpoints, admin, provisioning) is inert.
+    if (resolved.disabled) {
+      for (const slug of slugsToRegister) {
+        const col = config.collections.find((c) => c.slug === slug)
+        if (col) {
+          delete col.hooks
+        }
+      }
+      return config
     }
 
     // Register custom endpoints

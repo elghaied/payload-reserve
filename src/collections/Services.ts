@@ -3,12 +3,16 @@ import type { CollectionConfig, CollectionSlug, Field } from 'payload'
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
-import { makeServiceOwnerAccess } from '../utilities/ownerAccess.js'
+import { composeAccess, makeServiceOwnerAccess } from '../utilities/ownerAccess.js'
 
 export function createServicesCollection(config: ResolvedReservationPluginConfig): CollectionConfig {
   const rom = config.resourceOwnerMode
   const ownedServices = rom?.ownedServices ?? false
   const ownerField = rom?.ownerField ?? 'owner'
+  // Owner relationship points where owners/staff live — same resolution as
+  // Resources; previously hardcoded to customers, breaking separate user setups.
+  const ownerCollection =
+    rom?.ownerCollection ?? config.staffProvisioning?.userCollection ?? config.slugs.customers
 
   // Owner field on Services (only when ownedServices: true)
   const ownerFieldDef: Field | null =
@@ -28,15 +32,16 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
             ],
           },
           label: ({ t }) => (t as PluginT)('reservation:fieldOwner'),
-          relationTo: config.slugs.customers as unknown as CollectionSlug,
+          relationTo: ownerCollection as unknown as CollectionSlug,
           required: true,
         }
       : null
 
-  // Determine access: app override → owner-mode auto-wired → unrestricted
-  const access =
-    config.access.services ??
-    (rom && ownedServices ? makeServiceOwnerAccess(rom, ownerField) : {})
+  // Owner-mode base rules with any app overrides composed on top (per operation)
+  const access = composeAccess(
+    rom && ownedServices ? makeServiceOwnerAccess(rom, ownerField) : {},
+    config.access.services,
+  )
 
   return {
     slug: config.slugs.services,

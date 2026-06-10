@@ -10,6 +10,7 @@ import type { ReservationPluginHooks, ResolvedReservationPluginConfig } from '..
 
 import { calculateEndTime } from '../hooks/reservations/calculateEndTime.js'
 import { checkIdempotency } from '../hooks/reservations/checkIdempotency.js'
+import { enforceCustomerOwnership } from '../hooks/reservations/enforceCustomerOwnership.js'
 import { expandRequiredResources } from '../hooks/reservations/expandRequiredResources.js'
 import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
@@ -17,7 +18,7 @@ import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
 import { validateGuestBooking } from '../hooks/reservations/validateGuestBooking.js'
 import { validateStatusTransition } from '../hooks/reservations/validateStatusTransition.js'
 import { statusToI18nKey } from '../utilities/i18nUtils.js'
-import { makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
+import { composeAccess, makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
 
 function createPluginHooksBeforeCreate(
   hooks: ReservationPluginHooks,
@@ -59,7 +60,7 @@ export function createReservationsCollection(
   const { statusMachine } = config
   const rom = config.resourceOwnerMode
   const access =
-    config.access.reservations ?? (rom ? makeReservationOwnerAccess(rom) : {})
+    composeAccess(rom ? makeReservationOwnerAccess(rom) : {}, config.access.reservations)
 
   return {
     slug: config.slugs.reservations,
@@ -264,6 +265,7 @@ export function createReservationsCollection(
       ],
       beforeChange: [
         createPluginHooksBeforeCreate(config.hooks),
+        enforceCustomerOwnership(config),
         checkIdempotency(config),
         validateGuestBooking(config),
         expandRequiredResources(config),

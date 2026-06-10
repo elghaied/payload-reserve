@@ -3,7 +3,7 @@ import type { CollectionConfig, CollectionSlug, Field } from 'payload'
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
-import { makeResourceOwnerAccess } from '../utilities/ownerAccess.js'
+import { composeAccess, makeResourceOwnerAccess } from '../utilities/ownerAccess.js'
 import { buildSelectOptions } from '../utilities/selectOptions.js'
 
 /**
@@ -60,7 +60,7 @@ export function createResourcesCollection(
 
   // Determine access: app override → owner-mode auto-wired → unrestricted
   const access =
-    config.access.resources ?? (rom ? makeResourceOwnerAccess(rom) : {})
+    composeAccess(rom ? makeResourceOwnerAccess(rom) : {}, config.access.resources)
 
   return {
     slug: config.slugs.resources,

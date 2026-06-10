@@ -5,7 +5,7 @@ import { ValidationError } from 'payload'
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
-import { makeScheduleOwnerAccess } from '../utilities/ownerAccess.js'
+import { composeAccess, makeScheduleOwnerAccess } from '../utilities/ownerAccess.js'
 import { buildSelectOptions } from '../utilities/selectOptions.js'
 import { getDayKeyInTimezone } from '../utilities/timezoneUtils.js'
 
@@ -21,7 +21,7 @@ export function createSchedulesCollection(
 ): CollectionConfig {
   const rom = config.resourceOwnerMode
   const access =
-    config.access.schedules ?? (rom ? makeScheduleOwnerAccess(rom) : {})
+    composeAccess(rom ? makeScheduleOwnerAccess(rom) : {}, config.access.schedules)
 
   return {
     slug: config.slugs.schedules,
@@ -190,9 +190,15 @@ export function createSchedulesCollection(
     hooks: {
       beforeValidate: [
         ({ data }) => {
+          // Only compare well-formed HH:mm values — otherwise a malformed time
+          // ('9:00') would lexically compare wrong and surface this misleading
+          // message instead of the field validator's format error.
+          const HHMM = /^\d{2}:\d{2}$/
+          const ordered = (start?: string, end?: string) =>
+            !start || !end || !HHMM.test(start) || !HHMM.test(end) || start < end
           const slots = (data?.recurringSlots as Array<{ endTime?: string; startTime?: string }>) ?? []
           for (const slot of slots) {
-            if (slot.startTime && slot.endTime && slot.startTime >= slot.endTime) {
+            if (!ordered(slot.startTime, slot.endTime)) {
               throw new ValidationError({
                 errors: [{ message: 'endTime must be after startTime', path: 'recurringSlots' }],
               })
@@ -200,7 +206,7 @@ export function createSchedulesCollection(
           }
           const manual = (data?.manualSlots as Array<{ endTime?: string; startTime?: string }>) ?? []
           for (const slot of manual) {
-            if (slot.startTime && slot.endTime && slot.startTime >= slot.endTime) {
+            if (!ordered(slot.startTime, slot.endTime)) {
               throw new ValidationError({
                 errors: [{ message: 'endTime must be after startTime', path: 'manualSlots' }],
               })

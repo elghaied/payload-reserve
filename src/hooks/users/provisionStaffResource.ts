@@ -22,7 +22,7 @@ export function roleMatches(role: unknown, staffRoles: string[]): boolean {
  */
 export const provisionStaffResource =
   (config: ResolvedReservationPluginConfig): CollectionAfterChangeHook =>
-  async ({ context, doc, operation, previousDoc, req }) => {
+  async ({ context, doc, req }) => {
     if (context?.skipReservationHooks) {
       return doc
     }
@@ -38,17 +38,10 @@ export const provisionStaffResource =
       return doc
     }
 
-    if (operation === 'update') {
-      // Skip if the user was already staff — provisioned on a prior save.
-      const wasStaff = roleMatches(
-        (previousDoc as Record<string, unknown> | undefined)?.[sp.roleField],
-        sp.staffRoles,
-      )
-      if (wasStaff) {
-        return doc
-      }
-    }
-
+    // Idempotency is enforced by the dedup-by-owner query below — NOT by an
+    // early "was already staff" return. Relying on the query means pre-existing
+    // staff (enabled after the fact) and users whose Resource was deleted get
+    // (re)provisioned on their next save (review C5).
     const ownerField = config.resourceOwnerMode?.ownerField ?? 'owner'
 
     try {

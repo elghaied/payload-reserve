@@ -32,6 +32,19 @@ function validateStatusMachine(sm: StatusMachineConfig): void {
       }
     }
   }
+  // A terminal status must have no outgoing transitions — otherwise the config
+  // contradicts itself (the status is declared terminal but can be left).
+  for (const s of sm.terminalStatuses) {
+    if ((sm.transitions[s]?.length ?? 0) > 0) {
+      throw new Error(
+        `statusMachine.terminalStatuses contains "${s}" but transitions["${s}"] is non-empty — a terminal status cannot have outgoing transitions`,
+      )
+    }
+  }
+  // A reservation is born in defaultStatus, so it must not be terminal.
+  if (sm.terminalStatuses.includes(sm.defaultStatus)) {
+    throw new Error(`statusMachine.defaultStatus "${sm.defaultStatus}" cannot be a terminal status`)
+  }
 }
 
 export const DEFAULT_RESOURCE_TYPES = ['staff', 'equipment', 'room']
@@ -92,11 +105,18 @@ export const DEFAULT_CANCELLATION_NOTICE_PERIOD = 24
 export function resolveConfig(
   pluginOptions: ReservationPluginConfig,
 ): ResolvedReservationPluginConfig {
-  if (pluginOptions.resourceTypes !== undefined && pluginOptions.resourceTypes.length === 0) {
-    throw new Error('resourceTypes must be a non-empty array')
-  }
-  if (pluginOptions.leaveTypes !== undefined && pluginOptions.leaveTypes.length === 0) {
-    throw new Error('leaveTypes must be a non-empty array')
+  // A disabled plugin still resolves (so collections register with the right
+  // slugs for schema stability) but skips all config validation — temporarily
+  // disabling a misconfigured plugin should not throw at boot (review C3).
+  const disabled = pluginOptions.disabled ?? false
+
+  if (!disabled) {
+    if (pluginOptions.resourceTypes !== undefined && pluginOptions.resourceTypes.length === 0) {
+      throw new Error('resourceTypes must be a non-empty array')
+    }
+    if (pluginOptions.leaveTypes !== undefined && pluginOptions.leaveTypes.length === 0) {
+      throw new Error('leaveTypes must be a non-empty array')
+    }
   }
 
   const resourceTypes = pluginOptions.resourceTypes ?? DEFAULT_RESOURCE_TYPES
@@ -124,6 +144,7 @@ export function resolveConfig(
           ownedServices: rom.ownedServices ?? false,
           ownerCollection: rom.ownerCollection,
           ownerField: rom.ownerField ?? 'owner',
+          roleField: rom.roleField ?? pluginOptions.staffProvisioning?.roleField ?? 'role',
         }
       : undefined,
     resourceTypes,
@@ -135,7 +156,9 @@ export function resolveConfig(
       schedules: pluginOptions.slugs?.schedules ?? DEFAULT_SLUGS.schedules,
       services: pluginOptions.slugs?.services ?? DEFAULT_SLUGS.services,
     },
-    staffProvisioning: resolveStaffProvisioning(pluginOptions, resourceTypes),
+    staffProvisioning: disabled
+      ? undefined
+      : resolveStaffProvisioning(pluginOptions, resourceTypes),
     statusMachine: userStatusMachine
       ? {
           blockingStatuses:
@@ -151,8 +174,10 @@ export function resolveConfig(
     userCollection: pluginOptions.userCollection ?? undefined,
   }
 
-  validateStatusMachine(resolved.statusMachine)
-  validateTimezone(resolved.timezone)
+  if (!disabled) {
+    validateStatusMachine(resolved.statusMachine)
+    validateTimezone(resolved.timezone)
+  }
 
   return resolved
 }

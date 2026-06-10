@@ -98,6 +98,8 @@ export type ResourceOwnerModeConfig = {
   ownerCollection?: string
   /** Field name for the owner relationship on Resources (default: 'owner') */
   ownerField?: string
+  /** User field holding the role for admin detection (default: staffProvisioning.roleField or 'role') */
+  roleField?: string
 }
 
 export type ResolvedResourceOwnerModeConfig = {
@@ -105,6 +107,7 @@ export type ResolvedResourceOwnerModeConfig = {
   ownedServices: boolean
   ownerCollection?: string
   ownerField: string
+  roleField: string
 }
 
 // --- Staff provisioning ---
