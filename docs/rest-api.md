@@ -1,12 +1,13 @@
 # REST API
 
-The plugin mounts six endpoints. Five are under `/api/reserve/`; the customer-search endpoint is mounted at `/api/reservation-customer-search`. These are Payload custom endpoints — they respect the same access control as the rest of the API.
+The plugin mounts seven endpoints. Six are under `/api/reserve/`; the customer-search endpoint is mounted at `/api/reservation-customer-search`. These are Payload custom endpoints — they respect the same access control as the rest of the API.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/reserve/availability` | Available time slots for a resource+service on a date (`guestCount`, `resources`) |
 | GET | `/api/reserve/slots` | Available slots with echoed `date`/`guestCount` |
 | GET | `/api/reserve/resource-availability` | Shift windows, time-off, and busy intervals for a resource over a date range; staff/admin only |
+| GET | `/api/reserve/effective-timezone` | The business timezone for the current request's selected tenant (`tenant → global → UTC`); authenticated only |
 | POST | `/api/reserve/book` | Create a booking (supports `guest` and `items`); fires `beforeBookingCreate` hooks |
 | POST | `/api/reserve/cancel` | Cancel a booking (authenticated owner/admin, or guest via `token`) |
 | GET | `/api/reservation-customer-search` | Search customers by name/email/phone; privileged staff/admin only |
@@ -153,7 +154,8 @@ GET /api/reserve/resource-availability?resource=abc123&start=2025-06-15&end=2025
   ],
   "requiredPools": [
     { "quantity": 4, "busy": [ { "start": "...", "end": "...", "units": 1 } ] }
-  ]
+  ],
+  "timeZone": "Europe/Paris"
 }
 ```
 
@@ -161,6 +163,25 @@ GET /api/reserve/resource-availability?resource=abc123&start=2025-06-15&end=2025
 - `capacityMode` / `quantity` — the resource's capacity configuration.
 - `days[]` — one entry per day: `shiftWindows` (resolved schedule ranges) and `timeOff` (full-day exception ranges with optional `reason` and `type`).
 - `requiredPools[]` — for each distinct resource that this resource's services also require (e.g. a shared chair pool): its `quantity` and `busy` intervals, so callers can detect when a slot is blocked by a shared pool even when the resource itself is free.
+- `timeZone` — the IANA zone the day windows were resolved in: the selected tenant's zone in `multiTenant` mode, otherwise the global `timezone`.
+
+---
+
+## GET /api/reserve/effective-timezone
+
+The business timezone for the current request's selected tenant. The custom admin calendar calls this so its day-boundary rendering follows the tenant selector; the tenant is read from the cookie (`multiTenant.cookieName`, default `payload-tenant`), so no query params are needed.
+
+Resolution precedence: **selected tenant's `timezoneField` → global `timezone` → `'UTC'`**. Requires an authenticated user (401 otherwise). On plain single-tenant installs this always returns the global `timezone` with no extra DB read.
+
+```
+GET /api/reserve/effective-timezone
+```
+
+**Response:**
+
+```json
+{ "timeZone": "Europe/Paris" }
+```
 
 ---
 

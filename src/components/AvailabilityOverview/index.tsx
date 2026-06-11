@@ -60,11 +60,43 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const slugs = config.admin?.custom?.reservationSlugs
   const statusMachine = config.admin?.custom?.reservationStatusMachine
   const blockingStatuses: string[] = statusMachine?.blockingStatuses ?? ['pending', 'confirmed']
-  const reservationTimezone: string = config.admin?.custom?.reservationTimezone ?? 'UTC'
+  // In multiTenant mode the business timezone is the SELECTED tenant's zone,
+  // resolved server-side from the tenant cookie; fall back to the static global
+  // zone until it resolves and for plain installs.
+  const staticReservationTimezone: string = config.admin?.custom?.reservationTimezone ?? 'UTC'
 
   const resourcesTenantParams = useTenantFilter(slugs?.resources ?? 'resources')
   const schedulesTenantParams = useTenantFilter(slugs?.schedules ?? 'schedules')
   const reservationsTenantParams = useTenantFilter(slugs?.reservations ?? 'reservations')
+
+  const [effectiveTimezone, setEffectiveTimezone] = useState<null | string>(null)
+  const reservationTimezone = effectiveTimezone ?? staticReservationTimezone
+
+  const tenantKey = JSON.stringify(reservationsTenantParams)
+  useEffect(() => {
+    let cancelled = false
+    const apiBase = `${config.serverURL ?? ''}${config.routes.api}`
+    void (async () => {
+      try {
+        const res = await fetch(`${apiBase}/reserve/effective-timezone`, {
+          credentials: 'same-origin',
+        })
+        if (!res.ok) {
+          return
+        }
+        const json = await res.json()
+        if (!cancelled && typeof json?.timeZone === 'string') {
+          setEffectiveTimezone(json.timeZone)
+        }
+      } catch {
+        // keep the static fallback
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+     
+  }, [config.serverURL, config.routes.api, tenantKey])
 
   const DAY_NAMES = useMemo(
     () => [

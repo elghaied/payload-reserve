@@ -197,6 +197,12 @@ export type ReservationPluginConfig = {
     cookieName?: string
     /** Tenant field name on scoped collections (default 'tenant'). */
     tenantField?: string
+    /**
+     * Field on the tenant document holding its IANA timezone (default 'timezone').
+     * When set and the selected tenant has a valid value, the admin views resolve
+     * day-boundaries in that tenant's zone instead of the global `timezone`.
+     */
+    timezoneField?: string
   }
   /** Enable resource-owner multi-tenancy (opt-in) */
   resourceOwnerMode?: ResourceOwnerModeConfig
@@ -250,6 +256,7 @@ export type ResolvedReservationPluginConfig = {
   multiTenant: {
     cookieName: string
     tenantField: string
+    timezoneField: string
   }
   resourceOwnerMode: ResolvedResourceOwnerModeConfig | undefined
   resourceTypes: string[]

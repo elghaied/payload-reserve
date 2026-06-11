@@ -3,6 +3,8 @@ import type { Endpoint, Payload, Where } from 'payload'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { resolveScheduleForDate } from '../utilities/scheduleUtils.js'
+import { readCookie } from '../utilities/tenantFilter.js'
+import { getEffectiveTenantTimezone } from '../utilities/tenantTimezone.js'
 import {
   addDaysToDayKey,
   combineDayKeyAndTime,
@@ -27,6 +29,8 @@ export type ResourceAvailability = {
   quantity: number
   /** Capacity of resources this resource's services also require (e.g. a chair pool). */
   requiredPools: Array<{ busy: Busy; quantity: number }>
+  /** IANA zone the day windows were resolved in (selected tenant's zone, else global). */
+  timeZone: string
 }
 
 /** Busy intervals (with capacity units) for one resource over [start, end). */
@@ -216,7 +220,7 @@ export async function buildResourceAvailability(params: {
     })
   }
 
-  return { busy, capacityMode, days, quantity, requiredPools }
+  return { busy, capacityMode, days, quantity, requiredPools, timeZone }
 }
 
 export function createResourceAvailabilityEndpoint(
@@ -258,6 +262,22 @@ export function createResourceAvailabilityEndpoint(
         return Response.json({ error: 'Date range too large (max 90 days)' }, { status: 400 })
       }
 
+      // In multiTenant mode, resolve day-boundaries in the SELECTED tenant's zone
+      // (tenant timezone → global → UTC). Degrades to the global zone for plain
+      // installs: no tenant relationship on reservations / no tenant cookie ⇒ no
+      // DB read, same output as before.
+      const reservationsCollection = req.payload.config.collections?.find(
+        (c) => c.slug === config.slugs.reservations,
+      )
+      const timeZone = await getEffectiveTenantTimezone({
+        globalTimezone: config.timezone,
+        payload: req.payload,
+        scopedCollection: reservationsCollection as { fields?: unknown[] } | undefined,
+        tenantField: config.multiTenant.tenantField,
+        tenantId: readCookie(req.headers?.get('cookie'), config.multiTenant.cookieName),
+        timezoneField: config.multiTenant.timezoneField,
+      })
+
       const result = await buildResourceAvailability({
         blockingStatuses: config.statusMachine.blockingStatuses,
         end: endDate,
@@ -267,7 +287,7 @@ export function createResourceAvailabilityEndpoint(
         resourceSlug: config.slugs.resources,
         scheduleSlug: config.slugs.schedules,
         start: startDate,
-        timeZone: config.timezone,
+        timeZone,
       })
 
       if (!result) {

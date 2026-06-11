@@ -146,6 +146,7 @@ export function resolveConfig(
     multiTenant: {
       cookieName: pluginOptions.multiTenant?.cookieName ?? 'payload-tenant',
       tenantField: pluginOptions.multiTenant?.tenantField ?? 'tenant',
+      timezoneField: pluginOptions.multiTenant?.timezoneField ?? 'timezone',
     },
     resourceOwnerMode: rom
       ? {
