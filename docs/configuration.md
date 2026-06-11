@@ -182,6 +182,10 @@ payloadReserve({
 | `collectionOverrides` | `Record<collection, CollectionOverride>` | `{}` | Per-collection overrides (`services`/`resources`/`schedules`/`reservations`/`customers`). `fields` is a function `({ defaultFields }) => Field[]`; `hooks` merge with the plugin's (plugin first); `access` composes per operation; `slug` ignored. `customers` applies only in standalone mode |
 | `extraReservationFields` | `Field[]` | `[]` | **Deprecated** — use `collectionOverrides.reservations.fields`. Still appends extra Payload fields to the Reservations collection |
 | `allowGuestBooking` | `boolean` | `false` | Allow bookings without a customer account (per-service override available) |
+| `multiTenant` | `object` | `undefined` | Opt-in tenant scoping for the custom admin views; scopes/zones only when the collection actually has the tenant field (see sub-options) |
+| `multiTenant.tenantField` | `string` | `'tenant'` | Tenant relationship field name on scoped collections |
+| `multiTenant.cookieName` | `string` | `'payload-tenant'` | Cookie the tenant selector writes the active tenant id to |
+| `multiTenant.timezoneField` | `string` | `'timezone'` | Field on the tenant document holding its IANA timezone. Admin day-boundaries resolve `tenant.<timezoneField> → global timezone → 'UTC'`; a missing/invalid value falls back to the global `timezone` |
 | `resourceTypes` | `string[]` | `['staff', 'equipment', 'room']` | Option list for `Resource.resourceType`; first entry is the field default. Empty array throws |
 | `leaveTypes` | `string[]` | `['vacation', 'sick', 'personal', 'closure', 'other']` | Option list for `Schedule.exceptions[].type`. Empty array throws |
 | `resourceOwnerMode` | `ResourceOwnerModeConfig` | `undefined` | Opt-in resource-owner multi-tenancy (see sub-options below) |

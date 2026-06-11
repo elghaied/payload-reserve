@@ -19,7 +19,7 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Resource Owner Multi-Tenancy** — Opt-in `resourceOwnerMode` wires ownership access control so each resource owner (host) sees only their own listings and reservations
 - **Configurable Status Machine** — Define your own statuses, transitions, blocking states, terminal states, and the `confirmStatus`/`cancelStatus` that drive the confirm/cancel hooks and cancellation policy
 - **Double-Booking Prevention** — Server-side conflict detection that enforces both bookings' buffer times and checks each resource only for its own item window; respects capacity modes
-- **Business Timezone** — Set a plugin-level `timezone` (IANA, default `'UTC'`) so schedules, day boundaries, and the admin calendar resolve in your business's timezone regardless of server location
+- **Business Timezone** — Set a plugin-level `timezone` (IANA, default `'UTC'`) so schedules, day boundaries, and the admin calendar resolve in your business's timezone regardless of server location — with optional **per-tenant** zones in `multiTenant` mode
 - **Auto End Time** — Calculates `endTime` from `startTime + service.duration` automatically
 - **Three Duration Types** — `fixed` (service duration), `flexible` (customer-specified end), and `full-day` bookings
 - **Multi-Resource Bookings** — Single reservation that spans multiple resources simultaneously via the `items` array
@@ -252,6 +252,21 @@ payloadReserve({
 ```
 
 Without this, day resolution mixes server-local and UTC semantics — on non-UTC servers the slots API can resolve the wrong calendar day. With `timezone` set, all server-side day math runs via the built-in `Intl` API (no extra dependency). `'UTC'` on a UTC server is identical to the previous behaviour. The configured timezone is exposed to admin components via `config.admin.custom.reservationTimezone`.
+
+#### Per-tenant timezones (`multiTenant`)
+
+When tenant scoping is active, the admin Calendar, Availability grid, and Dashboard widget resolve day-boundaries in the **selected tenant's** zone instead of one global zone — so a tenant in `America/New_York` and a tenant in `Europe/Paris` each see their own local days. Point `multiTenant.timezoneField` at the IANA timezone field on your tenant document:
+
+```typescript
+payloadReserve({
+  timezone: 'UTC',                          // global default / fallback
+  multiTenant: {
+    timezoneField: 'timezone',              // field on the tenant doc (default: 'timezone')
+  },
+})
+```
+
+Resolution precedence is `tenant.<timezoneField> → global timezone → 'UTC'`; a tenant with no (or an invalid) timezone value transparently falls back to the global default. The zone is resolved server-side from the tenant cookie — the client calendar reads it from `GET /api/reserve/effective-timezone`. This is purely additive: plain single-tenant installs (no tenant relationship / no tenant cookie) keep the global zone with no extra DB read.
 
 ### Collection Overrides
 

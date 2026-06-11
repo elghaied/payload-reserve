@@ -109,10 +109,41 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const reservationTenantParams = useTenantFilter(reservationSlug)
   const resourceTenantParams = useTenantFilter(resourceSlug)
 
-  const reservationTimezone =
+  // Day-boundary rendering uses the business timezone. In multiTenant mode that's
+  // the SELECTED tenant's zone, resolved server-side from the tenant cookie (the
+  // client can't map tenant→zone itself). Until that resolves — and for plain
+  // installs — fall back to the static global zone baked into admin config.
+  const staticReservationTimezone =
     ((config.admin?.custom as Record<string, unknown> | undefined)?.reservationTimezone as
       | string
       | undefined) ?? 'UTC'
+  const [effectiveTimezone, setEffectiveTimezone] = useState<null | string>(null)
+  const reservationTimezone = effectiveTimezone ?? staticReservationTimezone
+
+  const tenantKey = JSON.stringify(reservationTenantParams)
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(`${apiBase}/reserve/effective-timezone`, {
+          credentials: 'same-origin',
+        })
+        if (!res.ok) {
+          return
+        }
+        const json = await res.json()
+        if (!cancelled && typeof json?.timeZone === 'string') {
+          setEffectiveTimezone(json.timeZone)
+        }
+      } catch {
+        // keep the static fallback
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+     
+  }, [apiBase, tenantKey])
 
   const statusMachine = config.admin?.custom?.reservationStatusMachine as
     | {

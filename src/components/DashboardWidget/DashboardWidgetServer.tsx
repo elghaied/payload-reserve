@@ -4,6 +4,7 @@ import type { PluginT } from '../../translations/index.js'
 import type { StatusMachineConfig } from '../../types.js'
 
 import { collectionHasTenantField, readCookie, tenantWhereClause } from '../../utilities/tenantFilter.js'
+import { getEffectiveTenantTimezone } from '../../utilities/tenantTimezone.js'
 import {
   addDaysToDayKey,
   combineDayKeyAndTime,
@@ -23,15 +24,17 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
 
   const tenantConfig =
     (payload.config.admin?.custom?.reservationTenant as
-      | { cookieName?: string; tenantField?: string }
+      | { cookieName?: string; tenantField?: string; timezoneField?: string }
       | undefined) ?? {}
   const cookieName = tenantConfig.cookieName ?? 'payload-tenant'
   const tenantField = tenantConfig.tenantField ?? 'tenant'
+  const timezoneField = tenantConfig.timezoneField ?? 'timezone'
   const reservationsCollection = payload.config.collections?.find((c) => c.slug === slugs.reservations)
+  const tenantId = readCookie(req.headers.get('cookie'), cookieName)
   const tenantWhere = tenantWhereClause({
     hasField: collectionHasTenantField(reservationsCollection as { fields?: unknown[] } | undefined, tenantField),
     tenantField,
-    tenantId: readCookie(req.headers.get('cookie'), cookieName),
+    tenantId,
   })
 
   // Read status machine from config — never hardcode status values
@@ -42,9 +45,16 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
   const blockingSet = new Set(blockingStatuses)
   const terminalSet = new Set(terminalStatuses)
 
-  // "Today" is the business timezone's calendar day, not the server's
-  const reservationTimezone: string =
-    payload.config.admin?.custom?.reservationTimezone ?? 'UTC'
+  // "Today" is the business timezone's calendar day, not the server's — and in
+  // multiTenant mode that's the SELECTED tenant's zone (tenant → global → UTC).
+  const reservationTimezone: string = await getEffectiveTenantTimezone({
+    globalTimezone: payload.config.admin?.custom?.reservationTimezone ?? 'UTC',
+    payload,
+    scopedCollection: reservationsCollection as { fields?: unknown[] } | undefined,
+    tenantField,
+    tenantId,
+    timezoneField,
+  })
   const now = new Date()
   const todayKey = getDayKeyInTimezone(now, reservationTimezone)
   const startOfDay = combineDayKeyAndTime(todayKey, '00:00', reservationTimezone)

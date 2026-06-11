@@ -39,7 +39,11 @@ export async function buildMultiTenantPayload(): Promise<{
       {
         slug: 'tenants',
         admin: { useAsTitle: 'name' },
-        fields: [{ name: 'name', type: 'text', required: true }],
+        fields: [
+          { name: 'name', type: 'text', required: true },
+          // Per-tenant IANA timezone — exercised by the per-tenant timezone tests.
+          { name: 'timezone', type: 'text' },
+        ],
       },
       {
         slug: 'media',

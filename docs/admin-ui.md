@@ -24,6 +24,8 @@ Replaces the default Reservations list view with a CSS Grid-based calendar. No e
 
 All views key days, bucket reservations, and render times in the configured business `timezone` (read from `config.admin.custom.reservationTimezone`), not the browser's local zone.
 
+**Per-tenant timezones (`multiTenant`):** when tenant scoping is active, the Calendar, Availability grid, and Dashboard widget resolve day-boundaries in the **selected tenant's** zone — `tenant's timezoneField → global timezone → 'UTC'`. The server resolves this from the tenant cookie (the calendar fetches it from `GET /api/reserve/effective-timezone`; the RSC dashboard resolves it inline). Set `multiTenant.timezoneField` (default `'timezone'`) to point at the field on your tenant document. A tenant with no timezone value transparently falls back to the global default, so plain single-tenant installs are unaffected.
+
 **Data correctness:**
 - **Month** view fetches the full 6-week (42-cell) span it renders, so trailing weeks are never silently empty.
 - **Week / Day / Lanes** derive their visible-hour window from the day's bookings rather than a fixed window — a booking outside business hours is still shown, and the three time views agree on the same window (never narrower than the default 7–20 business window).
@@ -135,7 +137,7 @@ config.admin.custom.reservationTimezone
 
 // Tenant scoping (when multiTenant is configured)
 config.admin.custom.reservationTenant
-// { tenantField, cookieName }
+// { tenantField, cookieName, timezoneField }
 ```
 
 ---

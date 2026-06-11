@@ -14,6 +14,7 @@ import { createCancelBookingEndpoint } from './endpoints/cancelBooking.js'
 import { createCheckAvailabilityEndpoint } from './endpoints/checkAvailability.js'
 import { createBookingEndpoint } from './endpoints/createBooking.js'
 import { createCustomerSearchEndpoint } from './endpoints/customerSearch.js'
+import { createEffectiveTimezoneEndpoint } from './endpoints/effectiveTimezone.js'
 import { createGetSlotsEndpoint } from './endpoints/getSlots.js'
 import { createResourceAvailabilityEndpoint } from './endpoints/resourceAvailability.js'
 import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
@@ -185,6 +186,7 @@ export const payloadReserve =
       createCheckAvailabilityEndpoint(resolved),
       createBookingEndpoint(resolved),
       createCustomerSearchEndpoint(resolved),
+      createEffectiveTimezoneEndpoint(resolved),
       createGetSlotsEndpoint(resolved),
       createResourceAvailabilityEndpoint(resolved),
     )

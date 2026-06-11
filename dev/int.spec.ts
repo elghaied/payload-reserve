@@ -3682,23 +3682,38 @@ describe('resourceOwnerMode owner field relationTo', () => {
 describe('Reservation plugin - multi-tenant config', () => {
   test('resolveConfig defaults the multiTenant option', () => {
     const resolved = resolveConfig({})
-    expect(resolved.multiTenant).toEqual({ cookieName: 'payload-tenant', tenantField: 'tenant' })
+    expect(resolved.multiTenant).toEqual({
+      cookieName: 'payload-tenant',
+      tenantField: 'tenant',
+      timezoneField: 'timezone',
+    })
   })
 
   test('resolveConfig honors overrides', () => {
-    const resolved = resolveConfig({ multiTenant: { cookieName: 'x-tenant', tenantField: 'org' } })
-    expect(resolved.multiTenant).toEqual({ cookieName: 'x-tenant', tenantField: 'org' })
+    const resolved = resolveConfig({
+      multiTenant: { cookieName: 'x-tenant', tenantField: 'org', timezoneField: 'tz' },
+    })
+    expect(resolved.multiTenant).toEqual({
+      cookieName: 'x-tenant',
+      tenantField: 'org',
+      timezoneField: 'tz',
+    })
   })
 
   test('resolveConfig falls back per-key on partial override', () => {
     const resolved = resolveConfig({ multiTenant: { tenantField: 'org' } })
-    expect(resolved.multiTenant).toEqual({ cookieName: 'payload-tenant', tenantField: 'org' })
+    expect(resolved.multiTenant).toEqual({
+      cookieName: 'payload-tenant',
+      tenantField: 'org',
+      timezoneField: 'timezone',
+    })
   })
 
   test('plugin publishes reservationTenant to admin.custom', () => {
     expect(payload.config.admin.custom?.reservationTenant).toEqual({
       cookieName: 'payload-tenant',
       tenantField: 'tenant',
+      timezoneField: 'timezone',
     })
   })
 })
@@ -4145,6 +4160,23 @@ describe('Endpoint security (review B1/B2/B3/B6/B8)', () => {
       availabilityReq('resource=not-an-id&start=2031-01-01&end=2031-01-08', admin) as any,
     )
     expect(malformed.status).toBe(404)
+  })
+
+  test('effective-timezone requires auth and returns the global zone for plain installs', async () => {
+    const { createEffectiveTimezoneEndpoint } = await import('../src/endpoints/effectiveTimezone.js')
+    const ep = createEffectiveTimezoneEndpoint(resolveConfig({ timezone: 'America/New_York' }))
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anon = await ep.handler({ payload, url: 'http://local/api/reserve/effective-timezone' } as any)
+    expect(anon.status).toBe(401)
+
+    const asAdmin = await ep.handler(
+      // no `headers` on the mock req → no tenant cookie → global zone, no crash
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { payload, url: 'http://local/api/reserve/effective-timezone', user: { id: 'admin-1', collection: 'users' } } as any,
+    )
+    expect(asAdmin.status).toBe(200)
+    expect(await asAdmin.json()).toEqual({ timeZone: 'America/New_York' })
   })
 
   test('anonymous bookings cannot set a customer (B3)', async () => {

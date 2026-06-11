@@ -65,12 +65,26 @@ export function isValidDayKey(dayKey: string): boolean {
 }
 
 /**
+ * True when the given string is a usable IANA timezone name. Non-throwing
+ * counterpart to {@link validateTimezone}; an empty/nullish value is not valid.
+ */
+export function isValidTimezone(timeZone: null | string | undefined): timeZone is string {
+  if (!timeZone) {
+    return false
+  }
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Throws when the given string is not a valid IANA timezone name.
  */
 export function validateTimezone(timeZone: string): void {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone })
-  } catch {
+  if (!isValidTimezone(timeZone)) {
     throw new Error(
       `Invalid timezone "${timeZone}" — use an IANA name like 'Europe/Paris' or 'UTC'`,
     )
