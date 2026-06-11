@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-06-11
+
+A minor, additive release: per-tenant timezones for the custom admin views in `multiTenant` mode. **No breaking changes** — plain single-tenant installs are byte-for-byte unaffected.
+
+### Added
+
+- **Per-tenant timezones (`multiTenant`).** The admin Calendar, Availability grid, and Dashboard widget now resolve day-boundaries in the **selected tenant's** timezone instead of one global zone, so tenants in different zones each see their own local days. Resolution precedence: `tenant.<timezoneField> → global timezone → 'UTC'`.
+- **`multiTenant.timezoneField`** option (default `'timezone'`) — points at the IANA timezone field on your tenant document. A missing or invalid value transparently falls back to the global `timezone`.
+- **`GET /api/reserve/effective-timezone`** endpoint — returns the resolved zone for the current request's selected tenant (read from the tenant cookie); the client calendar uses it for day-boundary rendering. Authenticated only.
+
+### Fixed
+
+- **`GET /api/reserve/resource-availability`** now resolves day windows in the selected tenant's zone (was a single global zone for every tenant) and echoes the resolved `timeZone` in its response.
+
+### Notes
+
+- Purely additive: `multiTenant.timezoneField` is optional, and installs with no tenant relationship / no tenant cookie keep the global zone with **no extra DB read**.
+
 ## [2.0.0] - 2026-06-10
 
 A correctness, security, and feature release following a full plugin audit. Most changes fix incorrect behavior, but several are **breaking** for specific integration patterns — read the migration notes first. On a UTC server with default configuration, core booking behavior is largely unchanged; the breaking items mainly affect API consumers, custom status vocabularies, partial `access` overrides, and non-UTC-server deployments.
@@ -13,12 +31,12 @@ A correctness, security, and feature release following a full plugin audit. Most
 
 - **`GET /api/reserve/resource-availability` now requires a staff/admin user.** It previously responded to anyone and leaked every resource's busy calendar. Unauthenticated requests now get `401`, customer-collection users `403`. If you called this endpoint from a public/unauthenticated frontend, it will stop working — call it only from authenticated admin/staff contexts. **Single-collection installs (`userCollection` set) must configure `resourceOwnerMode.adminRoles` and/or `staffProvisioning.staffRoles`**, otherwise every user (including real admins) is treated as a customer and gets `403`.
 - **`POST /api/reserve/book` no longer accepts an arbitrary `customer`.** Anonymous callers may not set `customer` (→ `403`; use the guest flow with `guest` details instead); authenticated non-staff users are always booked as themselves; staff/admin may still book for anyone. A caller-supplied `cancellationToken` in the body is now ignored (always server-generated). The same `customer`-mass-assignment guard also applies to Payload's default `POST /api/{reservations}` REST route. Update any client that posted a `customer` id for the current user — it's now inferred from the session.
-- **`access` overrides now compose per operation instead of replacing.** A partial override such as `access: { resources: { read } }` previously wiped the owner-mode `create`/`update`/`delete` rules; now it overlays only `read` and keeps the rest. If you relied on a partial override to *remove* owner-mode rules, specify every operation explicitly.
+- **`access` overrides now compose per operation instead of replacing.** A partial override such as `access: { resources: { read } }` previously wiped the owner-mode `create`/`update`/`delete` rules; now it overlays only `read` and keeps the rest. If you relied on a partial override to _remove_ owner-mode rules, specify every operation explicitly.
 - **Business timezone defaults to `'UTC'`.** Schedule resolution, day boundaries, exception matching, and the admin calendar now resolve in the configured `timezone`. On a UTC server this matches previous behavior; **on a non-UTC server, day/slot resolution changes to the correct calendar day** (it was previously buggy). Set `timezone` to your business IANA zone (e.g. `'America/New_York'`). The unused `Resource.timezone` field is deprecated.
 - **Custom status vocabularies must set `statusMachine.confirmStatus` / `cancelStatus`.** The confirm/cancel plugin hooks, the cancellation notice-period rule, and the `cancellationReason` field now key off these (default `'confirmed'`/`'cancelled'`) instead of hardcoded literals. If you renamed your statuses (e.g. `booked`/`voided`), set `confirmStatus`/`cancelStatus` or that behavior won't fire. Both are validated against `statuses` at init.
-- **Conflict detection is stricter and corrected.** Buffer times are now enforced symmetrically against *neighboring* bookings (the required gap between two bookings on a resource is the later one's `bufferTimeBefore` plus the earlier one's `bufferTimeAfter`), so back-to-back bookings that previously slipped past a cleanup buffer are now rejected. Multi-resource bookings now block each resource only for its own item window (no more whole-span over-blocking). Service buffer fields are capped at 1439 minutes. Expect some bookings that previously passed/failed to flip to the correct outcome.
+- **Conflict detection is stricter and corrected.** Buffer times are now enforced symmetrically against _neighboring_ bookings (the required gap between two bookings on a resource is the later one's `bufferTimeBefore` plus the earlier one's `bufferTimeAfter`), so back-to-back bookings that previously slipped past a cleanup buffer are now rejected. Multi-resource bookings now block each resource only for its own item window (no more whole-span over-blocking). Service buffer fields are capped at 1439 minutes. Expect some bookings that previously passed/failed to flip to the correct outcome.
 - **Stricter init-time validation throws on previously-silent misconfig.** A missing `userCollection`, a slug collision, a terminal status with outgoing transitions, a terminal `defaultStatus`, or a `confirmStatus`/`cancelStatus` not in `statuses` now throw a clear error at boot. A previously-broken-but-booting config may now fail fast — fix the config.
-- **Lifecycle hooks fire differently.** `beforeBookingCreate` fires once per `/api/reserve/book` booking (was twice — double-charges/double-sends are fixed) and now runs inside the collection `beforeChange` (after field validation), so a hook stamping a *required* field must read the merged document. `afterStatusChange`/`afterBookingConfirm` no longer fire on plain creates. `beforeBookingCancel` no longer fires when the cancellation is rejected by the notice period. Review integrations that depended on the old firing.
+- **Lifecycle hooks fire differently.** `beforeBookingCreate` fires once per `/api/reserve/book` booking (was twice — double-charges/double-sends are fixed) and now runs inside the collection `beforeChange` (after field validation), so a hook stamping a _required_ field must read the merged document. `afterStatusChange`/`afterBookingConfirm` no longer fire on plain creates. `beforeBookingCancel` no longer fires when the cancellation is rejected by the notice period. Review integrations that depended on the old firing.
 - **Type-only:** `StatusMachineConfig` gained required `confirmStatus`/`cancelStatus`. Config input is `Partial`, so plugin options are unaffected; only code that imported the full type and constructed it by hand needs the two fields.
 
 ### Added
