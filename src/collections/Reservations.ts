@@ -167,10 +167,11 @@ export function createReservationsCollection(
         name: 'endTime',
         type: 'date',
         admin: {
+          // Editable: flexible-duration services require a user-supplied endTime
+          // (calculateEndTime overwrites it for fixed/full-day on save).
           date: {
             pickerAppearance: 'dayAndTime',
           },
-          readOnly: true,
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldEndTime'),
       },

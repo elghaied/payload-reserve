@@ -59,6 +59,17 @@ describe('Reservation plugin - Collections', () => {
     expect(fieldNames).not.toContain('bookings')
   })
 
+  test('reservations endTime is editable (not readOnly) so flexible services can set it', () => {
+    const reservations = payload.config.collections.find((c) => c.slug === 'reservations')
+    expect(reservations).toBeDefined()
+    const endTime = reservations!.fields.find(
+      (f): f is { admin?: { readOnly?: boolean } } & Field =>
+        'name' in f && (f as { name?: string }).name === 'endTime',
+    )
+    expect(endTime).toBeDefined()
+    expect(endTime!.admin?.readOnly).not.toBe(true)
+  })
+
   test('can create a service', async () => {
     const service = await payload.create({
       collection: col('services'),
