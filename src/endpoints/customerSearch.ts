@@ -2,6 +2,7 @@ import type { CollectionSlug, Endpoint, Field, Where } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { collectionHasTenantField, readCookie, tenantWhereClause } from '../utilities/tenantFilter.js'
 import { isPrivilegedUser, privilegedRoles } from '../utilities/userRoles.js'
 
 /**
@@ -85,6 +86,18 @@ export function createCustomerSearchEndpoint(
         if (priv.length > 0) {
           andClauses.push({ [roleField]: { not_in: priv } })
         }
+      }
+
+      // Tenant scoping: when the customers collection carries the multi-tenant
+      // tenant field and a tenant is selected (cookie), restrict the search to
+      // that tenant. Plain installs (no tenant field / no cookie) add nothing.
+      const tenantClause = tenantWhereClause({
+        hasField: collectionHasTenantField(collectionConfig, config.multiTenant.tenantField),
+        tenantField: config.multiTenant.tenantField,
+        tenantId: readCookie(req.headers?.get('cookie'), config.multiTenant.cookieName),
+      })
+      if (tenantClause) {
+        andClauses.push(tenantClause)
       }
 
       const where: Where =
