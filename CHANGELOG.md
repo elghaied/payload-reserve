@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.1] - 2026-06-19
+
+A patch release fixing two multi-tenant issues surfaced in a real `@payloadcms/plugin-multi-tenant` install. **No breaking changes** — plain single-tenant installs are unaffected.
+
+### Fixed
+
+- **Customer search is now tenant-scoped.** The `/api/reservation-customer-search` endpoint (used by the reservation customer picker) restricts results to the selected tenant — read from the tenant cookie — whenever the customers collection carries the multi-tenant `tenant` field. This prevents picking a customer from another tenant, which would otherwise fail on save with a tenant mismatch. Plain single-tenant installs are unaffected (no tenant field / no cookie ⇒ no scoping).
+- **Flexible-duration reservations can be saved from the admin UI.** The reservation `endTime` field was unconditionally read-only, which contradicted the `calculateEndTime` validation that requires a user-supplied `endTime` for `flexible`-duration services. `endTime` is now editable; for `fixed`/`full-day` services it is still auto-computed and overwritten on save.
+
 ## [2.1.0] - 2026-06-11
 
 A minor, additive release: per-tenant timezones for the custom admin views in `multiTenant` mode. **No breaking changes** — plain single-tenant installs are byte-for-byte unaffected.
