@@ -167,7 +167,7 @@ The core booking records. Each reservation links a service performed by a resour
 | `guest` | Group | No | Anonymous guest details: `name` (text, max 200), `email` (email), `phone` (text, max 50). Used when no `customer` is set |
 | `cancellationToken` | Text | No | Hidden, indexed token for self-service (guest) cancellation. Server-generated only — create and update access are denied, so it can never be set via the API. Read access restricted to staff/admin (non-customer users); never returned by the public API |
 | `startTime` | Date | Yes | Appointment start (availability-aware slot picker) |
-| `endTime` | Date | No | Auto-calculated from service duration (read-only) |
+| `endTime` | Date | No | Editable. Auto-calculated from service duration and overwritten on save for `fixed`/`full-day` services; for `flexible`-duration services the caller/admin supplies it (required, must be after `startTime`) |
 | `status` | Select | No | Workflow status (default: `'pending'`) |
 | `guestCount` | Number | No | Number of guests (default: 1, min: 1) |
 | `cancellationReason` | Textarea | No | Visible only when status is `'cancelled'` |

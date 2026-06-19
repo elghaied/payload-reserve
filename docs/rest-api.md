@@ -276,6 +276,8 @@ const updated = await res.json()
 
 Searches customers by name, email, or phone. Used internally by the admin CustomerField component. Restricted to privileged staff/admin users (role-aware via `isPrivilegedUser`) — unauthenticated requests get `401`, non-privileged users get `403`.
 
+**Multi-tenant scoping:** when the customers collection carries the multi-tenant `tenant` field, results are restricted to the selected tenant (read from `multiTenant.cookieName`, default `payload-tenant`) — so the picker never surfaces a customer from another tenant (which would fail on save with a tenant mismatch). Purely additive: on plain single-tenant installs (no tenant field, or no tenant cookie) the search spans all customers as before.
+
 **Query parameters:**
 
 | Parameter | Required | Default | Description |

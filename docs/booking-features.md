@@ -19,7 +19,7 @@ The standard appointment mode. The service duration is fixed and always applied.
 
 ### Flexible
 
-`endTime` is provided by the caller in the booking request. The service `duration` field acts as the minimum; if the provided `endTime` results in less than `duration` minutes the booking is rejected. An inverted window — `endTime` at or before `startTime` — is rejected on both create and update.
+`endTime` is provided by the caller in the booking request. The service `duration` field acts as the minimum; if the provided `endTime` results in less than `duration` minutes the booking is rejected. An inverted window — `endTime` at or before `startTime` — is rejected on both create and update. In the admin UI the reservation `endTime` field is editable (not read-only) precisely so flexible bookings can set it; for `fixed`/`full-day` services it is auto-computed and overwritten on save.
 
 Used for open-ended services where the customer specifies how long they need — workspace rentals, recording studios, vehicle bays.
 
