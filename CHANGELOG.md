@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.2.1] - 2026-07-03
+
+### Fixed
+
+- **CalendarView: single-resource installs never showed availability shading.** The resource
+  filter only renders when there are 2+ resources, and nothing auto-selected the sole
+  resource — so week/day views never loaded shift windows, full/time-off shading, or the
+  new `external` slots. The sole resource is now auto-selected; installs with multiple
+  resources are unchanged (selection stays manual via the filter).
+
 ## [2.2.0] - 2026-07-03
 
 A minor, additive release: an app-supplied resolver for folding external busy time (e.g. calendar sync) into availability. **No breaking changes** — installs that don't configure `getExternalBusy` are unaffected.

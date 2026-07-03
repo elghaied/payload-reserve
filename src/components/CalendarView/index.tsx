@@ -262,6 +262,13 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         const result = await response.json()
         const docs: Array<{ id: string; name?: string }> = result.docs ?? []
         setResources(docs.map((d) => ({ id: d.id, name: d.name ?? '' })))
+        // Single-resource installs have no resource filter (it renders only for 2+),
+        // so nothing could ever select the resource and the week/day availability
+        // shading (off-shift / full / time-off / external) never loaded. Auto-select
+        // the sole resource; with 2+ the user chooses via the filter as before.
+        if (docs.length === 1) {
+          setSelectedResourceId((prev) => prev || String(docs[0].id))
+        }
       } catch {
         setResources([])
       }
