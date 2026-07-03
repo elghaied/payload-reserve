@@ -9,6 +9,7 @@ import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { statusToI18nKey } from '../../utilities/i18nUtils.js'
+import { reservationMatchesResource, sameId } from '../../utilities/reservationResourceFilter.js'
 import { getDayKeyInTimezone, getHourInTimezone } from '../../utilities/timezoneUtils.js'
 import { useTenantFilter } from '../../utilities/useTenantFilter.js'
 import styles from './CalendarView.module.css'
@@ -386,23 +387,12 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     }
   }, [viewMode, fetchPendingReservations])
 
-  // Client-side resource filtering
+  // Client-side resource filtering. Delegated to a pure, unit-tested helper:
+  // ids MUST be compared string-normalized — Postgres serves numeric ids over
+  // REST while the filter/auto-select value is a string, and strict `===` on
+  // the raw values filtered out EVERY reservation on Postgres installs.
   const matchesResourceFilter = useCallback(
-    (r: Reservation): boolean => {
-      if (!selectedResourceId) {return true}
-      // Check top-level resource
-      const topId = typeof r.resource === 'string' ? r.resource : r.resource?.id
-      if (topId === selectedResourceId) {return true}
-      // Check items array for multi-resource bookings
-      if (r.items && r.items.length > 0) {
-        return r.items.some((item) => {
-          const itemId =
-            typeof item.resource === 'string' ? item.resource : item.resource?.id
-          return itemId === selectedResourceId
-        })
-      }
-      return false
-    },
+    (r: Reservation): boolean => reservationMatchesResource(r, selectedResourceId),
     [selectedResourceId],
   )
 
@@ -1406,7 +1396,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   onBook={handleLaneBook}
                   resources={
                     selectedResourceId
-                      ? resources.filter((r) => r.id === selectedResourceId)
+                      ? resources.filter((r) => sameId(r.id, selectedResourceId))
                       : resources
                   }
                   startHour={startHour}

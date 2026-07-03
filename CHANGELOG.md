@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.2.2] - 2026-07-03
+
+### Fixed
+
+- **CalendarView: selecting a resource emptied the calendar on Postgres installs.** The
+  client-side resource filter compared ids with strict `===`, but Postgres serves numeric
+  ids over REST while the filter value (a `<select>` value, or 2.2.1's single-resource
+  auto-select) is a string — so `8 === '8'` never matched and every reservation was hidden.
+  2.2.1 made this fire with no user action on single-resource installs. Ids are now
+  compared string-normalized (`reservationMatchesResource` / `sameId`, unit-tested); the
+  same fix applies to the Lanes view's resource list, which had the identical mismatch.
+
 ## [2.2.1] - 2026-07-03
 
 ### Fixed
