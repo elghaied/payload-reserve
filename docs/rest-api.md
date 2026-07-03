@@ -155,6 +155,9 @@ GET /api/reserve/resource-availability?resource=abc123&start=2025-06-15&end=2025
   "requiredPools": [
     { "quantity": 4, "busy": [ { "start": "...", "end": "...", "units": 1 } ] }
   ],
+  "external": [
+    { "start": "2025-06-15T13:00:00.000Z", "end": "2025-06-15T14:00:00.000Z", "label": "Google" }
+  ],
   "timeZone": "Europe/Paris"
 }
 ```
@@ -163,6 +166,7 @@ GET /api/reserve/resource-availability?resource=abc123&start=2025-06-15&end=2025
 - `capacityMode` / `quantity` — the resource's capacity configuration.
 - `days[]` — one entry per day: `shiftWindows` (resolved schedule ranges) and `timeOff` (full-day exception ranges with optional `reason` and `type`).
 - `requiredPools[]` — for each distinct resource that this resource's services also require (e.g. a shared chair pool): its `quantity` and `busy` intervals, so callers can detect when a slot is blocked by a shared pool even when the resource itself is free.
+- `external[]` — external busy intervals from the app's `getExternalBusy` resolver (calendar sync etc.); `[]` unless the option is configured. Display-only here — enforcement happens in availability checks (booking hooks, `checkAvailability`, slot listings), not in this endpoint.
 - `timeZone` — the IANA zone the day windows were resolved in: the selected tenant's zone in `multiTenant` mode, otherwise the global `timezone`.
 
 ---
