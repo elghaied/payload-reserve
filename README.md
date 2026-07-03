@@ -268,6 +268,23 @@ payloadReserve({
 
 Resolution precedence is `tenant.<timezoneField> → global timezone → 'UTC'`; a tenant with no (or an invalid) timezone value transparently falls back to the global default. The zone is resolved server-side from the tenant cookie — the client calendar reads it from `GET /api/reserve/effective-timezone`. This is purely additive: plain single-tenant installs (no tenant relationship / no tenant cookie) keep the global zone with no extra DB read.
 
+### `getExternalBusy`
+
+Fold external busy time (e.g. a Google/Outlook calendar-sync table) into availability:
+
+```ts
+payloadReserve({
+  getExternalBusy: async ({ resourceId, start, end, req }) => {
+    // Return busy intervals for this resource over [start, end)
+    return [{ start: '2026-08-03T09:00:00.000Z', end: '2026-08-03T10:00:00.000Z', label: 'Google' }]
+  },
+})
+```
+
+- **Enforcement:** any booking (hooks, endpoints, slot listings) overlapping an interval is unavailable. An interval blocks the WHOLE resource (all `quantity` units) — external calendars aren't unit-aware.
+- **Display:** the `resource-availability` endpoint returns the intervals as `external[]` and the calendar renders them as distinct hatched "External event" slots.
+- **Fail-open:** if the resolver throws, the plugin treats it as no external busy — a sync failure never blocks a real booking or breaks the grid.
+
 #### Tenant-scoped customer search
 
 The reservation form's customer picker (and its backing `/api/reservation-customer-search` endpoint) restricts results to the **selected tenant** — read from the tenant cookie — whenever the customers collection carries the multi-tenant `tenant` field. This prevents picking a customer from another tenant (which would otherwise fail on save with a tenant mismatch). Like the per-tenant timezone behaviour, it is purely additive: plain single-tenant installs (customers collection without a tenant field, or no tenant cookie) are unaffected and the search spans all customers as before.
