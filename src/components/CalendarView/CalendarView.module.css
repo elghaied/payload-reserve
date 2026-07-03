@@ -172,6 +172,22 @@
   opacity: 0.8;
 }
 
+.eventItemExternal {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--theme-elevation-100),
+    var(--theme-elevation-100) 6px,
+    var(--theme-error-50) 6px,
+    var(--theme-error-50) 12px
+  );
+  color: var(--theme-elevation-800);
+  cursor: default;
+}
+
+.eventItemExternal:hover {
+  opacity: 1;
+}
+
 .statusPending {
   background: #fef3c7;
   color: #92400e;

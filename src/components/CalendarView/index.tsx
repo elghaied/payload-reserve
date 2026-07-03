@@ -8,6 +8,7 @@ import type { PluginT } from '../../translations/index.js'
 import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
+import { externalPillLabel } from '../../utilities/externalPillLabel.js'
 import { statusToI18nKey } from '../../utilities/i18nUtils.js'
 import { reservationMatchesResource, sameId } from '../../utilities/reservationResourceFilter.js'
 import { getDayKeyInTimezone, getHourInTimezone } from '../../utilities/timezoneUtils.js'
@@ -792,6 +793,19 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             return rKey === dayKey
           })
 
+          // External busy intervals (calendar sync etc.) overlapping this day —
+          // display-only pills; enforcement already lives in checkAvailability.
+          const dayExternal = (availability?.external ?? []).filter((ev) => {
+            const startKey = getDayKeyInTimezone(new Date(ev.start), reservationTimezone)
+            // end is exclusive: subtract 1ms so an interval ending at midnight
+            // doesn't claim the next day.
+            const endKey = getDayKeyInTimezone(
+              new Date(new Date(ev.end).getTime() - 1),
+              reservationTimezone,
+            )
+            return startKey <= dayKey && dayKey <= endKey
+          })
+
           const clickDate = new Date(day)
           clickDate.setHours(9, 0, 0, 0)
 
@@ -811,6 +825,17 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             >
               <div className={styles.dayNumber}>{day.getDate()}</div>
               {dayReservations.map((r) => renderEventItem(r, true))}
+              {dayExternal.map((ev, j) => (
+                <div
+                  className={`${styles.eventItem} ${styles.eventItemExternal}`}
+                  key={`ext-${ev.start}-${j}`}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  title={ev.label ?? t('reservation:slotExternal')}
+                >
+                  {externalPillLabel(ev, dayKey, reservationTimezone, t('reservation:slotExternal'))}
+                </div>
+              ))}
             </div>
           )
         })}
