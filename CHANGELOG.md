@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [2.2.2] - 2026-07-03
+## [2.3.0] - 2026-07-03
+
+### Added
+
+- **Month view renders external busy intervals as pills.** Events from `getExternalBusy`
+  now appear in month day-cells as distinct, non-clickable hatched pills (timed events show
+  "HH:MM label", all-day events show the label only), alongside reservation pills. Rendered
+  only when a resource is selected (or auto-selected on single-resource installs) — same
+  rule as the week/day availability shading.
 
 ### Fixed
 
