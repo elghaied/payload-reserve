@@ -161,6 +161,7 @@ payloadReserve({
 | `staffProvisioning.resourceType` | `string` | `'staff'` | resourceType stamped on the Resource (must be a valid `resourceType`) |
 | `staffProvisioning.nameFrom` | `string` | `'name'` | User field copied into `Resource.name` (falls back to email) |
 | `staffProvisioning.beforeCreate` | `function` | `undefined` | Stamp tenant/custom fields onto the Resource before create |
+| `getExternalBusy` | `GetExternalBusy` | `undefined` | Resolver folding external busy intervals (calendar sync etc.) into availability — see `README.md` § External Busy |
 
 > **Vocabularies:** `resourceTypes` (default `['staff', 'equipment', 'room']`) and `leaveTypes` (default `['vacation', 'sick', 'personal', 'closure', 'other']`) customize the option lists for `Resource.resourceType` and `Schedule.exceptions[].type`. See the `staffProvisioning` option above and [Examples](./examples.md).
 

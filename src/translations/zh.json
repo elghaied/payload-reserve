@@ -150,6 +150,7 @@
   "pickLoading": "正在加载可用时间……",
   "pickNone": "当天没有可用时间。",
   "laneNoResources": "没有可显示的启用资源。",
+  "slotExternal": "外部事件",
   "slotFree": "空闲",
   "slotFull": "已满",
   "slotOffShift": "非排班时段",

@@ -87,6 +87,7 @@ export const validateConflicts =
         bufferBefore,
         endTime: new Date(item.endTime),
         excludeReservationId: isUpdate ? originalDoc?.id : undefined,
+        getExternalBusy: config.getExternalBusy,
         guestCount: item.guestCount,
         payload: req.payload,
         req,

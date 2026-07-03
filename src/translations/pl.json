@@ -150,6 +150,7 @@
   "pickLoading": "Ładowanie dostępnych terminów…",
   "pickNone": "Brak dostępnych terminów na ten dzień.",
   "laneNoResources": "Brak aktywnych zasobów do wyświetlenia.",
+  "slotExternal": "Wydarzenie zewnętrzne",
   "slotFree": "Wolny",
   "slotFull": "Pełny",
   "slotOffShift": "Poza zmianą",

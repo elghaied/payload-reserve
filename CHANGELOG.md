@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.2.0] - 2026-07-03
+
+A minor, additive release: an app-supplied resolver for folding external busy time (e.g. calendar sync) into availability. **No breaking changes** — installs that don't configure `getExternalBusy` are unaffected.
+
+### Added
+
+- **`getExternalBusy` plugin option.** An app-supplied resolver that maps a resource and time window to external busy intervals (e.g. a Google/Outlook calendar-sync table), so third-party events are folded into this plugin's availability logic.
+- **Enforcement in `checkAvailability`.** An external interval blocks the WHOLE resource (all `quantity` units) — external calendars aren't unit-aware. The resolver is called inside try/catch and treated as fail-open: a resolver error never blocks a real booking.
+- **`external[]` in the resource-availability endpoint response**, carrying the resolved external intervals for the requested window.
+- **`external` slot state in CalendarView**, rendered as a distinct, non-clickable hatched slot, with `slotExternal` translations added in all 12 supported languages.
+
 ## [2.1.1] - 2026-06-19
 
 A patch release fixing two multi-tenant issues surfaced in a real `@payloadcms/plugin-multi-tenant` install. **No breaking changes** — plain single-tenant installs are unaffected.

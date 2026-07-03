@@ -150,6 +150,7 @@
   "pickLoading": "Müsait saatler yükleniyor…",
   "pickNone": "Bu gün için müsait saat yok.",
   "laneNoResources": "Gösterilecek aktif kaynak yok.",
+  "slotExternal": "Harici etkinlik",
   "slotFree": "Boş",
   "slotFull": "Dolu",
   "slotOffShift": "Mesai dışı",

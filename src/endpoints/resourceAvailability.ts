@@ -1,6 +1,10 @@
-import type { Endpoint, Payload, Where } from 'payload'
+import type { Endpoint, Payload, PayloadRequest, Where } from 'payload'
 
-import type { ResolvedReservationPluginConfig } from '../types.js'
+import type {
+  ExternalBusyInterval,
+  GetExternalBusy,
+  ResolvedReservationPluginConfig,
+} from '../types.js'
 
 import { resolveScheduleForDate } from '../utilities/scheduleUtils.js'
 import { readCookie } from '../utilities/tenantFilter.js'
@@ -26,6 +30,8 @@ export type ResourceAvailability = {
   busy: Busy
   capacityMode: 'per-guest' | 'per-reservation'
   days: DayAvailability[]
+  /** External busy intervals (calendar sync etc.) from getExternalBusy — display-only here; enforcement lives in checkAvailability. */
+  external: ExternalBusyInterval[]
   quantity: number
   /** Capacity of resources this resource's services also require (e.g. a chair pool). */
   requiredPools: Array<{ busy: Busy; quantity: number }>
@@ -55,7 +61,12 @@ async function busyFor(args: {
   // limit:0 = all matching — bounded by the endpoint's 90-day range cap, so this
   // can't run away, and the grid no longer silently drops busy intervals (D9).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { docs } = await (payload.find as any)({ collection: reservationSlug, depth: 0, limit: 0, where })
+  const { docs } = await (payload.find as any)({
+    collection: reservationSlug,
+    depth: 0,
+    limit: 0,
+    where,
+  })
   return (docs as Array<Record<string, unknown>>)
     .filter((r) => r.startTime && r.endTime)
     .map((r) => ({
@@ -68,7 +79,9 @@ async function busyFor(args: {
 export async function buildResourceAvailability(params: {
   blockingStatuses: string[]
   end: Date
+  getExternalBusy?: GetExternalBusy
   payload: Payload
+  req?: PayloadRequest
   reservationSlug: string
   resourceId: number | string
   resourceSlug: string
@@ -79,7 +92,9 @@ export async function buildResourceAvailability(params: {
   const {
     blockingStatuses,
     end,
+    getExternalBusy,
     payload,
+    req,
     reservationSlug,
     resourceId,
     resourceSlug,
@@ -99,7 +114,8 @@ export async function buildResourceAvailability(params: {
     return null
   }
   const quantity = (resource?.quantity as number) ?? 1
-  const capacityMode = (resource?.capacityMode as 'per-guest' | 'per-reservation') ?? 'per-reservation'
+  const capacityMode =
+    (resource?.capacityMode as 'per-guest' | 'per-reservation') ?? 'per-reservation'
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { docs: schedules } = await (payload.find as any)({
@@ -198,9 +214,11 @@ export async function buildResourceAvailability(params: {
   const requiredPools: ResourceAvailability['requiredPools'] = []
   for (const poolId of poolIds) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pool = await (payload.findByID as any)({ id: poolId, collection: resourceSlug, depth: 0 }).catch(
-      () => null,
-    )
+    const pool = await (payload.findByID as any)({
+      id: poolId,
+      collection: resourceSlug,
+      depth: 0,
+    }).catch(() => null)
     if (!pool) {
       continue
     }
@@ -220,7 +238,20 @@ export async function buildResourceAvailability(params: {
     })
   }
 
-  return { busy, capacityMode, days, quantity, requiredPools, timeZone }
+  // External busy — display only (enforcement lives in checkAvailability).
+  // Fail-open: a resolver error must never break the grid.
+  let external: ExternalBusyInterval[] = []
+  if (getExternalBusy && req) {
+    try {
+      external = (await getExternalBusy({ end, req, resourceId, start })).filter(
+        (iv) => !isNaN(Date.parse(iv.start)) && !isNaN(Date.parse(iv.end)),
+      )
+    } catch {
+      external = []
+    }
+  }
+
+  return { busy, capacityMode, days, external, quantity, requiredPools, timeZone }
 }
 
 export function createResourceAvailabilityEndpoint(
@@ -281,7 +312,9 @@ export function createResourceAvailabilityEndpoint(
       const result = await buildResourceAvailability({
         blockingStatuses: config.statusMachine.blockingStatuses,
         end: endDate,
+        getExternalBusy: config.getExternalBusy,
         payload: req.payload,
+        req,
         reservationSlug: config.slugs.reservations,
         resourceId: resource,
         resourceSlug: config.slugs.resources,

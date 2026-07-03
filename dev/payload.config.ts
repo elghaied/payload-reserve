@@ -12,6 +12,7 @@ import { payloadReserve } from 'payload-reserve'
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
+import { externalBusyResolver } from './helpers/externalBusyState.js'
 import { guestCancelOtpEndpoints } from './helpers/guestCancelEndpoints.js'
 import { testEmailAdapter } from './helpers/testEmailAdapter.js'
 import { seed } from './seed.js'
@@ -131,6 +132,7 @@ const buildConfigWithMemoryDB = async () => {
       allowGuestBooking: true,
       cancellationNoticePeriod: 24,
       defaultBufferTime: 10,
+      getExternalBusy: externalBusyResolver,
       hooks: {
         afterBookingCreate: [
           ({ doc }) => {

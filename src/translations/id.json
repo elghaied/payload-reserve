@@ -150,6 +150,7 @@
   "pickLoading": "Memuat waktu yang tersedia…",
   "pickNone": "Tidak ada waktu tersedia untuk hari ini.",
   "laneNoResources": "Tidak ada sumber daya aktif untuk ditampilkan.",
+  "slotExternal": "Acara eksternal",
   "slotFree": "Kosong",
   "slotFull": "Penuh",
   "slotOffShift": "Di luar jam kerja",

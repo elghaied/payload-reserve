@@ -150,6 +150,7 @@
   "pickLoading": "Verfügbare Zeiten werden geladen…",
   "pickNone": "Keine verfügbaren Zeiten für diesen Tag.",
   "laneNoResources": "Keine aktiven Ressourcen zum Anzeigen.",
+  "slotExternal": "Externer Termin",
   "slotFree": "Frei",
   "slotFull": "Ausgebucht",
   "slotOffShift": "Außer Dienst",

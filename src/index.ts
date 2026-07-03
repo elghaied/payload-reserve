@@ -11,6 +11,8 @@ export {
 export type {
   CapacityMode,
   DurationType,
+  ExternalBusyInterval,
+  GetExternalBusy,
   ReservationPluginConfig,
   ReservationPluginHooks,
   ResolvedReservationPluginConfig,

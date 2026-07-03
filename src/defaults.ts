@@ -138,6 +138,7 @@ export function resolveConfig(
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,
     extraReservationFields: pluginOptions.extraReservationFields ?? [],
+    getExternalBusy: pluginOptions.getExternalBusy,
     // Real value is set by the plugin once config.collections is known (C8)
     hasMediaCollection: false,
     hooks: pluginOptions.hooks ?? {},

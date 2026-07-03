@@ -85,6 +85,7 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
       const slots = await getAvailableSlots({
         blockingStatuses: config.statusMachine.blockingStatuses,
         date: dayKey,
+        getExternalBusy: config.getExternalBusy,
         guestCount,
         payload: req.payload,
         req,

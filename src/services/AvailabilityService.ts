@@ -1,6 +1,6 @@
 import type { Payload, PayloadRequest, Where } from 'payload'
 
-import type { CapacityMode, DurationType, StatusMachineConfig } from '../types.js'
+import type { CapacityMode, DurationType, GetExternalBusy, StatusMachineConfig } from '../types.js'
 import type { ResolvedItem } from '../utilities/resolveReservationItems.js'
 
 import { resolveReservationItems } from '../utilities/resolveReservationItems.js'
@@ -13,7 +13,10 @@ import {
 } from '../utilities/slotUtils.js'
 import { endOfDayInTimezone } from '../utilities/timezoneUtils.js'
 
-/** A window during which a resource is occupied, expanded by buffer times. */
+/** A window during which a resource is occupied. Reservation/sibling
+ * occupancies are expanded by buffer times; external intervals (from
+ * `getExternalBusy`) are used as-is — only the candidate window itself
+ * carries buffers when checked against them. */
 export type Occupancy = { blockedEnd: Date; blockedStart: Date; units: number }
 
 /** Coarse pre-filter widen: covers any realistic neighbor buffer (buffers are
@@ -199,6 +202,8 @@ export async function checkAvailability(params: {
   bufferBefore: number
   endTime: Date
   excludeReservationId?: number | string
+  /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
+  getExternalBusy?: GetExternalBusy
   guestCount: number
   payload: Payload
   req: PayloadRequest
@@ -221,6 +226,7 @@ export async function checkAvailability(params: {
     bufferBefore,
     endTime,
     excludeReservationId,
+    getExternalBusy,
     guestCount,
     payload,
     req,
@@ -315,7 +321,31 @@ export async function checkAvailability(params: {
     ? await itemsToOccupancies({ bufferFor, capacityMode, items: siblingItems, resourceId })
     : []
 
-  const occupancies = [...fetchedOccupancies, ...siblingOccupancies]
+  // External busy (calendar sync etc.) — a synced calendar isn't unit-aware, so
+  // an external event blocks the WHOLE resource (units = quantity), not one
+  // unit. Fail-open: a resolver error must never block a real booking.
+  let externalOccupancies: Occupancy[] = []
+  if (getExternalBusy) {
+    try {
+      const intervals = await getExternalBusy({
+        end: candidateEnd,
+        req,
+        resourceId,
+        start: candidateStart,
+      })
+      externalOccupancies = intervals
+        .map((iv) => ({
+          blockedEnd: new Date(iv.end),
+          blockedStart: new Date(iv.start),
+          units: quantity,
+        }))
+        .filter((o) => !isNaN(o.blockedStart.getTime()) && !isNaN(o.blockedEnd.getTime()))
+    } catch {
+      externalOccupancies = []
+    }
+  }
+
+  const occupancies = [...fetchedOccupancies, ...siblingOccupancies, ...externalOccupancies]
 
   // Sum the units of every occupancy whose buffered window overlaps the candidate
   const currentUnits = occupancies.reduce(
@@ -344,6 +374,8 @@ export async function checkAvailability(params: {
 export async function getAvailableSlots(params: {
   blockingStatuses: string[]
   date: Date | string
+  /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
+  getExternalBusy?: GetExternalBusy
   guestCount?: number
   payload: Payload
   req: PayloadRequest
@@ -359,6 +391,7 @@ export async function getAvailableSlots(params: {
   const {
     blockingStatuses,
     date,
+    getExternalBusy,
     guestCount,
     payload,
     req,
@@ -482,6 +515,7 @@ export async function getAvailableSlots(params: {
         bufferAfter: bAfter,
         bufferBefore: bBefore,
         endTime: end,
+        getExternalBusy,
         guestCount: guestCount ?? 1,
         payload,
         req,

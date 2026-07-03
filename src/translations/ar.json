@@ -150,6 +150,7 @@
   "pickLoading": "جارٍ تحميل الأوقات المتاحة…",
   "pickNone": "لا توجد أوقات متاحة لهذا اليوم.",
   "laneNoResources": "لا توجد موارد نشطة لعرضها.",
+  "slotExternal": "حدث خارجي",
   "slotFree": "متاح",
   "slotFull": "ممتلئ",
   "slotOffShift": "خارج الدوام",
