@@ -1,6 +1,6 @@
 import type { Payload, PayloadRequest, Where } from 'payload'
 
-import type { CapacityMode, DurationType, StatusMachineConfig } from '../types.js'
+import type { CapacityMode, DurationType, GetExternalBusy, StatusMachineConfig } from '../types.js'
 import type { ResolvedItem } from '../utilities/resolveReservationItems.js'
 
 import { resolveReservationItems } from '../utilities/resolveReservationItems.js'
@@ -199,6 +199,8 @@ export async function checkAvailability(params: {
   bufferBefore: number
   endTime: Date
   excludeReservationId?: number | string
+  /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
+  getExternalBusy?: GetExternalBusy
   guestCount: number
   payload: Payload
   req: PayloadRequest
@@ -221,6 +223,7 @@ export async function checkAvailability(params: {
     bufferBefore,
     endTime,
     excludeReservationId,
+    getExternalBusy,
     guestCount,
     payload,
     req,
@@ -315,7 +318,31 @@ export async function checkAvailability(params: {
     ? await itemsToOccupancies({ bufferFor, capacityMode, items: siblingItems, resourceId })
     : []
 
-  const occupancies = [...fetchedOccupancies, ...siblingOccupancies]
+  // External busy (calendar sync etc.) — a synced calendar isn't unit-aware, so
+  // an external event blocks the WHOLE resource (units = quantity), not one
+  // unit. Fail-open: a resolver error must never block a real booking.
+  let externalOccupancies: Occupancy[] = []
+  if (getExternalBusy) {
+    try {
+      const intervals = await getExternalBusy({
+        end: candidateEnd,
+        req,
+        resourceId,
+        start: candidateStart,
+      })
+      externalOccupancies = intervals
+        .map((iv) => ({
+          blockedEnd: new Date(iv.end),
+          blockedStart: new Date(iv.start),
+          units: quantity,
+        }))
+        .filter((o) => !isNaN(o.blockedStart.getTime()) && !isNaN(o.blockedEnd.getTime()))
+    } catch {
+      externalOccupancies = []
+    }
+  }
+
+  const occupancies = [...fetchedOccupancies, ...siblingOccupancies, ...externalOccupancies]
 
   // Sum the units of every occupancy whose buffered window overlaps the candidate
   const currentUnits = occupancies.reduce(
@@ -344,6 +371,8 @@ export async function checkAvailability(params: {
 export async function getAvailableSlots(params: {
   blockingStatuses: string[]
   date: Date | string
+  /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
+  getExternalBusy?: GetExternalBusy
   guestCount?: number
   payload: Payload
   req: PayloadRequest
@@ -359,6 +388,7 @@ export async function getAvailableSlots(params: {
   const {
     blockingStatuses,
     date,
+    getExternalBusy,
     guestCount,
     payload,
     req,
@@ -482,6 +512,7 @@ export async function getAvailableSlots(params: {
         bufferAfter: bAfter,
         bufferBefore: bBefore,
         endTime: end,
+        getExternalBusy,
         guestCount: guestCount ?? 1,
         payload,
         req,

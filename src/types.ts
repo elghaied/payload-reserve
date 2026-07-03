@@ -158,6 +158,25 @@ export type CollectionOverride = {
   fields?: (args: { defaultFields: Field[] }) => Field[]
 } & Omit<Partial<CollectionConfig>, 'fields' | 'slug'>
 
+/** One external busy interval returned by `getExternalBusy` (ISO date strings). */
+export type ExternalBusyInterval = { end: string; label?: string; start: string }
+
+/**
+ * App-supplied resolver mapping an external source (e.g. Google/Outlook sync
+ * tables) to busy intervals for one resource over [start, end). Wired into
+ * checkAvailability (bookings overlapping an interval are unavailable — the
+ * interval blocks the WHOLE resource, all units) and into the
+ * resource-availability endpoint (returned as `external` for distinct
+ * rendering). The plugin calls it inside try/catch and treats an error as []
+ * (fail-open): a calendar/sync failure must never block a real booking.
+ */
+export type GetExternalBusy = (args: {
+  end: Date
+  req: PayloadRequest
+  resourceId: number | string
+  start: Date
+}) => Promise<ExternalBusyInterval[]>
+
 export type ReservationPluginConfig = {
   /** Override access control per collection */
   access?: {
@@ -187,6 +206,8 @@ export type ReservationPluginConfig = {
   disabled?: boolean
   /** @deprecated Use `collectionOverrides.reservations.fields` instead. Extra fields appended to Reservations. */
   extraReservationFields?: Field[]
+  /** Resolve external busy intervals (calendar sync etc.) folded into availability + calendar display. */
+  getExternalBusy?: GetExternalBusy
   /** Plugin hooks for external integrations */
   hooks?: ReservationPluginHooks
   /** Configurable leave/exception type vocabulary (default: vacation/sick/personal/closure/other) */
@@ -248,6 +269,7 @@ export type ResolvedReservationPluginConfig = {
   defaultBufferTime: number
   disabled: boolean
   extraReservationFields: Field[]
+  getExternalBusy: GetExternalBusy | undefined
   /** Whether the media collection (`slugs.media`) exists — set by the plugin; gates the image upload fields. */
   hasMediaCollection: boolean
   hooks: ReservationPluginHooks
