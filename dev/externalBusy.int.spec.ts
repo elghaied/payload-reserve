@@ -89,3 +89,36 @@ describe('getExternalBusy enforcement (checkAvailability via validateConflicts)'
     await expect(createReservation(f, '2026-08-05T09:15:00.000Z')).rejects.toThrow()
   })
 })
+
+describe('resource-availability endpoint external[]', () => {
+  it('returns resolver intervals as external, separate from busy; [] when resolver throws', async () => {
+    const f = await fixtures('display')
+    const { buildResourceAvailability } = await import('../src/endpoints/resourceAvailability.js')
+    externalBusyState.intervals = [
+      { end: '2026-08-10T10:00:00.000Z', label: 'Google', start: '2026-08-10T09:00:00.000Z' },
+    ]
+    const { externalBusyResolver } = await import('./helpers/externalBusyState.js')
+    const args = {
+      blockingStatuses: ['pending', 'confirmed'],
+      end: new Date('2026-08-11T00:00:00.000Z'),
+      getExternalBusy: externalBusyResolver,
+      payload,
+      req: { payload } as never,
+      reservationSlug: 'reservations',
+      resourceId: f.resource.id,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      start: new Date('2026-08-10T00:00:00.000Z'),
+      timeZone: 'UTC',
+    }
+    const result = await buildResourceAvailability(args)
+    expect(result?.external).toEqual([
+      { end: '2026-08-10T10:00:00.000Z', label: 'Google', start: '2026-08-10T09:00:00.000Z' },
+    ])
+    expect(result?.busy).toEqual([]) // external never leaks into busy
+
+    externalBusyState.throwError = true
+    const failed = await buildResourceAvailability(args)
+    expect(failed?.external).toEqual([]) // fail-open: grid renders, just unshaded
+  })
+})
