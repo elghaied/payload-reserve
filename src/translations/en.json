@@ -150,6 +150,7 @@
   "pickLoading": "Loading available times…",
   "pickNone": "No available times for this day.",
   "laneNoResources": "No active resources to show.",
+  "slotExternal": "External event",
   "slotFree": "Free",
   "slotFull": "Full",
   "slotOffShift": "Off shift",

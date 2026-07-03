@@ -1,6 +1,6 @@
 import { addMinutes, doRangesOverlap } from './slotUtils.js'
 
-export type SlotState = 'free' | 'full' | 'off-shift' | 'time-off'
+export type SlotState = 'external' | 'free' | 'full' | 'off-shift' | 'time-off'
 
 export type SlotInfo = {
   end: Date
@@ -39,13 +39,15 @@ export function computeSlotStates(params: {
   capacityMode: 'per-guest' | 'per-reservation'
   dayEnd: Date
   dayStart: Date
+  external?: Interval[]
   quantity: number
   requiredPools?: RequiredPool[]
   shiftWindows: Interval[]
   step: number
   timeOff: Interval[]
 }): SlotInfo[] {
-  const { busy, dayEnd, dayStart, quantity, requiredPools, shiftWindows, step, timeOff } = params
+  const { busy, dayEnd, dayStart, external, quantity, requiredPools, shiftWindows, step, timeOff } =
+    params
   const pools = requiredPools ?? []
   const slots: SlotInfo[] = []
 
@@ -64,6 +66,10 @@ export function computeSlotStates(params: {
       state = 'time-off'
     } else if (occupancy >= quantity || poolFull) {
       state = 'full'
+    } else if (within(slotStart, slotEnd, external ?? [])) {
+      // External (synced calendar) busy — after `full` so a real booking's
+      // state wins when both overlap; enforcement already blocks either way.
+      state = 'external'
     } else {
       state = 'free'
     }

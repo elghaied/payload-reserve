@@ -13,6 +13,7 @@ import { useResourceAvailability } from './useResourceAvailability.js'
 type LaneResource = { id: string; name: string }
 
 const SLOT_STATE_KEYS: Record<SlotState, string> = {
+  external: 'reservation:slotExternal',
   free: 'reservation:slotFree',
   full: 'reservation:slotFull',
   'off-shift': 'reservation:slotOffShift',
@@ -54,6 +55,7 @@ function Lane({
         capacityMode: data!.capacityMode,
         dayEnd,
         dayStart,
+        external: data!.external,
         quantity: data!.quantity,
         requiredPools: data!.requiredPools,
         shiftWindows: dayAvail.shiftWindows,
@@ -72,9 +74,11 @@ function Lane({
               ? styles.slotOffShift
               : s.state === 'time-off'
                 ? styles.slotTimeOff
-                : s.state === 'full'
-                  ? styles.slotFull
-                  : styles.slotFree
+                : s.state === 'external'
+                  ? styles.slotExternal
+                  : s.state === 'full'
+                    ? styles.slotFull
+                    : styles.slotFree
           const isFree = s.state === 'free'
           const slotLabel = `${s.start.toLocaleTimeString([], {
             hour: '2-digit',

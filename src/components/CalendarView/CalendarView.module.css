@@ -520,6 +520,17 @@
   cursor: not-allowed;
 }
 
+.slotExternal {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--theme-elevation-100),
+    var(--theme-elevation-100) 6px,
+    var(--theme-error-50) 6px,
+    var(--theme-error-50) 12px
+  );
+  cursor: not-allowed;
+}
+
 .slotFree {
   cursor: pointer;
 }

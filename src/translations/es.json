@@ -150,6 +150,7 @@
   "pickLoading": "Cargando horarios disponibles…",
   "pickNone": "No hay horarios disponibles para este día.",
   "laneNoResources": "No hay recursos activos que mostrar.",
+  "slotExternal": "Evento externo",
   "slotFree": "Libre",
   "slotFull": "Completo",
   "slotOffShift": "Fuera de turno",

@@ -861,6 +861,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   capacityMode: availability.capacityMode,
                   dayEnd,
                   dayStart,
+                  external: availability.external,
                   quantity: availability.quantity,
                   requiredPools: availability.requiredPools,
                   shiftWindows: dayAvail.shiftWindows,
@@ -918,6 +919,9 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   isNonInteractive = true
                 } else if (slotInfo.state === 'time-off') {
                   slotClass = styles.slotTimeOff
+                  isNonInteractive = true
+                } else if (slotInfo.state === 'external') {
+                  slotClass = styles.slotExternal
                   isNonInteractive = true
                 } else if (slotInfo.state === 'full') {
                   slotClass = styles.slotFull
@@ -1012,6 +1016,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             capacityMode: availability.capacityMode,
             dayEnd,
             dayStart,
+            external: availability.external,
             quantity: availability.quantity,
             requiredPools: availability.requiredPools,
             shiftWindows: dayAvail.shiftWindows,
@@ -1047,6 +1052,9 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               isNonInteractive = true
             } else if (slotInfo.state === 'time-off') {
               slotClass = styles.slotTimeOff
+              isNonInteractive = true
+            } else if (slotInfo.state === 'external') {
+              slotClass = styles.slotExternal
               isNonInteractive = true
             } else if (slotInfo.state === 'full') {
               slotClass = styles.slotFull
