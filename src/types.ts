@@ -169,6 +169,9 @@ export type ExternalBusyInterval = { end: string; label?: string; start: string 
  * resource-availability endpoint (returned as `external` for distinct
  * rendering). The plugin calls it inside try/catch and treats an error as []
  * (fail-open): a calendar/sync failure must never block a real booking.
+ * Called once per candidate window during slot computation (N calls per
+ * request) — keep it cheap: read a local sync table or a per-request cache,
+ * never a remote API directly.
  */
 export type GetExternalBusy = (args: {
   end: Date

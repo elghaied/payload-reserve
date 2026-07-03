@@ -13,7 +13,10 @@ import {
 } from '../utilities/slotUtils.js'
 import { endOfDayInTimezone } from '../utilities/timezoneUtils.js'
 
-/** A window during which a resource is occupied, expanded by buffer times. */
+/** A window during which a resource is occupied. Reservation/sibling
+ * occupancies are expanded by buffer times; external intervals (from
+ * `getExternalBusy`) are used as-is — only the candidate window itself
+ * carries buffers when checked against them. */
 export type Occupancy = { blockedEnd: Date; blockedStart: Date; units: number }
 
 /** Coarse pre-filter widen: covers any realistic neighbor buffer (buffers are

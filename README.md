@@ -284,6 +284,7 @@ payloadReserve({
 - **Enforcement:** any booking (hooks, endpoints, slot listings) overlapping an interval is unavailable. An interval blocks the WHOLE resource (all `quantity` units) — external calendars aren't unit-aware.
 - **Display:** the `resource-availability` endpoint returns the intervals as `external[]` and the calendar renders them as distinct hatched "External event" slots.
 - **Fail-open:** if the resolver throws, the plugin treats it as no external busy — a sync failure never blocks a real booking or breaks the grid.
+- **Performance:** the resolver is called once per candidate window during slot computation (N calls per request), so keep it cheap — read a local sync table or a per-request cache, never a remote API directly.
 
 #### Tenant-scoped customer search
 
