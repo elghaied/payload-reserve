@@ -10,6 +10,7 @@ import {
   mergeReservationData,
   schedulingFieldsChanged,
 } from '../../utilities/reservationChanges.js'
+import { createReserveDebug } from '../../utilities/reserveDebug.js'
 import { extractId, resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 
 export const validateConflicts =
@@ -18,6 +19,8 @@ export const validateConflicts =
     if (context?.skipReservationHooks) {
       return data
     }
+
+    const dbg = createReserveDebug(req.payload.logger, config.debug)
 
     const isUpdate = operation === 'update'
 
@@ -85,6 +88,7 @@ export const validateConflicts =
         blockingStatuses: config.statusMachine.blockingStatuses,
         bufferAfter,
         bufferBefore,
+        debug: dbg,
         endTime: new Date(item.endTime),
         excludeReservationId: isUpdate ? originalDoc?.id : undefined,
         getExternalBusy: config.getExternalBusy,
@@ -99,7 +103,21 @@ export const validateConflicts =
         startTime: new Date(item.startTime),
       })
 
+      dbg.dbg('conflict_check', {
+        available: result.available,
+        index: i,
+        resourceId: item.resource,
+        startTime: new Date(item.startTime).toISOString(),
+      })
+
       if (!result.available) {
+        dbg.dbg('conflict_reject', {
+          index: i,
+          reason: result.reason,
+          resourceId: item.resource,
+          startTime: new Date(item.startTime).toISOString(),
+        })
+
         throw new ValidationError({
           errors: [
             {

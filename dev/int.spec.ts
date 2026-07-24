@@ -4811,3 +4811,82 @@ describe('Reservation plugin - slots endpoint debug traces', () => {
     info.mockRestore()
   })
 })
+
+describe('Reservation plugin - validateConflicts debug traces', () => {
+  let svcId: string
+  let resId: string
+  let custId: string
+  const START = '2030-07-15T09:00:00.000Z'
+  const END = '2030-07-15T10:00:00.000Z'
+
+  beforeAll(async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Dbg Conflict Service', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Dbg Conflict Resource', active: true, quantity: 1, services: [service.id] },
+    })
+    const customer = await payload.create({
+      collection: col('customers'),
+      data: {
+        email: 'dbgconflict@example.com',
+        firstName: 'Dbg',
+        lastName: 'Conflict',
+        password: 'testpass123',
+      },
+    })
+    svcId = service.id
+    resId = resource.id
+    custId = customer.id
+    // Occupy the slot so the next attempt conflicts.
+    // context.skipReservationHooks bypasses validateStatusTransition so the
+    // seed reservation can start directly as 'confirmed'.
+    await payload.create({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        customer: custId,
+        endTime: END,
+        resource: resId,
+        service: svcId,
+        startTime: START,
+        status: 'confirmed',
+      },
+    })
+  })
+
+  it('logs conflict_check and conflict_reject when a booking conflicts', async () => {
+    const { validateConflicts } = await import('../src/hooks/reservations/validateConflicts.js')
+    const hook = validateConflicts(resolveConfig({ debug: true }))
+    const info = vi.spyOn(payload.logger, 'info')
+
+    await expect(
+      hook({
+        collection: {} as Parameters<typeof hook>[0]['collection'],
+        context: {},
+        data: {
+          customer: custId,
+          endTime: END,
+          resource: resId,
+          service: svcId,
+          startTime: START,
+          status: 'confirmed',
+        },
+        operation: 'create',
+        req: {
+          payload,
+          t: ((k: string) => k) as unknown as Parameters<typeof hook>[0]['req']['t'],
+        } as Parameters<typeof hook>[0]['req'],
+      } as Parameters<typeof hook>[0]),
+    ).rejects.toThrow()
+
+    const lines = info.mock.calls
+      .map(([o]) => o as Record<string, unknown>)
+      .filter((o) => o?.event === 'reserve_debug')
+    expect(lines.some((l) => l.stage === 'conflict_check')).toBe(true)
+    expect(lines.some((l) => l.stage === 'conflict_reject')).toBe(true)
+    info.mockRestore()
+  })
+})
