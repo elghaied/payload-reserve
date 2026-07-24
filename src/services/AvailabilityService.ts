@@ -405,6 +405,8 @@ export async function checkAvailability(params: {
 export async function getAvailableSlots(params: {
   blockingStatuses: string[]
   date: Date | string
+  /** Optional tracer — emits per-stage slot-generation lines when enabled. */
+  debug?: ReserveDebug
   /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
   getExternalBusy?: GetExternalBusy
   guestCount?: number
@@ -422,6 +424,7 @@ export async function getAvailableSlots(params: {
   const {
     blockingStatuses,
     date,
+    debug,
     getExternalBusy,
     guestCount,
     payload,
@@ -445,7 +448,16 @@ export async function getAvailableSlots(params: {
       : resourceId !== undefined
         ? [resourceId]
         : []
+
+  const trace = (debug ?? NOOP_RESERVE_DEBUG).child({ resourceIds: ids, serviceId })
+  trace.dbg('input', {
+    date: date instanceof Date ? date.toISOString() : date,
+    guestCount: guestCount ?? 1,
+    timeZone: tz,
+  })
+
   if (ids.length === 0) {
+    trace.dbg('empty', { reason: 'no_resource_ids' })
     return []
   }
 
@@ -461,35 +473,49 @@ export async function getAvailableSlots(params: {
   const bufferBefore = (service.bufferTimeBefore as number) ?? 0
   const bufferAfter = (service.bufferTimeAfter as number) ?? 0
   const durationType = ((service.durationType as string) ?? 'fixed') as DurationType
+  trace.dbg('service', { bufferAfter, bufferBefore, duration, durationType })
 
   // 2. Per resource: fetch schedules and resolve to windows. A resource with >=1
   //    schedule is "schedule-bearing" and constrains time; a resource with zero
   //    schedules is capacity-only and contributes no time windows.
   const scheduleBearingWindowLists: Array<Array<{ end: Date; start: Date }>> = []
   for (const rid of ids) {
+    const scheduleWhere = { and: [{ resource: { equals: rid } }, { active: { equals: true } }] }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { docs: schedules } = await (payload.find as any)({
       collection: scheduleSlug,
       depth: 0,
       limit: 100,
       req,
-      where: {
-        and: [{ resource: { equals: rid } }, { active: { equals: true } }],
-      },
+      where: scheduleWhere,
+    })
+    trace.dbg('schedules', {
+      activeFlags: (schedules as Array<Record<string, unknown>>).map((s) => s.active),
+      resourceId: rid,
+      rowsFound: (schedules as unknown[]).length,
+      scheduleWhere,
     })
     if (!schedules || schedules.length === 0) {
+      trace.dbg('skip', { reason: 'no_active_schedules', resourceId: rid, rowsFound: 0 })
       continue
     }
     // A11: an exception on ANY of the resource's schedules makes the whole
     // resource unavailable that day — not just the schedule it's recorded on.
-    const exceptedToday = (schedules as Array<Record<string, unknown>>).some((s) =>
-      isExceptionDate(
-        date,
-        (s.exceptions as Array<{ date: string; endDate?: string }> | undefined) ?? [],
-        tz,
-      ),
-    )
-    if (exceptedToday) {
+    let matched: { exception: unknown; scheduleId: unknown } | undefined
+    for (const s of schedules as Array<Record<string, unknown>>) {
+      const exs = (s.exceptions as Array<{ date: string; endDate?: string }> | undefined) ?? []
+      if (isExceptionDate(date, exs, tz)) {
+        matched = { exception: exs.find((e) => isExceptionDate(date, [e], tz)), scheduleId: s.id }
+        break
+      }
+    }
+    if (matched) {
+      trace.dbg('skip', {
+        matchedException: matched.exception,
+        reason: 'date_excepted',
+        resourceId: rid,
+        scheduleId: matched.scheduleId,
+      })
       scheduleBearingWindowLists.push([])
       continue
     }
@@ -503,11 +529,18 @@ export async function getAvailableSlots(params: {
         ),
       )
     }
+    trace.dbg('windows', {
+      resourceId: rid,
+      windowCount: windows.length,
+      windows: windows.map((w) => ({ end: w.end.toISOString(), start: w.start.toISOString() })),
+      windowsEmpty: windows.length === 0,
+    })
     scheduleBearingWindowLists.push(windows)
   }
 
   // No resource constrains time → no basis for generating slots
   if (scheduleBearingWindowLists.length === 0) {
+    trace.dbg('empty', { reason: 'no_windows' })
     return []
   }
 
@@ -517,6 +550,12 @@ export async function getAvailableSlots(params: {
     timeRanges = intersectIntervals(timeRanges, scheduleBearingWindowLists[i])
   }
   if (timeRanges.length === 0) {
+    trace.dbg('empty', {
+      perResourceWindows: scheduleBearingWindowLists.map((list) =>
+        list.map((w) => ({ end: w.end.toISOString(), start: w.start.toISOString() })),
+      ),
+      reason: 'empty_intersection',
+    })
     return []
   }
 
@@ -532,6 +571,11 @@ export async function getAvailableSlots(params: {
   })
   const slotDuration = Math.round(slotEndOffset.getTime() / 60_000)
   const effectiveDuration = durationType === 'fixed' ? duration : slotDuration
+  trace.dbg('sizing', {
+    effectiveDuration,
+    slotDuration,
+    stepSize: Math.min(effectiveDuration, 15),
+  })
 
   // Helper: a window is available only if EVERY required resource is free
   const allAvailable = async (
@@ -545,6 +589,7 @@ export async function getAvailableSlots(params: {
         blockingStatuses,
         bufferAfter: bAfter,
         bufferBefore: bBefore,
+        debug: trace,
         endTime: end,
         getExternalBusy,
         guestCount: guestCount ?? 1,
@@ -567,15 +612,24 @@ export async function getAvailableSlots(params: {
 
   // Full-day: offer each range as a single slot if all resources are free
   if (durationType === 'full-day') {
+    let candidatesGenerated = 0
     for (const range of timeRanges) {
+      candidatesGenerated++
       if (await allAvailable(range.start, range.end, 0, 0)) {
         availableSlots.push({ end: range.end, start: range.start })
       }
     }
+    trace.dbg('result', {
+      candidatesAvailable: availableSlots.length,
+      candidatesGenerated,
+      durationType: 'full-day',
+      returnedCount: availableSlots.length,
+    })
     return availableSlots
   }
 
   const stepSize = Math.min(effectiveDuration, 15)
+  let candidatesGenerated = 0
 
   for (const range of timeRanges) {
     let candidateStart = new Date(range.start)
@@ -586,6 +640,7 @@ export async function getAvailableSlots(params: {
         break
       }
 
+      candidatesGenerated++
       if (await allAvailable(candidateStart, candidateEnd, bufferBefore, bufferAfter)) {
         availableSlots.push({ end: candidateEnd, start: new Date(candidateStart) })
       }
@@ -594,5 +649,10 @@ export async function getAvailableSlots(params: {
     }
   }
 
+  trace.dbg('result', {
+    candidatesAvailable: availableSlots.length,
+    candidatesGenerated,
+    returnedCount: availableSlots.length,
+  })
   return availableSlots
 }

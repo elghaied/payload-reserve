@@ -4659,3 +4659,102 @@ describe('Reservation plugin - checkAvailability debug traces', () => {
     info.mockRestore()
   })
 })
+
+describe('Reservation plugin - getAvailableSlots debug traces', () => {
+  let svcId: string
+  let schedResId: string
+  const MON = '2030-04-08' // a Monday
+
+  beforeAll(async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Dbg Slots Service', active: true, duration: 60, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Dbg Slots Resource', active: true, services: [service.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'Dbg Mon Schedule',
+        active: true,
+        recurringSlots: [{ day: 'mon', endTime: '12:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+    svcId = service.id
+    schedResId = resource.id
+  })
+
+  const call = async (over: Record<string, unknown>) => {
+    const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
+    return getAvailableSlots({
+      blockingStatuses: ['pending', 'confirmed'],
+      date: MON,
+      payload,
+      req: {} as Parameters<typeof getAvailableSlots>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: svcId,
+      serviceSlug: 'services',
+      timeZone: 'UTC',
+      ...over,
+    })
+  }
+
+  const linesFor = (info: ReturnType<typeof vi.spyOn>, tid: string) =>
+    info.mock.calls
+      .map(([o]) => o as Record<string, unknown>)
+      .filter((o) => o?.event === 'reserve_debug' && o.traceId === tid)
+
+  it('emits no reserve_debug lines when debug is absent', async () => {
+    const info = vi.spyOn(payload.logger, 'info')
+    await call({ resourceId: schedResId })
+    const any = info.mock.calls.map(([o]) => o as Record<string, unknown>).some((o) => o?.event === 'reserve_debug')
+    expect(any).toBe(false)
+    info.mockRestore()
+  })
+
+  it('logs empty/no_resource_ids when no resources are given', async () => {
+    const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
+    const info = vi.spyOn(payload.logger, 'info')
+    const slots = await call({ debug: createReserveDebug(payload.logger, true, 'g_norid'), resourceIds: [] })
+    expect(slots).toEqual([])
+    const empty = linesFor(info, 'g_norid').find((l) => l.stage === 'empty')
+    expect(empty).toMatchObject({ reason: 'no_resource_ids' })
+    info.mockRestore()
+  })
+
+  it('logs skip/no_active_schedules for a resource with no schedule', async () => {
+    const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
+    const noSched = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Dbg No Schedule', active: true, services: [svcId] },
+    })
+    const info = vi.spyOn(payload.logger, 'info')
+    await call({ debug: createReserveDebug(payload.logger, true, 'g_nosched'), resourceId: noSched.id })
+    const lines = linesFor(info, 'g_nosched')
+    expect(lines.find((l) => l.stage === 'skip')).toMatchObject({ reason: 'no_active_schedules' })
+    expect(lines.find((l) => l.stage === 'empty')).toMatchObject({ reason: 'no_windows' })
+    info.mockRestore()
+  })
+
+  it('logs a result line with per-stage counts on a successful call and shares one traceId', async () => {
+    const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
+    const info = vi.spyOn(payload.logger, 'info')
+    const slots = await call({ debug: createReserveDebug(payload.logger, true, 'g_ok'), resourceId: schedResId })
+    expect(slots.length).toBeGreaterThan(0)
+    const lines = linesFor(info, 'g_ok')
+    expect(lines.find((l) => l.stage === 'input')).toBeDefined()
+    const result = lines.find((l) => l.stage === 'result')
+    expect(result).toBeDefined()
+    expect(result!.candidatesGenerated).toBeGreaterThan(0)
+    expect(result!.returnedCount).toBe(slots.length)
+    // Every line (including checkAvailability's) carries the same traceId.
+    expect(lines.every((l) => l.traceId === 'g_ok')).toBe(true)
+    info.mockRestore()
+  })
+})
