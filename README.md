@@ -38,6 +38,7 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **12 Bundled Languages** — Every admin string is translatable; ships with English, French, German, Spanish, Russian, Polish, Turkish, Arabic, Simplified Chinese, Indonesian, Persian/Farsi, and Hindi. Override any string or add your own language
 - **Localization Support** — Collection field *content* can be localized when Payload localization is enabled (separate from the admin-UI language above)
 - **External Busy** — Optional `getExternalBusy` resolver folds busy time from calendar sync, legacy booking systems, or ops tooling into availability, with distinct calendar display and fail-open error handling
+- **Debug Tracing** — Opt-in `debug` (`boolean`, default `false`) emits info-level `reserve_debug` traces for slot generation and conflict detection. Each line has a `stage` field and a per-call `traceId`; grep one `traceId` to see the whole story of one availability call. Off by default, no overhead when disabled
 - **Type-Safe** — Full TypeScript support with exported types
 
 ---
