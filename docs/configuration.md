@@ -173,6 +173,7 @@ payloadReserve({
 | `timezone` | `string` | `'UTC'` | IANA timezone governing schedule resolution, day boundaries, exception matching, and full-day windows. Invalid name throws at init |
 | `adminGroup` | `string` | `'Reservations'` | Admin panel group label |
 | `defaultBufferTime` | `number` | `0` | Default buffer between bookings (minutes) |
+| `debug` | `boolean` | `false` | Emit info-level `reserve_debug` traces (one Pino event, a `stage` field, a per-call `traceId`) for slot generation and conflict detection — every `getAvailableSlots`/`checkAvailability` empty-return reason, per-stage candidate counts, endpoint request/response, write-path conflict decisions, and previously-swallowed `bufferFor`/`getExternalBusy` errors. Emits at `info` (not `debug`) so lines survive Pino's default production level. No output when false |
 | `cancellationNoticePeriod` | `number` | `24` | Minimum hours notice for cancellation |
 | `userCollection` | `string` | `undefined` | Existing auth collection slug to extend |
 | `slugs.services` | `string` | `'services'` | Services collection slug |
