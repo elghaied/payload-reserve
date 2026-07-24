@@ -4890,3 +4890,56 @@ describe('Reservation plugin - validateConflicts debug traces', () => {
     info.mockRestore()
   })
 })
+
+describe('Reservation plugin - resourceAvailability debug traces', () => {
+  let resId: string
+
+  beforeAll(async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Dbg RA Service', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Dbg RA Resource', active: true, quantity: 1, services: [service.id] },
+    })
+    resId = resource.id
+  })
+
+  it('logs a getExternalBusy error under err and still returns a grid', async () => {
+    const { buildResourceAvailability } = await import('../src/endpoints/resourceAvailability.js')
+    const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
+    const info = vi.spyOn(payload.logger, 'info')
+
+    const result = await buildResourceAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      debug: createReserveDebug(payload.logger, true, 'ra1'),
+      end: new Date('2030-08-02T00:00:00.000Z'),
+      getExternalBusy: () => {
+        throw new Error('calendar down')
+      },
+      payload,
+      req: { payload } as Parameters<typeof buildResourceAvailability>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resId,
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      start: new Date('2030-08-01T00:00:00.000Z'),
+      timeZone: 'UTC',
+    })
+
+    expect(result).not.toBeNull()
+    const errLine = info.mock.calls
+      .map(([o]) => o as Record<string, unknown>)
+      .find(
+        (o) =>
+          o?.event === 'reserve_debug' &&
+          o.traceId === 'ra1' &&
+          o.stage === 'error' &&
+          o.where === 'getExternalBusy',
+      )
+    expect(errLine).toBeDefined()
+    expect((errLine!.err as Error).message).toBe('calendar down')
+    info.mockRestore()
+  })
+})

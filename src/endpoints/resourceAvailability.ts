@@ -6,6 +6,11 @@ import type {
   ResolvedReservationPluginConfig,
 } from '../types.js'
 
+import {
+  createReserveDebug,
+  NOOP_RESERVE_DEBUG,
+  type ReserveDebug,
+} from '../utilities/reserveDebug.js'
 import { resolveScheduleForDate } from '../utilities/scheduleUtils.js'
 import { readCookie } from '../utilities/tenantFilter.js'
 import { getEffectiveTenantTimezone } from '../utilities/tenantTimezone.js'
@@ -78,6 +83,7 @@ async function busyFor(args: {
 
 export async function buildResourceAvailability(params: {
   blockingStatuses: string[]
+  debug?: ReserveDebug
   end: Date
   getExternalBusy?: GetExternalBusy
   payload: Payload
@@ -91,6 +97,7 @@ export async function buildResourceAvailability(params: {
 }): Promise<null | ResourceAvailability> {
   const {
     blockingStatuses,
+    debug,
     end,
     getExternalBusy,
     payload,
@@ -102,6 +109,7 @@ export async function buildResourceAvailability(params: {
     start,
     timeZone,
   } = params
+  const trace = debug ?? NOOP_RESERVE_DEBUG
 
   // depth 1 so `services` are populated (their `requiredResources` come back as ids)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -246,7 +254,8 @@ export async function buildResourceAvailability(params: {
       external = (await getExternalBusy({ end, req, resourceId, start })).filter(
         (iv) => !isNaN(Date.parse(iv.start)) && !isNaN(Date.parse(iv.end)),
       )
-    } catch {
+    } catch (err) {
+      trace.dbg('error', { err, resourceId, where: 'getExternalBusy' })
       external = []
     }
   }
@@ -267,6 +276,7 @@ export function createResourceAvailabilityEndpoint(
       if (!isPrivilegedUser(req.user, config)) {
         return Response.json({ error: 'Forbidden' }, { status: 403 })
       }
+      const dbg = createReserveDebug(req.payload.logger, config.debug)
 
       const url = new URL(req.url!)
       const resource = url.searchParams.get('resource')
@@ -309,8 +319,11 @@ export function createResourceAvailabilityEndpoint(
         timezoneField: config.multiTenant.timezoneField,
       })
 
+      dbg.dbg('request', { end, endpoint: 'resource-availability', resource, start, timeZone })
+
       const result = await buildResourceAvailability({
         blockingStatuses: config.statusMachine.blockingStatuses,
+        debug: dbg,
         end: endDate,
         getExternalBusy: config.getExternalBusy,
         payload: req.payload,
@@ -324,9 +337,15 @@ export function createResourceAvailabilityEndpoint(
       })
 
       if (!result) {
+        dbg.dbg('response', { endpoint: 'resource-availability', reason: 'resource_not_found' })
         return Response.json({ error: 'Resource not found' }, { status: 404 })
       }
 
+      dbg.dbg('response', {
+        dayCount: result.days.length,
+        endpoint: 'resource-availability',
+        externalCount: result.external.length,
+      })
       return Response.json(result)
     },
     method: 'get',
