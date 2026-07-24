@@ -30,7 +30,8 @@ describe('ReserveDebug helper', () => {
     // Exercised for coverage; simply must not throw.
     NOOP_RESERVE_DEBUG.dbg('anything', { a: 1 })
     NOOP_RESERVE_DEBUG.child({ b: 2 }).dbg('more', {})
-    expect(true).toBe(true)
+    expect(NOOP_RESERVE_DEBUG.enabled).toBe(false)
+    expect(NOOP_RESERVE_DEBUG.child({ b: 2 }).enabled).toBe(false)
   })
 
   it('child shares the traceId and merges base fields into every line', () => {

@@ -15,7 +15,8 @@ export type ReserveDebug = {
 
 /**
  * Create a debug tracer. When `enabled`, every `dbg(stage, fields)` emits a
- * single Pino line: `logger.info({ event: 'reserve_debug', traceId, stage, ...base, ...fields }, 'reserve_debug')`.
+ * single Pino line:
+ * `logger.info({ event: 'reserve_debug', traceId, stage, ...base, ...fields }, 'reserve_debug')`.
  * When disabled, `dbg` is an immediate no-op. Emitting at INFO is deliberate:
  * the opt-in flag is the gate, so traces survive Pino's default info level in
  * production (a `.debug()` line would be silently dropped there).
