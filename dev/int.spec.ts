@@ -4566,3 +4566,15 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
     expect(open.length).toBeGreaterThan(0)
   })
 })
+
+describe('Reservation plugin - debug config option', () => {
+  it('defaults debug to false', () => {
+    const resolved = resolveConfig({})
+    expect(resolved.debug).toBe(false)
+  })
+
+  it('honors debug: true', () => {
+    const resolved = resolveConfig({ debug: true })
+    expect(resolved.debug).toBe(true)
+  })
+})

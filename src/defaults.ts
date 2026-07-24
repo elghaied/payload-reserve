@@ -135,6 +135,7 @@ export function resolveConfig(
     cancellationNoticePeriod:
       pluginOptions.cancellationNoticePeriod ?? DEFAULT_CANCELLATION_NOTICE_PERIOD,
     collectionOverrides: pluginOptions.collectionOverrides ?? {},
+    debug: pluginOptions.debug ?? false,
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,
     extraReservationFields: pluginOptions.extraReservationFields ?? [],

@@ -203,6 +203,8 @@ export type ReservationPluginConfig = {
     schedules?: CollectionOverride
     services?: CollectionOverride
   }
+  /** Emit info-level `reserve_debug` traces for slot generation and conflict detection (default false) */
+  debug?: boolean
   /** Default buffer time in minutes between reservations */
   defaultBufferTime?: number
   /** Disable the plugin entirely */
@@ -269,6 +271,7 @@ export type ResolvedReservationPluginConfig = {
     schedules?: CollectionOverride
     services?: CollectionOverride
   }
+  debug: boolean
   defaultBufferTime: number
   disabled: boolean
   extraReservationFields: Field[]
