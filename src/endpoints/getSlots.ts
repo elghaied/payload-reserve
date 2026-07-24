@@ -3,12 +3,14 @@ import type { Endpoint } from 'payload'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { getAvailableSlots } from '../services/AvailabilityService.js'
+import { createReserveDebug } from '../utilities/reserveDebug.js'
 import { extractId, mergeResourceIds } from '../utilities/resolveRequiredResources.js'
 import { getDayKeyInTimezone, isValidDayKey } from '../utilities/timezoneUtils.js'
 
 export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
     handler: async (req) => {
+      const dbg = createReserveDebug(req.payload.logger, config.debug)
       const url = new URL(req.url!)
       const date = url.searchParams.get('date')
       const resource = url.searchParams.get('resource')
@@ -82,9 +84,19 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
         .filter((r): r is number | string => r !== undefined)
       const resourceIds = mergeResourceIds(callerIds, requiredIds)
 
+      dbg.dbg('request', {
+        date: dayKey,
+        endpoint: 'slots',
+        guestCount,
+        resourceIds,
+        serviceId: service,
+        timeZone: config.timezone,
+      })
+
       const slots = await getAvailableSlots({
         blockingStatuses: config.statusMachine.blockingStatuses,
         date: dayKey,
+        debug: dbg,
         getExternalBusy: config.getExternalBusy,
         guestCount,
         payload: req.payload,
@@ -97,6 +109,8 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
         serviceSlug: config.slugs.services,
         timeZone: config.timezone,
       })
+
+      dbg.dbg('response', { endpoint: 'slots', slotCount: slots.length })
 
       return Response.json({
         date,

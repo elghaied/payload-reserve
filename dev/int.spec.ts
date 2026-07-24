@@ -4758,3 +4758,56 @@ describe('Reservation plugin - getAvailableSlots debug traces', () => {
     info.mockRestore()
   })
 })
+
+describe('Reservation plugin - slots endpoint debug traces', () => {
+  let svcId: string
+  let resId: string
+  const MON = '2030-04-08'
+
+  beforeAll(async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Dbg Endpoint Service', active: true, duration: 60, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Dbg Endpoint Resource', active: true, services: [service.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'Dbg Endpoint Schedule',
+        active: true,
+        recurringSlots: [{ day: 'mon', endTime: '12:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+    svcId = service.id
+    resId = resource.id
+  })
+
+  it('emits request + response lines sharing one traceId when debug is on', async () => {
+    const { createGetSlotsEndpoint } = await import('../src/endpoints/getSlots.js')
+    const handler = createGetSlotsEndpoint(resolveConfig({ debug: true })).handler
+    const info = vi.spyOn(payload.logger, 'info')
+
+    const req = {
+      payload,
+      url: `http://x/api/reserve/slots?service=${svcId}&resource=${resId}&date=${MON}`,
+    } as unknown as Parameters<typeof handler>[0]
+    await handler(req)
+
+    const lines = info.mock.calls
+      .map(([o]) => o as Record<string, unknown>)
+      .filter((o) => o?.event === 'reserve_debug')
+    const request = lines.find((l) => l.stage === 'request')
+    const response = lines.find((l) => l.stage === 'response')
+    expect(request).toBeDefined()
+    expect(response).toBeDefined()
+    expect(response!.slotCount).toBeGreaterThan(0)
+    // Request/response and the internal getAvailableSlots trace share one id.
+    expect(lines.every((l) => l.traceId === request!.traceId)).toBe(true)
+    info.mockRestore()
+  })
+})
