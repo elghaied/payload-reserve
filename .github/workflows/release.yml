@@ -96,6 +96,5 @@ jobs:
         with:
           body_path: /tmp/release-body.md
 
-      - run: npm install -g npm@latest
       - name: Publish to npm
         run: pnpm publish --no-git-checks --provenance --access public
