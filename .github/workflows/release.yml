@@ -96,5 +96,9 @@ jobs:
         with:
           body_path: /tmp/release-body.md
 
+      # OIDC trusted publishing needs a modern npm (>=11.5.1). Pin to npm@11:
+      # it is Node-20-compatible, whereas npm@latest (12+) now requires Node>=22
+      # and fails to install on this runner.
+      - run: npm install -g npm@11
       - name: Publish to npm
         run: pnpm publish --no-git-checks --provenance --access public
