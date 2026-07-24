@@ -3,6 +3,7 @@ import type { Payload, PayloadRequest, Where } from 'payload'
 import type { CapacityMode, DurationType, GetExternalBusy, StatusMachineConfig } from '../types.js'
 import type { ResolvedItem } from '../utilities/resolveReservationItems.js'
 
+import { NOOP_RESERVE_DEBUG, type ReserveDebug } from '../utilities/reserveDebug.js'
 import { resolveReservationItems } from '../utilities/resolveReservationItems.js'
 import { isExceptionDate, resolveScheduleForDate } from '../utilities/scheduleUtils.js'
 import {
@@ -200,6 +201,8 @@ export async function checkAvailability(params: {
   blockingStatuses: string[]
   bufferAfter: number
   bufferBefore: number
+  /** Optional tracer — emits check/check_result/error lines when enabled. */
+  debug?: ReserveDebug
   endTime: Date
   excludeReservationId?: number | string
   /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
@@ -224,6 +227,7 @@ export async function checkAvailability(params: {
     blockingStatuses,
     bufferAfter,
     bufferBefore,
+    debug,
     endTime,
     excludeReservationId,
     getExternalBusy,
@@ -237,6 +241,8 @@ export async function checkAvailability(params: {
     siblingItems,
     startTime,
   } = params
+
+  const trace = debug ?? NOOP_RESERVE_DEBUG
 
   // Fetch resource for quantity and capacity mode
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -258,19 +264,30 @@ export async function checkAvailability(params: {
   )
 
   // Coarse superset fetch — precise per-item overlap is computed in memory below
+  const coarseWhere = buildCoarseOverlapQuery({
+    blockingStatuses,
+    candidateEnd,
+    candidateStart,
+    excludeReservationId,
+    resourceId,
+  })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { docs } = await (payload.find as any)({
     collection: reservationSlug,
     depth: 0,
     limit: 0,
     req,
-    where: buildCoarseOverlapQuery({
-      blockingStatuses,
-      candidateEnd,
-      candidateStart,
-      excludeReservationId,
-      resourceId,
-    }),
+    where: coarseWhere,
+  })
+
+  trace.dbg('check', {
+    blockingReservations: (docs as unknown[]).length,
+    candidateEnd: candidateEnd.toISOString(),
+    candidateStart: candidateStart.toISOString(),
+    capacityMode,
+    coarseWhere,
+    quantity,
+    resourceId,
   })
 
   // Per-call cache: fetch each distinct service's buffers at most once
@@ -299,8 +316,8 @@ export async function checkAvailability(params: {
             before: (service.bufferTimeBefore as number) ?? 0,
           }
         }
-      } catch {
-        // service missing — no buffers
+      } catch (err) {
+        trace.dbg('error', { err, serviceId, where: 'bufferFor' })
       }
     }
     bufferCache.set(key, result)
@@ -340,7 +357,8 @@ export async function checkAvailability(params: {
           units: quantity,
         }))
         .filter((o) => !isNaN(o.blockedStart.getTime()) && !isNaN(o.blockedEnd.getTime()))
-    } catch {
+    } catch (err) {
+      trace.dbg('error', { err, resourceId, where: 'getExternalBusy' })
       externalOccupancies = []
     }
   }
@@ -358,6 +376,19 @@ export async function checkAvailability(params: {
 
   const candidateUnits = capacityMode === 'per-guest' ? guestCount : 1
   const available = currentUnits + candidateUnits <= quantity
+
+  trace.dbg('check_result', {
+    available,
+    candidateUnits,
+    currentUnits,
+    occupancySources: {
+      external: externalOccupancies.length,
+      fetched: fetchedOccupancies.length,
+      sibling: siblingOccupancies.length,
+    },
+    quantity,
+    resourceId,
+  })
 
   return {
     available,

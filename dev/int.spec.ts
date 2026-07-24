@@ -2,7 +2,7 @@ import type { Access, Field, Payload } from 'payload'
 
 import config from '@payload-config'
 import { getPayload } from 'payload'
-import { afterAll, beforeAll, describe, expect, it, test } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, test, vi } from 'vitest'
 
 import { resolveConfig } from '../src/defaults.js'
 import { createCancelBookingEndpoint } from '../src/endpoints/cancelBooking.js'
@@ -4576,5 +4576,86 @@ describe('Reservation plugin - debug config option', () => {
   it('honors debug: true', () => {
     const resolved = resolveConfig({ debug: true })
     expect(resolved.debug).toBe(true)
+  })
+})
+
+describe('Reservation plugin - checkAvailability debug traces', () => {
+  let svcId: string
+  let resId: string
+
+  beforeAll(async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Dbg Check Service', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Dbg Check Resource', active: true, quantity: 1, services: [service.id] },
+    })
+    svcId = service.id
+    resId = resource.id
+  })
+
+  it('emits check and check_result lines with occupancy sources', async () => {
+    const { checkAvailability } = await import('../src/services/AvailabilityService.js')
+    const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
+    const info = vi.spyOn(payload.logger, 'info')
+
+    await checkAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      bufferAfter: 0,
+      bufferBefore: 0,
+      debug: createReserveDebug(payload.logger, true, 'chk1'),
+      endTime: new Date('2030-05-06T10:00:00.000Z'),
+      guestCount: 1,
+      payload,
+      req: {} as Parameters<typeof checkAvailability>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resId,
+      resourceSlug: 'resources',
+      servicesSlug: 'services',
+      startTime: new Date('2030-05-06T09:00:00.000Z'),
+    })
+
+    const lines = info.mock.calls.map(([o]) => o as Record<string, unknown>).filter((o) => o?.event === 'reserve_debug' && o.traceId === 'chk1')
+    expect(lines.some((l) => l.stage === 'check')).toBe(true)
+    const resultLine = lines.find((l) => l.stage === 'check_result')
+    expect(resultLine).toBeDefined()
+    expect(resultLine!.occupancySources).toMatchObject({ external: 0, fetched: 0, sibling: 0 })
+    info.mockRestore()
+  })
+
+  it('logs a getExternalBusy error under err and still fails open', async () => {
+    const { checkAvailability } = await import('../src/services/AvailabilityService.js')
+    const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
+    const info = vi.spyOn(payload.logger, 'info')
+
+    const result = await checkAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      bufferAfter: 0,
+      bufferBefore: 0,
+      debug: createReserveDebug(payload.logger, true, 'chk2'),
+      endTime: new Date('2030-05-06T10:00:00.000Z'),
+      getExternalBusy: () => {
+        throw new Error('resolver down')
+      },
+      guestCount: 1,
+      payload,
+      req: {} as Parameters<typeof checkAvailability>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: resId,
+      resourceSlug: 'resources',
+      servicesSlug: 'services',
+      startTime: new Date('2030-05-06T09:00:00.000Z'),
+    })
+
+    // Fails open: no external occupancy blocks the slot
+    expect(result.available).toBe(true)
+    const errLine = info.mock.calls
+      .map(([o]) => o as Record<string, unknown>)
+      .find((o) => o?.event === 'reserve_debug' && o.traceId === 'chk2' && o.stage === 'error' && o.where === 'getExternalBusy')
+    expect(errLine).toBeDefined()
+    expect((errLine!.err as Error).message).toBe('resolver down')
+    info.mockRestore()
   })
 })
