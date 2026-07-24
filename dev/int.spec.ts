@@ -4580,7 +4580,6 @@ describe('Reservation plugin - debug config option', () => {
 })
 
 describe('Reservation plugin - checkAvailability debug traces', () => {
-  let svcId: string
   let resId: string
 
   beforeAll(async () => {
@@ -4592,7 +4591,6 @@ describe('Reservation plugin - checkAvailability debug traces', () => {
       collection: col('resources'),
       data: { name: 'Dbg Check Resource', active: true, quantity: 1, services: [service.id] },
     })
-    svcId = service.id
     resId = resource.id
   })
 
@@ -4617,7 +4615,9 @@ describe('Reservation plugin - checkAvailability debug traces', () => {
       startTime: new Date('2030-05-06T09:00:00.000Z'),
     })
 
-    const lines = info.mock.calls.map(([o]) => o as Record<string, unknown>).filter((o) => o?.event === 'reserve_debug' && o.traceId === 'chk1')
+    const lines = info.mock.calls
+      .map(([o]) => o as Record<string, unknown>)
+      .filter((o) => o?.event === 'reserve_debug' && o.traceId === 'chk1')
     expect(lines.some((l) => l.stage === 'check')).toBe(true)
     const resultLine = lines.find((l) => l.stage === 'check_result')
     expect(resultLine).toBeDefined()
@@ -4653,9 +4653,88 @@ describe('Reservation plugin - checkAvailability debug traces', () => {
     expect(result.available).toBe(true)
     const errLine = info.mock.calls
       .map(([o]) => o as Record<string, unknown>)
-      .find((o) => o?.event === 'reserve_debug' && o.traceId === 'chk2' && o.stage === 'error' && o.where === 'getExternalBusy')
+      .find(
+        (o) =>
+          o?.event === 'reserve_debug' &&
+          o.traceId === 'chk2' &&
+          o.stage === 'error' &&
+          o.where === 'getExternalBusy',
+      )
     expect(errLine).toBeDefined()
     expect((errLine!.err as Error).message).toBe('resolver down')
+    info.mockRestore()
+  })
+})
+
+describe('Reservation plugin - checkAvailability bufferFor error trace', () => {
+  let bufResId: string
+
+  beforeAll(async () => {
+    const service = await payload.create({
+      collection: col('services'),
+      data: { name: 'Dbg Buffer Service', active: true, duration: 60 },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Dbg Buffer Resource', active: true, quantity: 1, services: [service.id] },
+    })
+    bufResId = resource.id
+
+    // A blocking reservation referencing the service. Hooks are skipped so the
+    // explicit startTime/endTime/status are stored verbatim.
+    await payload.create({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        endTime: new Date('2030-06-06T10:00:00.000Z').toISOString(),
+        resource: bufResId,
+        service: service.id,
+        startTime: new Date('2030-06-06T09:00:00.000Z').toISOString(),
+        status: 'confirmed',
+      },
+    })
+
+    // Delete the service the reservation still references. bufferFor's
+    // payload.findByID(service.id) now throws NotFound and must fail open.
+    await payload.delete({ id: service.id, collection: col('services') })
+  })
+
+  it('logs a bufferFor error under err and still fails open', async () => {
+    const { checkAvailability } = await import('../src/services/AvailabilityService.js')
+    const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
+    const info = vi.spyOn(payload.logger, 'info')
+
+    const result = await checkAvailability({
+      blockingStatuses: ['pending', 'confirmed'],
+      bufferAfter: 0,
+      bufferBefore: 0,
+      debug: createReserveDebug(payload.logger, true, 'buf1'),
+      endTime: new Date('2030-06-06T10:00:00.000Z'),
+      guestCount: 1,
+      payload,
+      req: {} as Parameters<typeof checkAvailability>[0]['req'],
+      reservationSlug: 'reservations',
+      resourceId: bufResId,
+      resourceSlug: 'resources',
+      servicesSlug: 'services',
+      startTime: new Date('2030-06-06T09:00:00.000Z'),
+    })
+
+    // Fails open: bufferFor's error doesn't stop checkAvailability from returning.
+    expect(result).toBeDefined()
+    expect(typeof result.available).toBe('boolean')
+
+    const errLine = info.mock.calls
+      .map(([o]) => o as Record<string, unknown>)
+      .find(
+        (o) =>
+          o?.event === 'reserve_debug' &&
+          o.traceId === 'buf1' &&
+          o.stage === 'error' &&
+          o.where === 'bufferFor',
+      )
+    expect(errLine).toBeDefined()
+    expect(errLine!.err).toBeInstanceOf(Error)
     info.mockRestore()
   })
 })
@@ -4713,7 +4792,9 @@ describe('Reservation plugin - getAvailableSlots debug traces', () => {
   it('emits no reserve_debug lines when debug is absent', async () => {
     const info = vi.spyOn(payload.logger, 'info')
     await call({ resourceId: schedResId })
-    const any = info.mock.calls.map(([o]) => o as Record<string, unknown>).some((o) => o?.event === 'reserve_debug')
+    const any = info.mock.calls
+      .map(([o]) => o as Record<string, unknown>)
+      .some((o) => o?.event === 'reserve_debug')
     expect(any).toBe(false)
     info.mockRestore()
   })
