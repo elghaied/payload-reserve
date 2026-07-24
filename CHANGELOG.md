@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.4.0] - 2026-07-24
+
+### Added
+
+- **Opt-in `debug` tracing for availability.** A new `debug?: boolean` plugin option
+  (default `false`) emits info-level `reserve_debug` Pino logs — one event with a `stage`
+  field and a per-call `traceId` — tracing slot generation and conflict detection. Every
+  silent empty-return in `getAvailableSlots`/`checkAvailability` now logs its exact reason
+  and inputs; per-stage candidate counts are logged on success; the availability/slots
+  endpoints and the `validateConflicts` write path emit request/response and conflict
+  decisions; and previously-swallowed `bufferFor`/`getExternalBusy` errors surface under
+  the Pino `err` key (still fail-open). Emits at `info` (not `debug`) so lines survive
+  Pino's default production level; no output and no overhead when disabled.
+
 ## [2.3.0] - 2026-07-03
 
 ### Added
