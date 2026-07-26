@@ -63,6 +63,9 @@ export function createCheckAvailabilityEndpoint(
         id: service,
         collection: config.slugs.services,
         depth: 0,
+        // Skip the resources join — internal logic never reads it, and without this
+        // every service read becomes an aggregation with a $lookup.
+        joins: false,
         req,
       }).catch(() => null)
       if (!svcDoc) {

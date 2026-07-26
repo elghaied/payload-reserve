@@ -26,6 +26,9 @@ export const expandRequiredResources =
         id: serviceId,
         collection: config.slugs.services,
         depth: 0,
+        // Skip the resources join — internal logic never reads it, and without this
+        // every service read becomes an aggregation with a $lookup.
+        joins: false,
         req,
       })
       required = ((service?.requiredResources as unknown[]) ?? [])

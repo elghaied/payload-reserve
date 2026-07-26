@@ -55,6 +55,10 @@ export const calculateEndTime =
       const service = await (req.payload.findByID as any)({
         id: serviceId,
         collection: config.slugs.services,
+        depth: 0,
+        // Skip the resources join — internal logic never reads it, and without this
+        // every service read becomes an aggregation with a $lookup.
+        joins: false,
         req,
       })
 
@@ -119,6 +123,10 @@ export const calculateEndTime =
         const service = await (req.payload.findByID as any)({
           id: itemServiceId,
           collection: config.slugs.services,
+          depth: 0,
+          // Skip the resources join — internal logic never reads it, and without this
+          // every service read becomes an aggregation with a $lookup.
+          joins: false,
           req,
         })
 

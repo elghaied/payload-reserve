@@ -308,6 +308,9 @@ export async function checkAvailability(params: {
           id: serviceId,
           collection: servicesSlug,
           depth: 0,
+          // Skip the resources join — internal logic never reads it, and without this
+          // every service read becomes an aggregation with a $lookup.
+          joins: false,
           req,
         })
         if (service) {
@@ -467,6 +470,9 @@ export async function getAvailableSlots(params: {
     id: serviceId,
     collection: serviceSlug,
     depth: 0,
+    // Skip the resources join — internal logic never reads it, and without this
+    // every service read becomes an aggregation with a $lookup.
+    joins: false,
     req,
   })
   const duration = (service.duration as number) ?? 60
