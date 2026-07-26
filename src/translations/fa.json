@@ -61,6 +61,8 @@
   "errorInvalidTransition": "امکان تغییر از «{{from}}» به «{{to}}» وجود ندارد.",
   "errorCancellationNotice": "لغو رزرو به حداقل {{period}} ساعت اطلاع‌رسانی پیش نیاز دارد. تنها {{hours}} ساعت تا زمان قرار باقی مانده است.",
   "errorConflict": "این بازه زمانی با یک رزرو موجود برای این منبع تداخل دارد.",
+  "errorServiceInactive": "سرویس «{{name}}» فعال نیست و قابل رزرو نیست.",
+  "errorResourceInactive": "منبع «{{name}}» فعال نیست و قابل رزرو نیست.",
   "calendarLoading": "در حال بارگذاری رزروها...",
   "calendarToday": "امروز",
   "calendarCreateNew": "ایجاد جدید",

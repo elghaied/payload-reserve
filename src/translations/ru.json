@@ -61,6 +61,8 @@
   "errorInvalidTransition": "Невозможно перейти из «{{from}}» в «{{to}}».",
   "errorCancellationNotice": "Для отмены требуется уведомление не менее чем за {{period}} часов. До приёма осталось всего {{hours}} часов.",
   "errorConflict": "Этот временной слот конфликтует с существующим бронированием для данного ресурса.",
+  "errorServiceInactive": "Услуга «{{name}}» неактивна и недоступна для бронирования.",
+  "errorResourceInactive": "Ресурс «{{name}}» неактивен и недоступен для бронирования.",
   "calendarLoading": "Загрузка бронирований...",
   "calendarToday": "Сегодня",
   "calendarCreateNew": "Создать",

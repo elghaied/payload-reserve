@@ -61,6 +61,8 @@
   "errorInvalidTransition": "\"{{from}}\" से \"{{to}}\" में नहीं बदला जा सकता।",
   "errorCancellationNotice": "रद्दीकरण के लिए कम से कम {{period}} घंटे की सूचना आवश्यक है। अपॉइंटमेंट में केवल {{hours}} घंटे शेष हैं।",
   "errorConflict": "यह समय स्लॉट इस संसाधन के किसी मौजूदा आरक्षण से टकराता है।",
+  "errorServiceInactive": "सेवा \"{{name}}\" सक्रिय नहीं है और बुक नहीं की जा सकती।",
+  "errorResourceInactive": "संसाधन \"{{name}}\" सक्रिय नहीं है और बुक नहीं किया जा सकता।",
   "calendarLoading": "आरक्षण लोड हो रहे हैं...",
   "calendarToday": "आज",
   "calendarCreateNew": "नया बनाएँ",

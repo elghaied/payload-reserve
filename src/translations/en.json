@@ -61,6 +61,8 @@
   "errorInvalidTransition": "Cannot transition from \"{{from}}\" to \"{{to}}\".",
   "errorCancellationNotice": "Cancellations require at least {{period}} hours notice. Only {{hours}} hours until the appointment.",
   "errorConflict": "This time slot conflicts with an existing reservation for this resource.",
+  "errorServiceInactive": "Service \"{{name}}\" is not active and cannot be booked.",
+  "errorResourceInactive": "Resource \"{{name}}\" is not active and cannot be booked.",
   "calendarLoading": "Loading reservations...",
   "calendarToday": "Today",
   "calendarCreateNew": "Create New",

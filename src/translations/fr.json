@@ -61,6 +61,8 @@
   "errorInvalidTransition": "Impossible de passer de « {{from}} » à « {{to}} ».",
   "errorCancellationNotice": "Les annulations nécessitent un préavis d'au moins {{period}} heures. Il ne reste que {{hours}} heures avant le rendez-vous.",
   "errorConflict": "Ce créneau horaire est en conflit avec une réservation existante pour cette ressource.",
+  "errorServiceInactive": "Le service « {{name}} » n'est pas actif et ne peut pas être réservé.",
+  "errorResourceInactive": "La ressource « {{name}} » n'est pas active et ne peut pas être réservée.",
   "calendarLoading": "Chargement des réservations...",
   "calendarToday": "Aujourd'hui",
   "calendarCreateNew": "Créer",

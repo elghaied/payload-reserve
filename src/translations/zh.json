@@ -61,6 +61,8 @@
   "errorInvalidTransition": "无法从“{{from}}”转换为“{{to}}”。",
   "errorCancellationNotice": "取消预约至少需要提前 {{period}} 小时通知。距离预约仅剩 {{hours}} 小时。",
   "errorConflict": "此时间段与该资源的现有预约冲突。",
+  "errorServiceInactive": "服务\"{{name}}\"未启用，无法预订。",
+  "errorResourceInactive": "资源\"{{name}}\"未启用，无法预订。",
   "calendarLoading": "正在加载预约……",
   "calendarToday": "今天",
   "calendarCreateNew": "新建",

@@ -61,6 +61,8 @@
   "errorInvalidTransition": "لا يمكن الانتقال من \"{{from}}\" إلى \"{{to}}\".",
   "errorCancellationNotice": "يتطلب الإلغاء إشعاراً مسبقاً لا يقل عن {{period}} ساعة. لم يتبقَّ سوى {{hours}} ساعة على الموعد.",
   "errorConflict": "يتعارض هذا الموعد الزمني مع حجز قائم لهذا المورد.",
+  "errorServiceInactive": "الخدمة \"{{name}}\" غير نشطة ولا يمكن حجزها.",
+  "errorResourceInactive": "المورد \"{{name}}\" غير نشط ولا يمكن حجزه.",
   "calendarLoading": "جارٍ تحميل الحجوزات...",
   "calendarToday": "اليوم",
   "calendarCreateNew": "إنشاء جديد",

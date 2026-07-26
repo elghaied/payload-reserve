@@ -13,6 +13,7 @@ import { checkIdempotency } from '../hooks/reservations/checkIdempotency.js'
 import { enforceCustomerOwnership } from '../hooks/reservations/enforceCustomerOwnership.js'
 import { expandRequiredResources } from '../hooks/reservations/expandRequiredResources.js'
 import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
+import { validateActive } from '../hooks/reservations/validateActive.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
 import { validateGuestBooking } from '../hooks/reservations/validateGuestBooking.js'
@@ -270,6 +271,9 @@ export function createReservationsCollection(
         checkIdempotency(config),
         validateGuestBooking(config),
         expandRequiredResources(config),
+        // After expandRequiredResources so auto-injected required pools are
+        // checked too; before validateConflicts so rejection is cheap.
+        validateActive(config),
         calculateEndTime(config),
         validateConflicts(config),
         // validateCancellation runs BEFORE validateStatusTransition so a cancel

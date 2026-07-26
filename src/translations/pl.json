@@ -61,6 +61,8 @@
   "errorInvalidTransition": "Nie można przejść ze stanu \"{{from}}\" do \"{{to}}\".",
   "errorCancellationNotice": "Anulowanie wymaga wyprzedzenia co najmniej {{period}} godzin. Do wizyty pozostało tylko {{hours}} godzin.",
   "errorConflict": "Ten przedział czasowy koliduje z istniejącą rezerwacją dla tego zasobu.",
+  "errorServiceInactive": "Usługa „{{name}}\" nie jest aktywna i nie można jej zarezerwować.",
+  "errorResourceInactive": "Zasób „{{name}}\" nie jest aktywny i nie można go zarezerwować.",
   "calendarLoading": "Ładowanie rezerwacji...",
   "calendarToday": "Dziś",
   "calendarCreateNew": "Utwórz nową",

@@ -61,6 +61,8 @@
   "errorInvalidTransition": "Wechsel von \"{{from}}\" zu \"{{to}}\" nicht möglich.",
   "errorCancellationNotice": "Stornierungen erfordern eine Vorlaufzeit von mindestens {{period}} Stunden. Nur noch {{hours}} Stunden bis zum Termin.",
   "errorConflict": "Dieses Zeitfenster überschneidet sich mit einer bestehenden Reservierung für diese Ressource.",
+  "errorServiceInactive": "Die Leistung „{{name}}\" ist nicht aktiv und kann nicht gebucht werden.",
+  "errorResourceInactive": "Die Ressource „{{name}}\" ist nicht aktiv und kann nicht gebucht werden.",
   "calendarLoading": "Reservierungen werden geladen...",
   "calendarToday": "Heute",
   "calendarCreateNew": "Neu erstellen",

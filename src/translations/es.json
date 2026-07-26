@@ -61,6 +61,8 @@
   "errorInvalidTransition": "No se puede cambiar de \"{{from}}\" a \"{{to}}\".",
   "errorCancellationNotice": "Las cancelaciones requieren al menos {{period}} horas de antelación. Solo quedan {{hours}} horas hasta la cita.",
   "errorConflict": "Esta franja horaria entra en conflicto con una reserva existente para este recurso.",
+  "errorServiceInactive": "El servicio \"{{name}}\" no está activo y no se puede reservar.",
+  "errorResourceInactive": "El recurso \"{{name}}\" no está activo y no se puede reservar.",
   "calendarLoading": "Cargando reservas...",
   "calendarToday": "Hoy",
   "calendarCreateNew": "Crear nueva",

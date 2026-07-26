@@ -61,6 +61,8 @@
   "errorInvalidTransition": "\"{{from}}\" durumundan \"{{to}}\" durumuna geçiş yapılamaz.",
   "errorCancellationNotice": "İptaller en az {{period}} saat önceden bildirim gerektirir. Randevuya yalnızca {{hours}} saat kaldı.",
   "errorConflict": "Bu zaman aralığı, bu kaynak için mevcut bir rezervasyonla çakışıyor.",
+  "errorServiceInactive": "\"{{name}}\" hizmeti aktif değil ve rezerve edilemez.",
+  "errorResourceInactive": "\"{{name}}\" kaynağı aktif değil ve rezerve edilemez.",
   "calendarLoading": "Rezervasyonlar yükleniyor...",
   "calendarToday": "Bugün",
   "calendarCreateNew": "Yeni Oluştur",

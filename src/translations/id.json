@@ -61,6 +61,8 @@
   "errorInvalidTransition": "Tidak dapat berpindah dari \"{{from}}\" ke \"{{to}}\".",
   "errorCancellationNotice": "Pembatalan memerlukan pemberitahuan minimal {{period}} jam. Hanya tersisa {{hours}} jam sebelum janji temu.",
   "errorConflict": "Slot waktu ini berbenturan dengan reservasi yang sudah ada untuk sumber daya ini.",
+  "errorServiceInactive": "Layanan \"{{name}}\" tidak aktif dan tidak dapat dipesan.",
+  "errorResourceInactive": "Sumber daya \"{{name}}\" tidak aktif dan tidak dapat dipesan.",
   "calendarLoading": "Memuat reservasi...",
   "calendarToday": "Hari Ini",
   "calendarCreateNew": "Buat Baru",
