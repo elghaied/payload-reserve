@@ -128,6 +128,8 @@
   "filterByResource": "Filtrer par ressource",
   "fieldOwner": "Propriétaire",
   "fieldResourceType": "Type de ressource",
+  "fieldResources": "Ressources",
+  "fieldResourcesDesc": "Ressources pouvant réaliser ce service. Pour le modifier, ouvrez la ressource et modifiez son champ Services.",
   "fieldRequiredResources": "Ressources requises",
   "fieldRequiredResourcesDesc": "Pools de ressources supplémentaires occupés par chaque réservation de cette prestation (par ex. un fauteuil). Les réservations sont automatiquement étendues pour les inclure et sont bloquées si l'un des pools est complet.",
   "fieldAllowGuestBooking": "Réservation invité",

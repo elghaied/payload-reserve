@@ -128,6 +128,8 @@
   "filterByResource": "Filtrar por recurso",
   "fieldOwner": "Propietario",
   "fieldResourceType": "Tipo de recurso",
+  "fieldResources": "Recursos",
+  "fieldResourcesDesc": "Recursos que pueden realizar este servicio. Para cambiarlo, abre el recurso y edita su campo Servicios.",
   "fieldRequiredResources": "Recursos necesarios",
   "fieldRequiredResourcesDesc": "Grupos de recursos adicionales que ocupa cada reserva de este servicio (p. ej. una silla). Las reservas se amplían automáticamente para incluirlos y se bloquean si algún grupo está completo.",
   "fieldAllowGuestBooking": "Reserva de invitado",

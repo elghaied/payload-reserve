@@ -128,6 +128,8 @@
   "filterByResource": "Filter berdasarkan sumber daya",
   "fieldOwner": "Pemilik",
   "fieldResourceType": "Tipe sumber daya",
+  "fieldResources": "Sumber Daya",
+  "fieldResourcesDesc": "Sumber daya yang dapat melakukan layanan ini. Untuk mengubahnya, buka sumber daya dan edit bidang Layanan-nya.",
   "fieldRequiredResources": "Sumber daya yang dibutuhkan",
   "fieldRequiredResourcesDesc": "Kumpulan sumber daya tambahan yang ditempati oleh setiap pemesanan layanan ini (mis. sebuah kursi). Pemesanan otomatis diperluas untuk menyertakan ini dan diblokir jika ada kumpulan yang penuh.",
   "fieldAllowGuestBooking": "Pemesanan tamu",

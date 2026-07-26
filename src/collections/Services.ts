@@ -130,6 +130,36 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
         max: 1439,
         min: 0,
       },
+      ...(config.hasResourceServicesField
+        ? [
+            {
+              name: 'resources',
+              type: 'join' as const,
+              admin: {
+                // A join's only write affordance is creating a BRAND-NEW resource
+                // from here; it can never link an existing one (no allowAddExisting
+                // in 3.86). Left off deliberately — `getInitialDrawerData` pre-fills
+                // the target relationship as a SCALAR (`{ services: docID }`), while
+                // `Resources.services` is hasMany and expects an array, so the
+                // pre-fill is not reliably correct for this shape. Assignment belongs
+                // on the Resource, which the description says.
+                allowCreate: false,
+                // Shows `active` in the table, so an admin can see at a glance that a
+                // linked resource is disabled — the exact diagnosis this field exists
+                // to make possible.
+                defaultColumns: ['name', 'resourceType', 'active'],
+                description: ({ t }: { t: unknown }) =>
+                  (t as PluginT)('reservation:fieldResourcesDesc'),
+              },
+              collection: config.slugs.resources as unknown as CollectionSlug,
+              // Joins default to 10 (buildJoinAggregation). A service performed by
+              // more than 10 resources would otherwise silently show 10 of them.
+              defaultLimit: 100,
+              label: ({ t }: { t: unknown }) => (t as PluginT)('reservation:fieldResources'),
+              on: 'services',
+            },
+          ]
+        : []),
       {
         name: 'requiredResources',
         type: 'relationship',

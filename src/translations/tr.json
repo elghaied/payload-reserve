@@ -128,6 +128,8 @@
   "filterByResource": "Kaynağa göre filtrele",
   "fieldOwner": "Sahip",
   "fieldResourceType": "Kaynak türü",
+  "fieldResources": "Kaynaklar",
+  "fieldResourcesDesc": "Bu hizmeti verebilecek kaynaklar. Değiştirmek için kaynağı açın ve Hizmetler alanını düzenleyin.",
   "fieldRequiredResources": "Gerekli kaynaklar",
   "fieldRequiredResourcesDesc": "Bu hizmetin her rezervasyonunun kullandığı ek kaynak havuzları (ör. bir koltuk). Rezervasyonlar bunları içerecek şekilde otomatik genişletilir ve herhangi bir havuz dolarsa engellenir.",
   "fieldAllowGuestBooking": "Misafir rezervasyonu",

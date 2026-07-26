@@ -300,3 +300,18 @@ describe('C7: cancel endpoint uses the configured cancelStatus', () => {
     expect(written?.status).toBe('voided')
   })
 })
+
+describe('locale completeness', () => {
+  it('every locale defines the same keys as en', async () => {
+    const { translations } = await import('../src/translations/index.js')
+    const enKeys = Object.keys(
+      (translations.en as { reservation: Record<string, unknown> }).reservation,
+    ).sort()
+    for (const [locale, bundle] of Object.entries(translations)) {
+      const keys = Object.keys(
+        (bundle as { reservation: Record<string, unknown> }).reservation,
+      ).sort()
+      expect(keys, `locale ${locale} is missing keys`).toEqual(enKeys)
+    }
+  })
+})

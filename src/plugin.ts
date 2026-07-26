@@ -155,9 +155,20 @@ export const payloadReserve =
     )
 
     const ov = resolved.collectionOverrides
+    const resourcesCollection = applyCollectionOverride(
+      createResourcesCollection(resolved),
+      ov.resources,
+    )
+    // The join's `on: 'services'` only resolves against a TOP-LEVEL field.
+    // An override that removes, renames, or nests it inside a named group/tab
+    // would otherwise crash init with Payload's InvalidFieldJoin.
+    resolved.hasResourceServicesField = resourcesCollection.fields.some(
+      (f) => 'name' in f && f.name === 'services' && f.type === 'relationship',
+    )
+
     config.collections.push(
       applyCollectionOverride(createServicesCollection(resolved), ov.services),
-      applyCollectionOverride(createResourcesCollection(resolved), ov.resources),
+      resourcesCollection,
       applyCollectionOverride(createSchedulesCollection(resolved), ov.schedules),
       applyCollectionOverride(createReservationsCollection(resolved), ov.reservations),
       // The customers override applies only in standalone mode; in userCollection

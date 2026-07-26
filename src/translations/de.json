@@ -128,6 +128,8 @@
   "filterByResource": "Nach Ressource filtern",
   "fieldOwner": "Inhaber",
   "fieldResourceType": "Ressourcentyp",
+  "fieldResources": "Ressourcen",
+  "fieldResourcesDesc": "Ressourcen, die diese Leistung erbringen können. Zum Ändern die Ressource öffnen und dort das Feld „Leistungen\" bearbeiten.",
   "fieldRequiredResources": "Erforderliche Ressourcen",
   "fieldRequiredResourcesDesc": "Zusätzliche Ressourcenpools, die jede Buchung dieser Leistung belegt (z. B. ein Stuhl). Buchungen werden automatisch um diese erweitert und blockiert, wenn ein Pool ausgelastet ist.",
   "fieldAllowGuestBooking": "Gastbuchung",

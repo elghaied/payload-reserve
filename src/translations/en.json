@@ -128,6 +128,8 @@
   "filterByResource": "Filter by resource",
   "fieldOwner": "Owner",
   "fieldResourceType": "Resource type",
+  "fieldResources": "Resources",
+  "fieldResourcesDesc": "Resources that can perform this service. To change this, open the resource and edit its Services field.",
   "fieldRequiredResources": "Required resources",
   "fieldRequiredResourcesDesc": "Additional resource pools every booking of this service occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full.",
   "fieldAllowGuestBooking": "Guest booking",

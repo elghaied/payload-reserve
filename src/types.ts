@@ -278,6 +278,9 @@ export type ResolvedReservationPluginConfig = {
   getExternalBusy: GetExternalBusy | undefined
   /** Whether the media collection (`slugs.media`) exists — set by the plugin; gates the image upload fields. */
   hasMediaCollection: boolean
+  /** Set by the plugin once Resources is built: does it still expose a
+   *  top-level `services` relationship for the Services join to target? */
+  hasResourceServicesField: boolean
   hooks: ReservationPluginHooks
   leaveTypes: string[]
   localized: boolean

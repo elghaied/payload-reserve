@@ -128,6 +128,8 @@
   "filterByResource": "التصفية حسب المورد",
   "fieldOwner": "المالك",
   "fieldResourceType": "نوع المورد",
+  "fieldResources": "الموارد",
+  "fieldResourcesDesc": "الموارد التي يمكنها تقديم هذه الخدمة. لتغيير ذلك، افتح المورد وعدّل حقل الخدمات الخاص به.",
   "fieldRequiredResources": "الموارد المطلوبة",
   "fieldRequiredResourcesDesc": "مجموعات الموارد الإضافية التي يشغلها كل حجز لهذه الخدمة (مثل الكرسي). يتم توسيع الحجوزات تلقائياً لتشمل هذه الموارد، وتُحظر إذا كانت أي مجموعة ممتلئة.",
   "fieldAllowGuestBooking": "حجز الضيف",

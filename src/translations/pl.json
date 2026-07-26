@@ -128,6 +128,8 @@
   "filterByResource": "Filtruj według zasobu",
   "fieldOwner": "Właściciel",
   "fieldResourceType": "Typ zasobu",
+  "fieldResources": "Zasoby",
+  "fieldResourcesDesc": "Zasoby, które mogą wykonać tę usługę. Aby to zmienić, otwórz zasób i edytuj jego pole Usługi.",
   "fieldRequiredResources": "Wymagane zasoby",
   "fieldRequiredResourcesDesc": "Dodatkowe pule zasobów zajmowane przez każdą rezerwację tej usługi (np. fotel). Rezerwacje są automatycznie rozszerzane o nie i są blokowane, jeśli którakolwiek pula jest pełna.",
   "fieldAllowGuestBooking": "Rezerwacja gościnna",

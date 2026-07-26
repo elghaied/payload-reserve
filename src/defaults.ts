@@ -142,6 +142,9 @@ export function resolveConfig(
     getExternalBusy: pluginOptions.getExternalBusy,
     // Real value is set by the plugin once config.collections is known (C8)
     hasMediaCollection: false,
+    // Real value is set by the plugin once Resources is built — gates the
+    // Services.resources join (see Step 3a).
+    hasResourceServicesField: false,
     hooks: pluginOptions.hooks ?? {},
     leaveTypes: pluginOptions.leaveTypes ?? DEFAULT_LEAVE_TYPES,
     localized: false,
