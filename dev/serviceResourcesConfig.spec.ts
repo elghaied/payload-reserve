@@ -42,7 +42,10 @@ describe('Services.resources join — config only', () => {
             {
               type: 'tabs',
               tabs: [
-                { name: 'links', fields: defaultFields.filter((f) => 'name' in f && f.name === 'services') },
+                {
+                  name: 'links',
+                  fields: defaultFields.filter((f) => 'name' in f && f.name === 'services'),
+                },
               ],
             } as never,
             ...defaultFields.filter((f) => !('name' in f) || f.name !== 'services'),
@@ -54,6 +57,31 @@ describe('Services.resources join — config only', () => {
     const services = config.collections!.find((c) => c.slug === 'services')!
     const names = services.fields.map((f) => ('name' in f ? f.name : undefined))
     expect(names).not.toContain('resources')
+  })
+
+  it('keeps the join when an override wraps the target in an unnamed row', () => {
+    // flattenAllFields unconditionally hoists UNNAMED containers (row,
+    // collapsible, unnamed group/tabs) — Payload's own sanitizeJoinField still
+    // resolves `on: 'services'` through one, so the gate must not drop the
+    // join here. A consumer laying `services` out side-by-side with another
+    // field for admin UI reasons must not lose the join.
+    const config = payloadReserve({
+      collectionOverrides: {
+        resources: {
+          fields: ({ defaultFields }) => [
+            {
+              type: 'row',
+              fields: defaultFields.filter((f) => 'name' in f && f.name === 'services'),
+            } as never,
+            ...defaultFields.filter((f) => !('name' in f) || f.name !== 'services'),
+          ],
+        },
+      },
+    })(minimalConfig())
+
+    const services = config.collections!.find((c) => c.slug === 'services')!
+    const names = services.fields.map((f) => ('name' in f ? f.name : undefined))
+    expect(names).toContain('resources')
   })
 
   it('includes the join for a default install', () => {

@@ -1,5 +1,6 @@
 import type { CollectionSlug, Config, Field } from 'payload'
 
+import { flattenAllFields, getFieldByPath } from 'payload'
 import { deepMergeSimple } from 'payload/shared'
 
 import type { ReservationPluginConfig } from './types.js'
@@ -159,12 +160,22 @@ export const payloadReserve =
       createResourcesCollection(resolved),
       ov.resources,
     )
-    // The join's `on: 'services'` only resolves against a TOP-LEVEL field.
-    // An override that removes, renames, or nests it inside a named group/tab
-    // would otherwise crash init with Payload's InvalidFieldJoin.
-    resolved.hasResourceServicesField = resourcesCollection.fields.some(
-      (f) => 'name' in f && f.name === 'services' && f.type === 'relationship',
-    )
+    // The join's `on: 'services'` only resolves when Payload's own
+    // sanitizeJoinField can resolve it — mirror that resolution exactly
+    // (flattenAllFields + getFieldByPath) rather than re-implementing the
+    // traversal, so this can't drift from Payload's behavior on upgrade.
+    // Unnamed containers (row/collapsible/unnamed group/unnamed tabs) are
+    // hoisted by flattenAllFields and still resolve; only removal, renaming,
+    // or nesting inside a NAMED group/tab breaks it — that's the case this
+    // gate exists to catch instead of crashing init with InvalidFieldJoin.
+    const resourceServicesTarget = getFieldByPath({
+      fields: flattenAllFields({ fields: resourcesCollection.fields }),
+      path: 'services',
+    })
+    resolved.hasResourceServicesField =
+      resourceServicesTarget !== null &&
+      (resourceServicesTarget.field.type === 'relationship' ||
+        resourceServicesTarget.field.type === 'upload')
 
     config.collections.push(
       applyCollectionOverride(createServicesCollection(resolved), ov.services),
