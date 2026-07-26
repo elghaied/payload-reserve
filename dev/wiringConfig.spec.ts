@@ -301,6 +301,16 @@ describe('C7: cancel endpoint uses the configured cancelStatus', () => {
   })
 })
 
+describe('enforceActive config option', () => {
+  it('enforceActive defaults to true', () => {
+    expect(resolveConfig({}).enforceActive).toBe(true)
+  })
+
+  it('enforceActive can be turned off', () => {
+    expect(resolveConfig({ enforceActive: false }).enforceActive).toBe(false)
+  })
+})
+
 describe('locale completeness', () => {
   it('every locale defines the same keys as en', async () => {
     const { translations } = await import('../src/translations/index.js')

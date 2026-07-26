@@ -138,6 +138,7 @@ export function resolveConfig(
     debug: pluginOptions.debug ?? false,
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,
+    enforceActive: pluginOptions.enforceActive ?? true,
     extraReservationFields: pluginOptions.extraReservationFields ?? [],
     getExternalBusy: pluginOptions.getExternalBusy,
     // Real value is set by the plugin once config.collections is known (C8)

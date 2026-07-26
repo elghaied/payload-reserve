@@ -209,6 +209,12 @@ export type ReservationPluginConfig = {
   defaultBufferTime?: number
   /** Disable the plugin entirely */
   disabled?: boolean
+  /**
+   * Reject bookings against an inactive service or resource, and omit them from
+   * availability. Default `true`. Set `false` to restore the previous behaviour
+   * where `active` was advisory and only filtered in the admin UI.
+   */
+  enforceActive?: boolean
   /** @deprecated Use `collectionOverrides.reservations.fields` instead. Extra fields appended to Reservations. */
   extraReservationFields?: Field[]
   /** Resolve external busy intervals (calendar sync etc.) folded into availability + calendar display. */
@@ -274,6 +280,7 @@ export type ResolvedReservationPluginConfig = {
   debug: boolean
   defaultBufferTime: number
   disabled: boolean
+  enforceActive: boolean
   extraReservationFields: Field[]
   getExternalBusy: GetExternalBusy | undefined
   /** Whether the media collection (`slugs.media`) exists — set by the plugin; gates the image upload fields. */
