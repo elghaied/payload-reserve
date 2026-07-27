@@ -520,7 +520,7 @@ export async function getAvailableSlots(params: {
       // resource read becomes an aggregation with a $lookup.
       joins: false,
       req,
-    })
+    }).catch(() => null)
     if (enforceActive !== false && resourceDoc?.active === false) {
       trace.dbg('empty', { reason: 'resource_inactive', resourceId: rid })
       return { reason: 'resource_inactive', slots: [] }
