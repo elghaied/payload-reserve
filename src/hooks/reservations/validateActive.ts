@@ -70,6 +70,13 @@ export const validateActive =
         originalDoc: originalDoc as Record<string, unknown> | undefined,
       })
 
+    // A single-entry items[] still holds resource/service ids distinct from the
+    // top-level fields, so the error path must key off whether items[] is
+    // actually populated on the merged doc — not off the resolved item count,
+    // which is always >= 1 and collapses a real items.0.* mismatch onto the
+    // (wrong) top-level `resource`/`service` path.
+    const hasItemsArray = Array.isArray(merged.items) && (merged.items as unknown[]).length > 0
+
     for (const [index, item] of items.entries()) {
       const serviceId = extractId(item.service)
       const resourceId = extractId(item.resource)
@@ -82,7 +89,7 @@ export const validateActive =
         continue
       }
 
-      const prefix = items.length > 1 ? `items.${index}.` : ''
+      const prefix = hasItemsArray ? `items.${index}.` : ''
 
       for (const [kind, id, slug, key] of [
         ['service', serviceId, config.slugs.services, 'errorServiceInactive'],
