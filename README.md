@@ -28,7 +28,7 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Idempotency** — Optional `idempotencyKey` prevents duplicate submissions
 - **Collection Overrides** — Customize any generated collection (add fields like a `join`, tweak admin options, attach your own hooks) via `collectionOverrides` without forking — the plugin's hooks and access are merged, not clobbered (supersedes the deprecated `extraReservationFields`)
 - **Services ↔ Resources Join** — Services show a read-only `resources` field (a `join` over `Resources.services`) listing which resources currently perform them; assignment still happens on the Resource
-- **Active Enforcement** — `active: false` on a Service or Resource (or any multi-resource `items[]` entry's) now blocks new/changed bookings against it and is excluded from availability; opt out with `enforceActive: false`
+- **Active Enforcement** — `active: false` on a Service or Resource — including one referenced by a multi-resource `items[]` entry — now blocks new/changed bookings against it and excludes it from availability; opt out with `enforceActive: false`
 - **Cancellation Policy** — Configurable minimum notice period enforcement
 - **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems
 - **Availability Service** — Pure functions and DB helpers for slot generation (15-min step) and conflict checking with guest-count-aware filtering
