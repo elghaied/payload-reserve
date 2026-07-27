@@ -68,7 +68,12 @@ export function schedulingFieldsChanged({
   data,
   originalDoc,
 }: {
-  blockingStatuses: string[]
+  /**
+   * Omit to compare scheduling VALUES only, skipping the status clause below.
+   * `validateActive` needs that: a confirm or cancel must stay possible on a
+   * booking whose service or resource was deactivated after it was made.
+   */
+  blockingStatuses?: string[]
   data: Record<string, unknown>
   originalDoc: Record<string, unknown> | undefined
 }): boolean {
@@ -102,7 +107,7 @@ export function schedulingFieldsChanged({
     }
   }
 
-  if ('status' in data && typeof data.status === 'string') {
+  if (blockingStatuses && 'status' in data && typeof data.status === 'string') {
     const prevStatus = originalDoc.status as string | undefined
     if (
       data.status !== prevStatus &&

@@ -5,7 +5,10 @@ import { ValidationError } from 'payload'
 import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
-import { mergeReservationData } from '../../utilities/reservationChanges.js'
+import {
+  mergeReservationData,
+  schedulingFieldsChanged,
+} from '../../utilities/reservationChanges.js'
 import { extractId, resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 
 /**
@@ -42,12 +45,25 @@ export const validateActive =
       previous.map((p) => `${String(extractId(p.service))}|${String(extractId(p.resource))}`),
     )
 
+    // A reschedule keeps the same (service, resource) pair, so the pair-only
+    // skip below would wave it through even though availability refuses to
+    // offer any slot on an inactive resource. Compare scheduling VALUES too —
+    // deliberately WITHOUT blockingStatuses, so confirming or cancelling an
+    // existing booking stays possible after its references are deactivated.
+    const schedulingChanged =
+      operation === 'update' &&
+      schedulingFieldsChanged({
+        data: data as Record<string, unknown>,
+        originalDoc: originalDoc as Record<string, unknown> | undefined,
+      })
+
     for (const [index, item] of items.entries()) {
       const serviceId = extractId(item.service)
       const resourceId = extractId(item.resource)
 
       if (
         operation === 'update' &&
+        !schedulingChanged &&
         previousKeys.has(`${String(serviceId)}|${String(resourceId)}`)
       ) {
         continue

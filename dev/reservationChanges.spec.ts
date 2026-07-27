@@ -171,4 +171,24 @@ describe('schedulingFieldsChanged', () => {
       }),
     ).toBe(true)
   })
+
+  it('ignores a status change into a blocking status when blockingStatuses is omitted', () => {
+    // validateActive needs this: a confirm must stay possible on a booking
+    // whose service or resource was deactivated after it was made.
+    expect(
+      schedulingFieldsChanged({
+        data: { status: 'confirmed' },
+        originalDoc: { status: 'pending' },
+      }),
+    ).toBe(false)
+  })
+
+  it('still reports a startTime change when blockingStatuses is omitted', () => {
+    expect(
+      schedulingFieldsChanged({
+        data: { startTime: '2030-01-01T10:00:00.000Z' },
+        originalDoc: { startTime: '2030-01-01T09:00:00.000Z' },
+      }),
+    ).toBe(true)
+  })
 })

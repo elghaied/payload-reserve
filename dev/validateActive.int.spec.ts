@@ -193,4 +193,69 @@ describe('validateActive hook', () => {
       /not active/i,
     )
   })
+
+  it('rejects rescheduling an existing booking onto a deactivated resource', async () => {
+    const service = await payload.create({
+      collection: 'services',
+      data: { name: 'Reschedule Service G', duration: 30, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: 'resources',
+      data: { name: 'Chair Active G', quantity: 1 },
+    })
+    const r = await payload.create({
+      collection: 'reservations',
+      data: bookingFor(service, resource),
+    })
+
+    await payload.update({ id: resource.id, collection: 'resources', data: { active: false } })
+
+    // The (service, resource) pair is unchanged, so the pair-only skip would
+    // wave this through — but availability offers no slot on an inactive
+    // resource, so the write path must refuse it too.
+    await expectValidationMessage(
+      payload.update({
+        id: r.id,
+        collection: 'reservations',
+        data: { startTime: future(72) },
+      }),
+      /not active/i,
+    )
+  })
+
+  it('still allows confirm and non-scheduling edits after deactivation', async () => {
+    const service = await payload.create({
+      collection: 'services',
+      data: { name: 'Notes Service H', duration: 30, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: 'resources',
+      data: { name: 'Chair Active H', quantity: 1 },
+    })
+    const r = await payload.create({
+      collection: 'reservations',
+      data: bookingFor(service, resource),
+    })
+
+    await payload.update({ id: resource.id, collection: 'resources', data: { active: false } })
+
+    // Confirming is a status-only change. This is exactly why the call site in
+    // Step 7 omits blockingStatuses: with them, schedulingFieldsChanged reports
+    // pending -> confirmed as a change and the booking becomes stranded.
+    // (validateStatusTransition gates status on `create` only; on update the
+    // transition machine alone applies, and pending -> confirmed is valid.)
+    const confirmed = await payload.update({
+      id: r.id,
+      collection: 'reservations',
+      data: { status: 'confirmed' },
+    })
+    expect(confirmed.status).toBe('confirmed')
+
+    const updated = await payload.update({
+      id: r.id,
+      collection: 'reservations',
+      data: { notes: 'called ahead' },
+    })
+    expect(updated.notes).toBe('called ahead')
+  })
 })
