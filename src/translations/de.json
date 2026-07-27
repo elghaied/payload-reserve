@@ -133,7 +133,7 @@
   "fieldResources": "Ressourcen",
   "fieldResourcesDesc": "Ressourcen, die diese Leistung erbringen können. Zum Ändern die Ressource öffnen und dort das Feld „Leistungen\" bearbeiten.",
   "fieldRequiredResources": "Erforderliche Ressourcen",
-  "fieldRequiredResourcesDesc": "Zusätzliche Ressourcenpools, die jede Buchung dieser Leistung belegt (z. B. ein Stuhl). Buchungen werden automatisch um diese erweitert und blockiert, wenn ein Pool ausgelastet ist.",
+  "fieldRequiredResourcesDesc": "Zusätzliche Ressourcenpools, die jede Buchung dieser Leistung belegt (z. B. ein Stuhl). Buchungen werden automatisch um diese erweitert und blockiert, wenn ein Pool ausgelastet ist. Das ist nicht dasselbe wie die Ressourcen, die diese Leistung erbringen können – siehe „Ressourcen\" oben.",
   "fieldAllowGuestBooking": "Gastbuchung",
   "fieldAllowGuestBookingDesc": "Buchungen ohne Kundenkonto zulassen. \"Übernehmen\" verwendet die Plugin-Standardeinstellung.",
   "guestBookingInherit": "Plugin-Standard übernehmen",

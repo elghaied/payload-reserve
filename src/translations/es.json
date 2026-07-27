@@ -133,7 +133,7 @@
   "fieldResources": "Recursos",
   "fieldResourcesDesc": "Recursos que pueden realizar este servicio. Para cambiarlo, abre el recurso y edita su campo Servicios.",
   "fieldRequiredResources": "Recursos necesarios",
-  "fieldRequiredResourcesDesc": "Grupos de recursos adicionales que ocupa cada reserva de este servicio (p. ej. una silla). Las reservas se amplían automáticamente para incluirlos y se bloquean si algún grupo está completo.",
+  "fieldRequiredResourcesDesc": "Grupos de recursos adicionales que ocupa cada reserva de este servicio (p. ej. una silla). Las reservas se amplían automáticamente para incluirlos y se bloquean si algún grupo está completo. Esto no es lo mismo que los recursos que pueden realizar este servicio. Consulta Recursos arriba.",
   "fieldAllowGuestBooking": "Reserva de invitado",
   "fieldAllowGuestBookingDesc": "Permitir reservas sin una cuenta de cliente. \"Heredar\" usa el valor predeterminado del plugin.",
   "guestBookingInherit": "Heredar valor predeterminado del plugin",

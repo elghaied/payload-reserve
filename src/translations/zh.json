@@ -133,7 +133,7 @@
   "fieldResources": "资源",
   "fieldResourcesDesc": "可以提供此服务的资源。如需更改，请打开该资源并编辑其\"服务\"字段。",
   "fieldRequiredResources": "必需资源",
-  "fieldRequiredResourcesDesc": "此服务的每次预约都会占用的额外资源池（例如一把座椅）。预约会自动扩展以包含这些资源，若任一资源池已满则会被阻止。",
+  "fieldRequiredResourcesDesc": "此服务的每次预约都会占用的额外资源池（例如一把座椅）。预约会自动扩展以包含这些资源，若任一资源池已满则会被阻止。这与可以提供此服务的资源不是同一回事 — 请参见上方的\"资源\"。",
   "fieldAllowGuestBooking": "访客预约",
   "fieldAllowGuestBookingDesc": "允许无客户账户的预约。“继承”将使用插件级别的默认设置。",
   "guestBookingInherit": "继承插件默认设置",

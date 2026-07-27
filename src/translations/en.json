@@ -133,7 +133,7 @@
   "fieldResources": "Resources",
   "fieldResourcesDesc": "Resources that can perform this service. To change this, open the resource and edit its Services field.",
   "fieldRequiredResources": "Required resources",
-  "fieldRequiredResourcesDesc": "Additional resource pools every booking of this service occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full.",
+  "fieldRequiredResourcesDesc": "Extra resource pools every booking of this service also occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full. This is not the same as which resources perform the service — see Resources above.",
   "fieldAllowGuestBooking": "Guest booking",
   "fieldAllowGuestBookingDesc": "Allow bookings without a customer account. \"Inherit\" uses the plugin-level default.",
   "guestBookingInherit": "Inherit plugin default",

@@ -133,7 +133,7 @@
   "fieldResources": "Zasoby",
   "fieldResourcesDesc": "Zasoby, które mogą wykonać tę usługę. Aby to zmienić, otwórz zasób i edytuj jego pole Usługi.",
   "fieldRequiredResources": "Wymagane zasoby",
-  "fieldRequiredResourcesDesc": "Dodatkowe pule zasobów zajmowane przez każdą rezerwację tej usługi (np. fotel). Rezerwacje są automatycznie rozszerzane o nie i są blokowane, jeśli którakolwiek pula jest pełna.",
+  "fieldRequiredResourcesDesc": "Dodatkowe pule zasobów zajmowane przez każdą rezerwację tej usługi (np. fotel). Rezerwacje są automatycznie rozszerzane o nie i są blokowane, jeśli którakolwiek pula jest pełna. To nie to samo co zasoby, które mogą wykonać tę usługę — zobacz Zasoby powyżej.",
   "fieldAllowGuestBooking": "Rezerwacja gościnna",
   "fieldAllowGuestBookingDesc": "Zezwalaj na rezerwacje bez konta klienta. \"Dziedzicz\" używa domyślnego ustawienia wtyczki.",
   "guestBookingInherit": "Dziedzicz domyślne ustawienie wtyczki",

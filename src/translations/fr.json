@@ -133,7 +133,7 @@
   "fieldResources": "Ressources",
   "fieldResourcesDesc": "Ressources pouvant réaliser ce service. Pour le modifier, ouvrez la ressource et modifiez son champ Services.",
   "fieldRequiredResources": "Ressources requises",
-  "fieldRequiredResourcesDesc": "Pools de ressources supplémentaires occupés par chaque réservation de cette prestation (par ex. un fauteuil). Les réservations sont automatiquement étendues pour les inclure et sont bloquées si l'un des pools est complet.",
+  "fieldRequiredResourcesDesc": "Pools de ressources supplémentaires occupés par chaque réservation de cette prestation (par ex. un fauteuil). Les réservations sont automatiquement étendues pour les inclure et sont bloquées si l'un des pools est complet. Ce n'est pas la même chose que les ressources pouvant réaliser cette prestation — voir Ressources ci-dessus.",
   "fieldAllowGuestBooking": "Réservation invité",
   "fieldAllowGuestBookingDesc": "Autoriser les réservations sans compte client. « Hériter » utilise la valeur par défaut définie au niveau du plugin.",
   "guestBookingInherit": "Hériter de la valeur par défaut du plugin",
