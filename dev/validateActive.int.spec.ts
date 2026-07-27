@@ -287,4 +287,49 @@ describe('validateActive hook', () => {
       /not active/i,
     )
   })
+
+  it('stays editable for a benign edit when items[] has a duplicate (resource, startTime) pair', async () => {
+    // Models a row written before resolveReservationItems' duplicate-item
+    // check existed, or seeded via context.skipReservationHooks — both are
+    // documented as staying editable for benign edits.
+    const service = await payload.create({
+      collection: 'services',
+      data: { name: 'Malformed Items Service J', duration: 30, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: 'resources',
+      data: { name: 'Chair Active J', quantity: 1 },
+    })
+    const r = await payload.create({
+      collection: 'reservations',
+      data: bookingFor(service, resource),
+    })
+
+    const duplicatedStartTime = future(48)
+    // Bypass all reservation hooks to inject a malformed items[]: two entries
+    // sharing the same (resource, startTime), which resolveReservationItems
+    // rejects as a duplicate.
+    await payload.update({
+      id: r.id,
+      collection: 'reservations',
+      context: { skipReservationHooks: true },
+      data: {
+        items: [
+          { resource: resource.id, startTime: duplicatedStartTime },
+          { resource: resource.id, startTime: duplicatedStartTime },
+        ],
+      },
+    })
+
+    // A notes-only edit must still succeed — validateActive must decline to
+    // act on a malformed items[] rather than surface the duplicate-item error
+    // calculateEndTime/validateConflicts would raise only on a real
+    // scheduling change.
+    const updated = await payload.update({
+      id: r.id,
+      collection: 'reservations',
+      data: { notes: 'benign edit on a malformed row' },
+    })
+    expect(updated.notes).toBe('benign edit on a malformed row')
+  })
 })

@@ -4,6 +4,7 @@ import { ValidationError } from 'payload'
 
 import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
+import type { ResolvedItem } from '../../utilities/resolveReservationItems.js'
 
 import {
   mergeReservationData,
@@ -32,15 +33,27 @@ export const validateActive =
       data as Record<string, unknown>,
       originalDoc as Record<string, unknown> | undefined,
     )
-    const items = resolveReservationItems(merged)
 
-    // On update, only re-check references that actually changed. Otherwise a
-    // service deactivated after booking would make its existing reservations
-    // permanently uneditable.
-    const previous =
-      operation === 'update'
-        ? resolveReservationItems((originalDoc ?? {}) as Record<string, unknown>)
-        : []
+    let items: ResolvedItem[]
+    let previous: ResolvedItem[]
+    try {
+      items = resolveReservationItems(merged)
+      // On update, only re-check references that actually changed. Otherwise a
+      // service deactivated after booking would make its existing reservations
+      // permanently uneditable.
+      previous =
+        operation === 'update'
+          ? resolveReservationItems((originalDoc ?? {}) as Record<string, unknown>)
+          : []
+    } catch {
+      // A malformed items[] is calculateEndTime's and validateConflicts' error
+      // to raise, and only on a real scheduling change. Rows written before
+      // that validation existed — or seeded via context.skipReservationHooks —
+      // must stay editable for benign edits, exactly as they were before this
+      // hook was added.
+      return data
+    }
+
     const previousKeys = new Set(
       previous.map((p) => `${String(extractId(p.service))}|${String(extractId(p.resource))}`),
     )
