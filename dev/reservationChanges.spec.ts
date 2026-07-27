@@ -172,15 +172,15 @@ describe('schedulingFieldsChanged', () => {
     ).toBe(true)
   })
 
-  it('ignores a status change into a blocking status when blockingStatuses is omitted', () => {
-    // validateActive needs this: a confirm must stay possible on a booking
-    // whose service or resource was deactivated after it was made.
-    expect(
-      schedulingFieldsChanged({
-        data: { status: 'confirmed' },
-        originalDoc: { status: 'pending' },
-      }),
-    ).toBe(false)
+  it('applies the status clause only when blockingStatuses is supplied', () => {
+    // 'draft' is not blocking, 'confirmed' is — so the status clause fires when
+    // blockingStatuses is supplied...
+    const args = { data: { status: 'confirmed' }, originalDoc: { status: 'draft' } }
+    expect(schedulingFieldsChanged({ ...args, blockingStatuses: ['confirmed'] })).toBe(true)
+    // ...and is skipped entirely when it is omitted. validateActive omits it for
+    // exactly this reason: otherwise confirming a booking would count as a
+    // scheduling change and strand it once its resource was deactivated.
+    expect(schedulingFieldsChanged(args)).toBe(false)
   })
 
   it('still reports a startTime change when blockingStatuses is omitted', () => {
