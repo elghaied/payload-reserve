@@ -84,6 +84,9 @@ export interface Config {
     'payload-migrations': PayloadMigration;
   };
   collectionsJoins: {
+    services: {
+      resources: 'resources';
+    };
     customers: {
       bookings: 'reservations';
     };
@@ -259,13 +262,12 @@ export interface Service {
   price?: number | null;
   bufferTimeBefore?: number | null;
   bufferTimeAfter?: number | null;
-  /**
-   * Additional resource pools every booking of this service occupies (e.g. a chair). Bookings are auto-expanded to include these and are blocked if any pool is full.
-   */
+  resources?: {
+    docs?: (string | Resource)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
   requiredResources?: (string | Resource)[] | null;
-  /**
-   * Allow bookings without a customer account. "Inherit" uses the plugin-level default.
-   */
   allowGuestBooking?: ('inherit' | 'enabled' | 'disabled') | null;
   active?: boolean | null;
   updatedAt: string;
@@ -284,6 +286,9 @@ export interface Resource {
   active?: boolean | null;
   quantity: number;
   capacityMode?: ('per-reservation' | 'per-guest') | null;
+  /**
+   * Deprecated — not used by the plugin. Schedule resolution uses the plugin-level `timezone` option.
+   */
   timezone?: string | null;
   resourceType?: ('staff' | 'equipment' | 'room') | null;
   updatedAt: string;
@@ -336,9 +341,6 @@ export interface Reservation {
   service: string | Service;
   resource: string | Resource;
   customer?: (string | null) | Customer;
-  /**
-   * Contact details for a booking made without a customer account. Leave empty when a customer is set.
-   */
   guest?: {
     name?: string | null;
     email?: string | null;
@@ -351,9 +353,6 @@ export interface Reservation {
   cancellationReason?: string | null;
   guestCount?: number | null;
   notes?: string | null;
-  /**
-   * Resources included in this booking. Leave empty for single-resource bookings.
-   */
   items?:
     | {
         resource: string | Resource;
@@ -614,6 +613,7 @@ export interface ServicesSelect<T extends boolean = true> {
   price?: T;
   bufferTimeBefore?: T;
   bufferTimeAfter?: T;
+  resources?: T;
   requiredResources?: T;
   allowGuestBooking?: T;
   active?: T;
