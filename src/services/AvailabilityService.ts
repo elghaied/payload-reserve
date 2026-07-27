@@ -516,19 +516,24 @@ export async function getAvailableSlots(params: {
   //    schedules is capacity-only and contributes no time windows.
   const scheduleBearingWindowLists: Array<Array<{ end: Date; start: Date }>> = []
   for (const rid of ids) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const resourceDoc = await (payload.findByID as any)({
-      id: rid,
-      collection: resourceSlug,
-      depth: 0,
-      // Skip joins — internal logic never reads them, and without this every
-      // resource read becomes an aggregation with a $lookup.
-      joins: false,
-      req,
-    }).catch(() => null)
-    if (enforceActive !== false && resourceDoc?.active === false) {
-      trace.dbg('empty', { reason: 'resource_inactive', resourceId: rid })
-      return { reason: 'resource_inactive', slots: [] }
+    // This read exists solely to feed the active check below — skip it
+    // entirely when enforceActive is off so an opted-out consumer doesn't pay
+    // for a findByID whose result is never read.
+    if (enforceActive !== false) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const resourceDoc = await (payload.findByID as any)({
+        id: rid,
+        collection: resourceSlug,
+        depth: 0,
+        // Skip joins — internal logic never reads them, and without this every
+        // resource read becomes an aggregation with a $lookup.
+        joins: false,
+        req,
+      }).catch(() => null)
+      if (resourceDoc?.active === false) {
+        trace.dbg('empty', { reason: 'resource_inactive', resourceId: rid })
+        return { reason: 'resource_inactive', slots: [] }
+      }
     }
 
     const scheduleWhere = { and: [{ resource: { equals: rid } }, { active: { equals: true } }] }
