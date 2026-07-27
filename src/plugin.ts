@@ -169,7 +169,12 @@ export const payloadReserve =
     // or nesting inside a NAMED group/tab breaks it — that's the case this
     // gate exists to catch instead of crashing init with InvalidFieldJoin.
     const resourceServicesTarget = getFieldByPath({
-      fields: flattenAllFields({ fields: resourcesCollection.fields }),
+      // A throwaway copy: flattenAllFields caches by array identity even when
+      // `cache` isn't passed, and sanitizeFields mutates-and-returns the same
+      // array instance. Flattening resourcesCollection.fields directly would
+      // seed that cache with a pre-sanitization snapshot under a key Payload's
+      // own sanitizeJoinField (cache: true) could later be served from.
+      fields: flattenAllFields({ fields: [...resourcesCollection.fields] }),
       path: 'services',
     })
     resolved.hasResourceServicesField =
