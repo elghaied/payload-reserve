@@ -211,9 +211,14 @@ export const payloadReserve =
       const hostOnInit = config.onInit
       config.onInit = async (payload) => {
         await hostOnInit?.(payload)
-        payload.logger.warn(
-          `payload-reserve: the "${resolved.slugs.services}" collection's read-only "resources" join was skipped because "${resolved.slugs.resources}.services" is not a top-level relationship field. A collectionOverrides.resources override removed, renamed, or nested it inside a named group or tab.`,
-        )
+        try {
+          payload.logger.warn(
+            `payload-reserve: the "${resolved.slugs.services}" collection's read-only "resources" join was skipped because "${resolved.slugs.resources}.services" is not a top-level relationship field. A collectionOverrides.resources override removed, renamed, or nested it inside a named group or tab.`,
+          )
+        } catch {
+          // A diagnostic must never break boot — that is the whole reason this
+          // is a warning and not a throw.
+        }
       }
     }
 

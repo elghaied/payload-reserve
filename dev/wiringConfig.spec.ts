@@ -358,6 +358,27 @@ describe('resources join gate warns at init', () => {
     expect(calls).toEqual(['host', 'warn'])
   })
 
+  it('does not break init when the logger throws', async () => {
+    const calls: string[] = []
+    const hostConfig = minimalConfig()
+    // eslint-disable-next-line @typescript-eslint/require-await
+    hostConfig.onInit = async () => {
+      calls.push('host')
+    }
+    const config = dropServicesField()(hostConfig)
+    await expect(
+      config.onInit!({
+        logger: {
+          warn: () => {
+            throw new Error('logger exploded')
+          },
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any),
+    ).resolves.toBeUndefined()
+    expect(calls).toEqual(['host'])
+  })
+
   it('leaves onInit alone when the field is present', () => {
     expect(payloadReserve({})(minimalConfig()).onInit).toBeUndefined()
   })
