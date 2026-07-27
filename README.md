@@ -27,6 +27,8 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Guest Bookings** — Account-less reservations with inline contact details (name + email/phone); `allowGuestBooking` plugin option and per-service `inherit`/`enabled`/`disabled` override; guests receive a `cancellationToken` via the `afterBookingCreate` hook for cancel-link delivery
 - **Idempotency** — Optional `idempotencyKey` prevents duplicate submissions
 - **Collection Overrides** — Customize any generated collection (add fields like a `join`, tweak admin options, attach your own hooks) via `collectionOverrides` without forking — the plugin's hooks and access are merged, not clobbered (supersedes the deprecated `extraReservationFields`)
+- **Services ↔ Resources Join** — Services show a read-only `resources` field (a `join` over `Resources.services`) listing which resources currently perform them; assignment still happens on the Resource
+- **Active Enforcement** — `active: false` on a Service or Resource (or any multi-resource `items[]` entry's) now blocks new/changed bookings against it and is excluded from availability; opt out with `enforceActive: false`
 - **Cancellation Policy** — Configurable minimum notice period enforcement
 - **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems
 - **Availability Service** — Pure functions and DB helpers for slot generation (15-min step) and conflict checking with guest-count-aware filtering
@@ -51,7 +53,7 @@ pnpm add payload-reserve
 npm install payload-reserve
 ```
 
-**Peer dependencies:** `payload ^3.79.0`, `@payloadcms/ui ^3.79.0`, `@payloadcms/translations ^3.79.0`
+**Peer dependencies:** `payload ^3.86.0`, `@payloadcms/ui ^3.86.0`, `@payloadcms/translations ^3.86.0`
 
 ---
 
@@ -291,7 +293,10 @@ Customize any generated collection without forking the plugin via `collectionOve
 payloadReserve({
   collectionOverrides: {
     services: {
-      // append a join field back to Resources (the inverse of Resources.services)
+      // Generic illustration of appending a field via collectionOverrides — not
+      // the way to get a services↔resources view: Services already ships that
+      // built in as a read-only `resources` join (see below). Don't name your
+      // own appended field `resources` on `services`, or it collides with it.
       fields: ({ defaultFields }) => [
         ...defaultFields,
         { name: 'referencedResources', type: 'join', collection: 'resources', on: 'services' },
@@ -307,9 +312,37 @@ payloadReserve({
 
 The plugin's load-bearing behavior is protected: supplied `hooks` are **merged** (the plugin's conflict-detection/status hooks always run, and run first — an override can add hooks but not remove them), `access` **composes** per operation (rules you omit keep the plugin's owner-mode/default behavior), and `slug` is ignored (use the `slugs` option). The `customers` override applies only when the standalone Customers collection is generated (ignored when `userCollection` is set — your auth collection is yours to edit directly). `collectionOverrides` supersedes the deprecated `extraReservationFields`.
 
+> **Note:** a `collectionOverrides.resources` override that removes, renames, or nests the `services` field inside a *named* group or tab causes the Services `resources` join (below) to be silently skipped rather than erroring — the app still boots, the field simply doesn't appear.
+
 ### Optional `Resource.services`
 
 The `services` relationship on Resources is now optional. This lets a freshly provisioned staff Resource exist before services are assigned, avoiding validation errors during auto-provisioning.
+
+### Services `resources` Join
+
+Services expose a read-only `resources` field — a Payload `join` over `Resources.services` — listing which resources currently perform that service. `Resources.services` remains the single source of truth and the only editable side: assign or remove services from the **Resource**, and the reverse list on the Service updates automatically. There is no way to add or remove a link from the Service side.
+
+Reading (or viewing in the admin) a Service returns the join in Payload's standard join-field shape:
+
+```json
+{
+  "resources": {
+    "docs": [{ "id": "...", "name": "...", "resourceType": "staff", "active": true }],
+    "hasNextPage": false,
+    "totalDocs": 3
+  }
+}
+```
+
+- **`defaultLimit: 100`** — raised from Payload's default of 10, so a service performed by more than 10 resources doesn't silently show a truncated list.
+- **`allowCreate: false`** — the join can only ever create a *brand-new* Resource from the drawer, never link an existing one, and the Resource's `services` field is `hasMany` while the join's create-drawer pre-fill is scalar — so the affordance is disabled. Assign resources on the Resource itself.
+- **`defaultColumns: ['name', 'resourceType', 'active']`** — the `active` column lets an admin see at a glance that a linked resource is disabled.
+
+If a `collectionOverrides.resources` override removes, renames, or nests `services` inside a *named* group/tab, the join is gated off entirely (see the note above) rather than crashing the app at init.
+
+#### `joins: false` on hot paths
+
+Payload join fields resolve via a DB-level aggregation (`$lookup`) and ignore `depth`, so every internal `findByID` the plugin makes on Services now passes `joins: false` to avoid that extra query cost. If your own code reads Services on a hot path, consider doing the same — `payload.findByID({ collection: 'services', id, joins: false })`.
 
 ---
 
