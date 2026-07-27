@@ -53,12 +53,23 @@ GET /api/reserve/availability?resource=abc123&service=def456&date=2025-06-15
 }
 ```
 
+When `slots` comes back empty, the response also includes a `reason` field — one of `'no_resource_ids'`, `'no_windows'`, `'all_slots_taken'`, `'empty_intersection'`, `'service_inactive'`, or `'resource_inactive'` — explaining why. It is omitted whenever at least one slot is returned:
+
+```json
+{
+  "reason": "resource_inactive",
+  "slots": []
+}
+```
+
 **Example fetch:**
 
 ```typescript
 const res = await fetch('/api/reserve/availability?resource=abc123&service=def456&date=2025-06-15')
 const { slots } = await res.json()
 ```
+
+The existing `const { slots } = await res.json()` destructure above still works unchanged — `reason` is an additional, optional key alongside `slots`, not a replacement for it. Destructure it too (`const { reason, slots } = await res.json()`) if you want to show a specific empty-state message.
 
 ---
 
@@ -92,6 +103,17 @@ GET /api/reserve/slots?resource=abc123&service=def456&date=2025-06-15&guestCount
     { "start": "2025-06-15T09:00:00.000Z", "end": "2025-06-15T09:30:00.000Z" },
     { "start": "2025-06-15T09:30:00.000Z", "end": "2025-06-15T10:00:00.000Z" }
   ]
+}
+```
+
+As with `/availability`, an empty `slots` array is accompanied by a `reason` field — one of `'no_resource_ids'`, `'no_windows'`, `'all_slots_taken'`, `'empty_intersection'`, `'service_inactive'`, or `'resource_inactive'` — omitted whenever at least one slot is returned:
+
+```json
+{
+  "date": "2025-06-15",
+  "guestCount": 2,
+  "reason": "service_inactive",
+  "slots": []
 }
 ```
 

@@ -20,6 +20,7 @@ Defines what can be booked (e.g., "Haircut", "Consultation", "Massage").
 | `price` | Number | No | Price (min: 0, step: 0.01) |
 | `bufferTimeBefore` | Number | No | Buffer minutes before the slot (default: 0, max: 1439) |
 | `bufferTimeAfter` | Number | No | Buffer minutes after the slot (default: 0, max: 1439) |
+| `resources` | Join | No | Read-only — resources that perform this service (join over `Resources.services`, `defaultLimit: 100`). Assigned on the Resource side; this field has no write affordance |
 | `requiredResources` | Relationship | No | Extra resource pools (hasMany) auto-expanded into the reservation `items[]` at booking time |
 | `allowGuestBooking` | Select | No | `'inherit'`, `'enabled'`, or `'disabled'` (default: `'inherit'`). Controls whether anonymous guest bookings are permitted for this service |
 | `owner` | Relationship | Yes* | *Only present when `resourceOwnerMode.ownedServices` is enabled.* Owner of this service (sidebar). Defaults to the requesting user on create. Relates to `resourceOwnerMode.ownerCollection ?? staffProvisioning.userCollection ?? customers` (not a hardcoded customers slug) |
