@@ -2809,6 +2809,51 @@ describe('Reservation plugin - enforceActive threads through to endpoints', () =
     const unenforced = await callSlots(resolveConfig({ enforceActive: false }))
     expect(unenforced.slots.length).toBeGreaterThan(0)
   })
+
+  it('enforceActive: false yields slots for an inactive service via /availability', async () => {
+    const { createCheckAvailabilityEndpoint } = await import('../src/endpoints/checkAvailability.js')
+
+    const inactiveSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'CA Inactive Service', active: false, duration: 60, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'CA Resource', active: true, services: [inactiveSvc.id] },
+    })
+    const allDaySlots = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({
+      day,
+      endTime: '17:00',
+      startTime: '09:00',
+    }))
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'CA Schedule',
+        active: true,
+        recurringSlots: allDaySlots,
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+
+    const qs = `date=2033-09-05&resource=${resource.id}&service=${inactiveSvc.id}`
+    const callAvailability = async (resolved: ReturnType<typeof resolveConfig>) => {
+      const ep = createCheckAvailabilityEndpoint(resolved)
+      const res = await ep.handler(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { payload, url: `http://local/api/reserve/availability?${qs}` } as any,
+      )
+      return res.json()
+    }
+
+    const enforced = await callAvailability(resolveConfig({}))
+    expect(enforced.reason).toBe('service_inactive')
+    expect(enforced.slots).toEqual([])
+
+    const unenforced = await callAvailability(resolveConfig({ enforceActive: false }))
+    expect(unenforced.slots.length).toBeGreaterThan(0)
+  })
 })
 
 describe('Reservation plugin - multi-resource startTime span', () => {

@@ -258,4 +258,33 @@ describe('validateActive hook', () => {
     })
     expect(updated.notes).toBe('called ahead')
   })
+
+  it('rejects an update that swaps in a newly referenced inactive service', async () => {
+    const service = await payload.create({
+      collection: 'services',
+      data: { name: 'Original Service I', duration: 30, durationType: 'fixed' },
+    })
+    const inactiveService = await payload.create({
+      collection: 'services',
+      data: { name: 'Retired Service I', active: false, duration: 30, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: 'resources',
+      data: { name: 'Chair Active I', quantity: 1 },
+    })
+    const r = await payload.create({
+      collection: 'reservations',
+      data: bookingFor(service, resource),
+    })
+
+    // A pair the booking never had before, so previousKeys cannot skip it.
+    await expectValidationMessage(
+      payload.update({
+        id: r.id,
+        collection: 'reservations',
+        data: { service: inactiveService.id },
+      }),
+      /not active/i,
+    )
+  })
 })
