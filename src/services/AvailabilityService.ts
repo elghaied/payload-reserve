@@ -405,11 +405,29 @@ export async function checkAvailability(params: {
   }
 }
 
+/**
+ * Why availability came back empty. Returned alongside the slots so an empty
+ * result is diagnosable without turning on `debug`.
+ *
+ * `no_active_schedules` and `date_excepted` are deliberately absent: they are
+ * per-resource `skip` traces inside a loop, not return points — they funnel
+ * into `no_windows` — and stay debug-only.
+ */
+export type EmptyReason =
+  | 'all_slots_taken'
+  | 'empty_intersection'
+  | 'no_resource_ids'
+  | 'no_windows'
+  | 'resource_inactive'
+  | 'service_inactive'
+
 export async function getAvailableSlots(params: {
   blockingStatuses: string[]
   date: Date | string
   /** Optional tracer — emits per-stage slot-generation lines when enabled. */
   debug?: ReserveDebug
+  /** Skip the service/resource `active` short-circuits when explicitly `false`. */
+  enforceActive?: boolean
   /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
   getExternalBusy?: GetExternalBusy
   guestCount?: number
@@ -423,11 +441,12 @@ export async function getAvailableSlots(params: {
   serviceId: number | string
   serviceSlug: string
   timeZone?: string
-}): Promise<Array<{ end: Date; start: Date }>> {
+}): Promise<{ reason?: EmptyReason; slots: Array<{ end: Date; start: Date }> }> {
   const {
     blockingStatuses,
     date,
     debug,
+    enforceActive,
     getExternalBusy,
     guestCount,
     payload,
@@ -461,7 +480,7 @@ export async function getAvailableSlots(params: {
 
   if (ids.length === 0) {
     trace.dbg('empty', { reason: 'no_resource_ids' })
-    return []
+    return { reason: 'no_resource_ids', slots: [] }
   }
 
   // 1. Service for duration + buffer times (from the primary service)
@@ -475,6 +494,12 @@ export async function getAvailableSlots(params: {
     joins: false,
     req,
   })
+
+  if (enforceActive !== false && service?.active === false) {
+    trace.dbg('empty', { reason: 'service_inactive', serviceId })
+    return { reason: 'service_inactive', slots: [] }
+  }
+
   const duration = (service.duration as number) ?? 60
   const bufferBefore = (service.bufferTimeBefore as number) ?? 0
   const bufferAfter = (service.bufferTimeAfter as number) ?? 0
@@ -486,6 +511,21 @@ export async function getAvailableSlots(params: {
   //    schedules is capacity-only and contributes no time windows.
   const scheduleBearingWindowLists: Array<Array<{ end: Date; start: Date }>> = []
   for (const rid of ids) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resourceDoc = await (payload.findByID as any)({
+      id: rid,
+      collection: resourceSlug,
+      depth: 0,
+      // Skip joins — internal logic never reads them, and without this every
+      // resource read becomes an aggregation with a $lookup.
+      joins: false,
+      req,
+    })
+    if (enforceActive !== false && resourceDoc?.active === false) {
+      trace.dbg('empty', { reason: 'resource_inactive', resourceId: rid })
+      return { reason: 'resource_inactive', slots: [] }
+    }
+
     const scheduleWhere = { and: [{ resource: { equals: rid } }, { active: { equals: true } }] }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { docs: schedules } = await (payload.find as any)({
@@ -547,7 +587,7 @@ export async function getAvailableSlots(params: {
   // No resource constrains time → no basis for generating slots
   if (scheduleBearingWindowLists.length === 0) {
     trace.dbg('empty', { reason: 'no_windows' })
-    return []
+    return { reason: 'no_windows', slots: [] }
   }
 
   // 3. Intersect all schedule-bearing window lists
@@ -562,7 +602,7 @@ export async function getAvailableSlots(params: {
       ),
       reason: 'empty_intersection',
     })
-    return []
+    return { reason: 'empty_intersection', slots: [] }
   }
 
   // 4. Candidate slot sizing
@@ -631,7 +671,10 @@ export async function getAvailableSlots(params: {
       durationType: 'full-day',
       returnedCount: availableSlots.length,
     })
-    return availableSlots
+    return {
+      ...(availableSlots.length === 0 ? { reason: 'all_slots_taken' as const } : {}),
+      slots: availableSlots,
+    }
   }
 
   const stepSize = Math.min(effectiveDuration, 15)
@@ -660,5 +703,8 @@ export async function getAvailableSlots(params: {
     candidatesGenerated,
     returnedCount: availableSlots.length,
   })
-  return availableSlots
+  return {
+    ...(availableSlots.length === 0 ? { reason: 'all_slots_taken' as const } : {}),
+    slots: availableSlots,
+  }
 }

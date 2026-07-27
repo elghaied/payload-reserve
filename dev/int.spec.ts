@@ -1088,7 +1088,7 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
   it('returns available slots for a resource with a schedule', async () => {
     const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
 
-    const slots = await getAvailableSlots({
+    const { slots } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: MONDAY_LOCAL,
       payload,
@@ -1113,7 +1113,7 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
 
     // First, get the current slots so we can book the first one using its
     // exact ISO startTime (avoids UTC/local timezone mismatch).
-    const initialSlots = await getAvailableSlots({
+    const { slots: initialSlots } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: MONDAY_LOCAL,
       payload,
@@ -1142,7 +1142,7 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
     })
 
     // Re-query: should be one fewer slot
-    const remainingSlots = await getAvailableSlots({
+    const { slots: remainingSlots } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: MONDAY_LOCAL,
       payload,
@@ -1171,7 +1171,7 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
       data: { name: 'No-Schedule Resource', active: true, services: [serviceId] },
     })
 
-    const slots = await getAvailableSlots({
+    const { slots } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: MONDAY_LOCAL,
       payload,
@@ -1636,7 +1636,7 @@ describe('Reservation plugin - slot generation with buffers', () => {
     const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
 
     // Get initial slots and book the first one (09:00-10:00)
-    const initialSlots = await getAvailableSlots({
+    const { slots: initialSlots } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: MONDAY_LOCAL,
       payload,
@@ -1661,7 +1661,7 @@ describe('Reservation plugin - slot generation with buffers', () => {
     })
 
     // Re-query
-    const afterSlots = await getAvailableSlots({
+    const { slots: afterSlots } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: MONDAY_LOCAL,
       payload,
@@ -2630,7 +2630,7 @@ describe('Reservation plugin - multi-resource slot discovery', () => {
 
   const callSlots = async () => {
     const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
-    return getAvailableSlots({
+    const { slots } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: DAY,
       payload,
@@ -2642,6 +2642,7 @@ describe('Reservation plugin - multi-resource slot discovery', () => {
       serviceId: svcId,
       serviceSlug: 'services',
     })
+    return slots
   }
 
   it('returns slots where both stylist and chair are free', async () => {
@@ -3245,7 +3246,7 @@ describe('leave range removes availability end-to-end', () => {
 
     // 2026-06-10 (Wed) is inside the vacation range → no slots
     // Use UTC midnight so toISOString().split('T')[0] === '2026-06-10'
-    const inRange = await getAvailableSlots({
+    const { slots: inRange } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: new Date('2026-06-10T00:00:00.000Z'),
       payload,
@@ -3260,7 +3261,7 @@ describe('leave range removes availability end-to-end', () => {
     expect(inRange.length).toBe(0)
 
     // 2026-06-17 (Wed) is outside the range → slots available
-    const outRange = await getAvailableSlots({
+    const { slots: outRange } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: new Date('2026-06-17T00:00:00.000Z'),
       payload,
@@ -4558,11 +4559,11 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
     }
 
     // 2030-09-11 is a Wednesday AND the exception day → no slots
-    const blocked = await getAvailableSlots({ ...base, date: '2030-09-11' })
+    const { slots: blocked } = await getAvailableSlots({ ...base, date: '2030-09-11' })
     expect(blocked).toHaveLength(0)
 
     // the following Wednesday is open
-    const open = await getAvailableSlots({ ...base, date: '2030-09-18' })
+    const { slots: open } = await getAvailableSlots({ ...base, date: '2030-09-18' })
     expect(open.length).toBeGreaterThan(0)
   })
 })
@@ -4769,7 +4770,7 @@ describe('Reservation plugin - getAvailableSlots debug traces', () => {
 
   const call = async (over: Record<string, unknown>) => {
     const { getAvailableSlots } = await import('../src/services/AvailabilityService.js')
-    return getAvailableSlots({
+    const { slots } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: MON,
       payload,
@@ -4782,6 +4783,7 @@ describe('Reservation plugin - getAvailableSlots debug traces', () => {
       timeZone: 'UTC',
       ...over,
     })
+    return slots
   }
 
   const linesFor = (info: ReturnType<typeof vi.spyOn>, tid: string) =>

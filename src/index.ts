@@ -8,6 +8,7 @@ export {
   isBlockingStatus,
   validateTransition,
 } from './services/index.js'
+export type { EmptyReason } from './services/index.js'
 export type {
   CapacityMode,
   DurationType,

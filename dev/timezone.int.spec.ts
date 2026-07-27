@@ -43,7 +43,7 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
     })
 
     // 2026-06-10 is a Wednesday; Paris is UTC+2 in June.
-    const slots = await getAvailableSlots({
+    const { slots } = await getAvailableSlots({
       blockingStatuses: ['pending', 'confirmed'],
       date: '2026-06-10',
       payload,
@@ -97,10 +97,10 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
       timeZone: 'Europe/Paris',
     }
 
-    const blocked = await getAvailableSlots({ ...base, date: '2026-06-17' })
+    const { slots: blocked } = await getAvailableSlots({ ...base, date: '2026-06-17' })
     expect(blocked).toHaveLength(0)
 
-    const open = await getAvailableSlots({ ...base, date: '2026-06-24' })
+    const { slots: open } = await getAvailableSlots({ ...base, date: '2026-06-24' })
     expect(open.length).toBeGreaterThan(0)
   })
 

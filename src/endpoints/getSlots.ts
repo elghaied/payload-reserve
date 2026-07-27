@@ -96,10 +96,11 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
         timeZone: config.timezone,
       })
 
-      const slots = await getAvailableSlots({
+      const { reason, slots } = await getAvailableSlots({
         blockingStatuses: config.statusMachine.blockingStatuses,
         date: dayKey,
         debug: dbg,
+        enforceActive: config.enforceActive,
         getExternalBusy: config.getExternalBusy,
         guestCount,
         payload: req.payload,
@@ -113,11 +114,12 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
         timeZone: config.timezone,
       })
 
-      dbg.dbg('response', { endpoint: 'slots', slotCount: slots.length })
+      dbg.dbg('response', { endpoint: 'slots', reason, slotCount: slots.length })
 
       return Response.json({
         date,
         guestCount,
+        ...(reason ? { reason } : {}),
         slots: slots.map((s) => ({ end: s.end.toISOString(), start: s.start.toISOString() })),
       })
     },

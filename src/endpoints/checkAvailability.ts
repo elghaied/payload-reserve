@@ -98,10 +98,11 @@ export function createCheckAvailabilityEndpoint(
         timeZone: config.timezone,
       })
 
-      const slots = await getAvailableSlots({
+      const { reason, slots } = await getAvailableSlots({
         blockingStatuses: config.statusMachine.blockingStatuses,
         date: dayKey,
         debug: dbg,
+        enforceActive: config.enforceActive,
         getExternalBusy: config.getExternalBusy,
         guestCount,
         payload: req.payload,
@@ -115,9 +116,9 @@ export function createCheckAvailabilityEndpoint(
         timeZone: config.timezone,
       })
 
-      dbg.dbg('response', { endpoint: 'availability', slotCount: slots.length })
+      dbg.dbg('response', { endpoint: 'availability', reason, slotCount: slots.length })
 
-      return Response.json({ slots })
+      return Response.json({ ...(reason ? { reason } : {}), slots })
     },
     method: 'get',
     path: '/reserve/availability',
