@@ -53,7 +53,7 @@ GET /api/reserve/availability?resource=abc123&service=def456&date=2025-06-15
 }
 ```
 
-When `slots` comes back empty, the response also includes a `reason` field — one of `'no_resource_ids'`, `'no_windows'`, `'all_slots_taken'`, `'empty_intersection'`, `'service_inactive'`, or `'resource_inactive'` — explaining why. It is omitted whenever at least one slot is returned:
+When `slots` comes back empty, the response also includes a `reason` field — one of `'no_resource_ids'`, `'no_windows'`, `'window_too_short'`, `'all_slots_taken'`, `'empty_intersection'`, `'service_inactive'`, or `'resource_inactive'` — explaining why. It is omitted whenever at least one slot is returned:
 
 ```json
 {
@@ -106,7 +106,7 @@ GET /api/reserve/slots?resource=abc123&service=def456&date=2025-06-15&guestCount
 }
 ```
 
-As with `/availability`, an empty `slots` array is accompanied by a `reason` field — one of `'no_resource_ids'`, `'no_windows'`, `'all_slots_taken'`, `'empty_intersection'`, `'service_inactive'`, or `'resource_inactive'` — omitted whenever at least one slot is returned:
+As with `/availability`, an empty `slots` array is accompanied by a `reason` field — one of `'no_resource_ids'`, `'no_windows'`, `'window_too_short'`, `'all_slots_taken'`, `'empty_intersection'`, `'service_inactive'`, or `'resource_inactive'` — omitted whenever at least one slot is returned:
 
 ```json
 {

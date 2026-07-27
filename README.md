@@ -28,7 +28,7 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Idempotency** — Optional `idempotencyKey` prevents duplicate submissions
 - **Collection Overrides** — Customize any generated collection (add fields like a `join`, tweak admin options, attach your own hooks) via `collectionOverrides` without forking — the plugin's hooks and access are merged, not clobbered (supersedes the deprecated `extraReservationFields`)
 - **Services ↔ Resources Join** — Services show a read-only `resources` field (a `join` over `Resources.services`) listing which resources currently perform them; assignment still happens on the Resource
-- **Active Enforcement** — `active: false` on a Service or Resource — including one referenced by a multi-resource `items[]` entry — now blocks new/changed bookings against it and excludes it from availability; opt out with `enforceActive: false`
+- **Active Enforcement** — `active: false` on a Service or Resource — including one referenced by a multi-resource `items[]` entry — blocks new bookings against it, blocks rescheduling or re-pointing an existing booking onto it, and excludes it from availability; non-scheduling edits such as confirm and cancel always remain allowed, and `enforceActive: false` opts out entirely
 - **Cancellation Policy** — Configurable minimum notice period enforcement
 - **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems
 - **Availability Service** — Pure functions and DB helpers for slot generation (15-min step) and conflict checking with guest-count-aware filtering
@@ -343,6 +343,8 @@ If a `collectionOverrides.resources` override removes, renames, or nests `servic
 #### `joins: false` on hot paths
 
 Payload join fields resolve via a DB-level aggregation (`$lookup`) and ignore `depth`, so every internal `findByID` the plugin makes on Services now passes `joins: false` to avoid that extra query cost. If your own code reads Services on a hot path, consider doing the same — `payload.findByID({ collection: 'services', id, joins: false })`.
+
+One path still pays for the join: when a Reservation is read at `depth >= 1`, Payload populates its `service` relationship through the internal dataloader, which offers no `joins: false` seam from plugin code. If that shows up in your profiles, read Reservations with `depth: 0` and fetch the service yourself.
 
 ---
 
