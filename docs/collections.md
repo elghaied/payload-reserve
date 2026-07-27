@@ -2,7 +2,7 @@
 
 Schemas for all five collections created by the plugin.
 
-Any of these collections can be customized — fields, hooks, access — via the `collectionOverrides` plugin option (for example, adding a `join` field on Services back to Resources). See [Configuration → `collectionOverrides`](./configuration.md) and [Advanced](./advanced.md).
+Any of these collections can be customized — fields, hooks, access — via the `collectionOverrides` plugin option (for example, adding a `join` field on Reservations back to an Invoices or Payments collection you maintain for billing). See [Configuration → `collectionOverrides`](./configuration.md) and [Advanced](./advanced.md).
 
 ## Services
 
