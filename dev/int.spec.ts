@@ -2756,6 +2756,61 @@ describe('Reservation plugin - slots endpoint resource resolution', () => {
   })
 })
 
+describe('Reservation plugin - enforceActive threads through to endpoints', () => {
+  // Regression: nothing pinned that createGetSlotsEndpoint/createCheckAvailabilityEndpoint
+  // actually pass config.enforceActive through to getAvailableSlots — deleting that one
+  // wired line from either endpoint would still leave every other test green. Going
+  // through the real endpoint handler (not calling getAvailableSlots directly) is the
+  // point: it proves the plumbing, not just the pure function's own behaviour.
+  it('enforceActive: false yields slots for an inactive service via the endpoint', async () => {
+    const { createGetSlotsEndpoint } = await import('../src/endpoints/getSlots.js')
+
+    const inactiveSvc = await payload.create({
+      collection: col('services'),
+      data: { name: 'EA Inactive Service', active: false, duration: 60, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'EA Resource', active: true, services: [inactiveSvc.id] },
+    })
+    const allDaySlots = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({
+      day,
+      endTime: '17:00',
+      startTime: '09:00',
+    }))
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'EA Schedule',
+        active: true,
+        recurringSlots: allDaySlots,
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+    const date = '2033-08-01'
+
+    const qs = `date=${date}&resource=${resource.id}&service=${inactiveSvc.id}`
+    const callSlots = async (resolved: ReturnType<typeof resolveConfig>) => {
+      const ep = createGetSlotsEndpoint(resolved)
+      const res = await ep.handler(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { payload, url: `http://local/api/reserve/slots?${qs}` } as any,
+      )
+      return res.json()
+    }
+
+    // Default config (enforceActive: true) must still block the inactive service.
+    const enforced = await callSlots(resolveConfig({}))
+    expect(enforced.reason).toBe('service_inactive')
+    expect(enforced.slots).toEqual([])
+
+    // enforceActive: false must reach getAvailableSlots THROUGH the endpoint.
+    const unenforced = await callSlots(resolveConfig({ enforceActive: false }))
+    expect(unenforced.slots.length).toBeGreaterThan(0)
+  })
+})
+
 describe('Reservation plugin - multi-resource startTime span', () => {
   let svcId: string
   let primaryId: string

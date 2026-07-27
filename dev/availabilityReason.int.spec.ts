@@ -248,4 +248,21 @@ describe('getAvailableSlots - EmptyReason', () => {
     })
     expect(r.slots.length).toBeGreaterThan(0)
   })
+
+  // Regression: a resource id that no longer resolves (e.g. an admin deleted a
+  // Resource still referenced by a service's requiredResources, or a caller
+  // passed a stale/unknown id via ?resources=) must degrade the same way a
+  // resource with zero schedules always has — contributing no time windows —
+  // not throw payload's NotFound out of getAvailableSlots.
+  it('does not throw when a resource id no longer resolves (deleted resource)', async () => {
+    const deletable = await payload.create({
+      collection: col('resources'),
+      data: { name: 'AR Deletable Resource', active: true, services: [serviceId] },
+    })
+    await payload.delete({ id: deletable.id, collection: col('resources') })
+
+    const r = await getAvailableSlots({ ...base, resourceIds: [deletable.id] })
+    expect(r.reason).toBe('no_windows')
+    expect(r.slots).toEqual([])
+  })
 })

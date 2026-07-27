@@ -29,6 +29,7 @@ describe('Services.resources join — owner isolation (resourceOwnerMode)', () =
   let adminUser: CreatedUser
   let staffA: CreatedUser
   let sharedServiceId: number | string
+  let staffAResourceId: number | string
   let staffBResourceId: number | string
 
   beforeAll(async () => {
@@ -53,12 +54,13 @@ describe('Services.resources join — owner isolation (resourceOwnerMode)', () =
 
     // Owner is stamped by the resource's own beforeChange hook from req.user —
     // creating "as" staffA/staffB is how each resource ends up owned by them.
-    await payload.create({
+    const staffAResource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair A', quantity: 1, services: [sharedServiceId] },
       overrideAccess: false,
       user: staffA,
     })
+    staffAResourceId = staffAResource.id
     const staffBResource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair B', quantity: 1, services: [sharedServiceId] },
@@ -79,6 +81,10 @@ describe('Services.resources join — owner isolation (resourceOwnerMode)', () =
     const ids = (asA.resources as { docs: Array<{ id: unknown } | string> }).docs.map((d) =>
       String(typeof d === 'object' ? d.id : d),
     )
+    // Positive control: staffA must still see their OWN resource. Without this,
+    // an empty `docs: []` (a total join failure) would also satisfy the
+    // not-containing-staffB assertion below, masking a broken join as "isolated".
+    expect(ids).toContain(String(staffAResourceId))
     expect(ids).not.toContain(String(staffBResourceId))
   })
 
