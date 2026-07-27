@@ -201,6 +201,22 @@ export const payloadReserve =
       return config
     }
 
+    // The Services `resources` join is omitted when a collectionOverrides.resources
+    // override removed, renamed, or nested `services` inside a NAMED group/tab.
+    // hasResourceServicesField is only ever false because of such an override — the
+    // default Resources collection always carries the field — so this cannot fire
+    // spuriously. Warn rather than throw: restructuring your own collection is a
+    // supported customization, not invalid config.
+    if (!resolved.hasResourceServicesField) {
+      const hostOnInit = config.onInit
+      config.onInit = async (payload) => {
+        await hostOnInit?.(payload)
+        payload.logger.warn(
+          `payload-reserve: the "${resolved.slugs.services}" collection's read-only "resources" join was skipped because "${resolved.slugs.resources}.services" is not a top-level relationship field. A collectionOverrides.resources override removed, renamed, or nested it inside a named group or tab.`,
+        )
+      }
+    }
+
     // Register custom endpoints
     if (!config.endpoints) {config.endpoints = []}
     config.endpoints.push(

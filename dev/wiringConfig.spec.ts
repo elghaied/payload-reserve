@@ -1,6 +1,6 @@
 import type { Config } from 'payload'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createServicesCollection } from '../src/collections/Services.js'
 import { resolveConfig } from '../src/defaults.js'
@@ -323,5 +323,42 @@ describe('locale completeness', () => {
       ).sort()
       expect(keys, `locale ${locale} is missing keys`).toEqual(enKeys)
     }
+  })
+})
+
+describe('resources join gate warns at init', () => {
+  const dropServicesField = () =>
+    payloadReserve({
+      collectionOverrides: {
+        resources: {
+          fields: ({ defaultFields }) =>
+            defaultFields.filter((f) => !('name' in f && f.name === 'services')),
+        },
+      },
+    })
+
+  it('warns when resources.services was overridden away', async () => {
+    const config = dropServicesField()(minimalConfig())
+    const warn = vi.fn()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await config.onInit!({ logger: { warn } } as any)
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/join was skipped/i))
+  })
+
+  it('awaits the host onInit before warning', async () => {
+    const calls: string[] = []
+    const hostConfig = minimalConfig()
+    // eslint-disable-next-line @typescript-eslint/require-await
+    hostConfig.onInit = async () => {
+      calls.push('host')
+    }
+    const config = dropServicesField()(hostConfig)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await config.onInit!({ logger: { warn: () => calls.push('warn') } } as any)
+    expect(calls).toEqual(['host', 'warn'])
+  })
+
+  it('leaves onInit alone when the field is present', () => {
+    expect(payloadReserve({})(minimalConfig()).onInit).toBeUndefined()
   })
 })
