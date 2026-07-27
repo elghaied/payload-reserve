@@ -234,6 +234,36 @@ describe('getAvailableSlots - EmptyReason', () => {
     expect(r).toEqual({ reason: 'all_slots_taken', slots: [] })
   })
 
+  it('reports window_too_short when no window is long enough for the service', async () => {
+    const longService = await payload.create({
+      collection: col('services'),
+      data: { name: 'AR Long Service', active: true, duration: 90, durationType: 'fixed' },
+    })
+    const shortShiftResource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'AR Short Shift Resource', active: true, services: [longService.id] },
+    })
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'AR Short Shift Schedule',
+        active: true,
+        recurringSlots: [{ day: 'mon', endTime: '10:00', startTime: '09:00' }],
+        resource: shortShiftResource.id,
+        scheduleType: 'recurring',
+      },
+    })
+
+    // A 90-minute service never fits a 60-minute window, so no candidate slot
+    // is ever generated — nothing was "taken", the shift is simply too short.
+    const r = await getAvailableSlots({
+      ...base,
+      resourceIds: [shortShiftResource.id],
+      serviceId: longService.id,
+    })
+    expect(r).toEqual({ reason: 'window_too_short', slots: [] })
+  })
+
   it('omits reason when slots are returned', async () => {
     const r = await getAvailableSlots(base)
     expect(r.slots.length).toBeGreaterThan(0)

@@ -412,6 +412,10 @@ export async function checkAvailability(params: {
  * `no_active_schedules` and `date_excepted` are deliberately absent: they are
  * per-resource `skip` traces inside a loop, not return points — they funnel
  * into `no_windows` — and stay debug-only.
+ *
+ * `window_too_short` is reachable only from the general (non-full-day) branch:
+ * the full-day branch returns `no_windows` before it, so it always has at least
+ * one candidate.
  */
 export type EmptyReason =
   | 'all_slots_taken'
@@ -420,6 +424,7 @@ export type EmptyReason =
   | 'no_windows'
   | 'resource_inactive'
   | 'service_inactive'
+  | 'window_too_short'
 
 export async function getAvailableSlots(params: {
   blockingStatuses: string[]
@@ -704,7 +709,13 @@ export async function getAvailableSlots(params: {
     returnedCount: availableSlots.length,
   })
   return {
-    ...(availableSlots.length === 0 ? { reason: 'all_slots_taken' as const } : {}),
+    ...(availableSlots.length === 0
+      ? {
+          reason: (candidatesGenerated === 0
+            ? 'window_too_short'
+            : 'all_slots_taken') as EmptyReason,
+        }
+      : {}),
     slots: availableSlots,
   }
 }
