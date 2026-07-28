@@ -47,7 +47,12 @@ export const calculateEndTime =
 
     const items = resolveReservationItems(merged)
 
-    if (items.length <= 1) {
+    // Branch on REAL items only. A synthesised parent item (B1) must not flip a
+    // single-resource booking onto the multi-resource path — that would change
+    // which code computes endTime, which this fix deliberately does not touch.
+    const realItemCount = items.filter((i) => !i.fromParent).length
+
+    if (realItemCount <= 1) {
       // Single-resource: compute top-level endTime
       const serviceId = extractId(merged.service)
 

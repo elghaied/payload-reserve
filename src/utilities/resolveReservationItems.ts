@@ -2,6 +2,8 @@ import { ValidationError } from 'payload'
 
 export type ResolvedItem = {
   endTime: string
+  /** True when this item was synthesised from the top-level resource/startTime. */
+  fromParent?: boolean
   guestCount: number
   resource: number | string
   service?: number | string
@@ -72,6 +74,35 @@ export function resolveReservationItems(data: Record<string, unknown>): Resolved
         resource,
         service: extractId(item.service) ?? extractId(data.service),
         startTime,
+      })
+    }
+
+    // The stored row occupies its top-level `resource` for every OTHER booking's
+    // conflict check (buildCoarseOverlapQuery matches top level OR items[]), so
+    // it must occupy it for its own check too. Skipped whenever an items[] entry
+    // already targets the same resource — that entry's own window already
+    // accounts for the occupancy. Dedup is by resource id, not an exact
+    // (resource, startTime) match: calculateEndTime's multi-resource branch can
+    // overwrite the top-level startTime/endTime to span every item, so by the
+    // time this function runs a second time (e.g. from validateConflicts), the
+    // top-level startTime is no longer reliably the parent resource's own
+    // window — matching on id alone stays correct regardless.
+    const parentResource = extractId(data.resource)
+    const parentStart = data.startTime as string
+    const parentAlreadyItemized = resolved.some((item) => item.resource === parentResource)
+    if (
+      parentResource !== undefined &&
+      parentResource !== '' &&
+      parentStart &&
+      !parentAlreadyItemized
+    ) {
+      resolved.push({
+        endTime: data.endTime as string,
+        fromParent: true,
+        guestCount: (data.guestCount as number) ?? 1,
+        resource: parentResource,
+        service: extractId(data.service),
+        startTime: parentStart,
       })
     }
 

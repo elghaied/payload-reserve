@@ -89,7 +89,9 @@ export const validateActive =
         continue
       }
 
-      const prefix = hasItemsArray ? `items.${index}.` : ''
+      // A synthesised parent item (B1) has no items[] index — report it against
+      // the top-level field instead of a path that does not exist.
+      const prefix = hasItemsArray && !item.fromParent ? `items.${index}.` : ''
 
       for (const [kind, id, slug, key] of [
         ['service', serviceId, config.slugs.services, 'errorServiceInactive'],

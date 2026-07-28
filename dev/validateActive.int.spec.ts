@@ -332,4 +332,73 @@ describe('validateActive hook', () => {
     })
     expect(updated.notes).toBe('benign edit on a malformed row')
   })
+
+  it('conflict-checks the top-level resource when items[] omits it', async () => {
+    const service = await payload.create({
+      collection: 'services',
+      data: { name: 'Primary Check K', duration: 60, durationType: 'fixed' },
+    })
+    const primary = await payload.create({
+      collection: 'resources',
+      data: { name: 'Chair Primary K', quantity: 1 },
+    })
+    const secondary = await payload.create({
+      collection: 'resources',
+      data: { name: 'Chair Secondary K', quantity: 1 },
+    })
+    const startTime = future(120)
+
+    // Occupies `primary` at startTime.
+    await payload.create({
+      collection: 'reservations',
+      data: bookingFor(service, primary, { startTime }),
+    })
+
+    // items[] names only `secondary`, but the row still stores resource=primary
+    // — so it must be rejected for double-booking primary.
+    await expectValidationMessage(
+      payload.create({
+        collection: 'reservations',
+        data: {
+          customer: customerId,
+          items: [{ resource: secondary.id, startTime }],
+          resource: primary.id,
+          service: service.id,
+          startTime,
+        },
+      }),
+      // The actual rejection message is checkAvailability's capacity-exceeded
+      // wording ("All units are booked for this time" — AvailabilityService.ts),
+      // not a generic "conflict" string; broadened to match the real message.
+      /conflict|already|not available|booked/i,
+    )
+  })
+
+  it('keeps a single-item booking on the single-resource endTime path', async () => {
+    const service = await payload.create({
+      collection: 'services',
+      data: { name: 'EndTime Branch L', duration: 45, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: 'resources',
+      data: { name: 'Chair Branch L', quantity: 1 },
+    })
+    const startTime = future(200)
+
+    const created = await payload.create({
+      collection: 'reservations',
+      data: {
+        customer: customerId,
+        items: [{ resource: resource.id, startTime }],
+        resource: resource.id,
+        service: service.id,
+        startTime,
+      },
+    })
+
+    // 45-minute fixed service: endTime must be start + 45m, exactly as before B1.
+    expect(new Date(created.endTime as string).getTime()).toBe(
+      new Date(startTime).getTime() + 45 * 60_000,
+    )
+  })
 })
