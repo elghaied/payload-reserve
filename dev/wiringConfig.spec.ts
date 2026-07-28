@@ -379,7 +379,17 @@ describe('resources join gate warns at init', () => {
     expect(calls).toEqual(['host'])
   })
 
-  it('leaves onInit alone when the field is present', () => {
-    expect(payloadReserve({})(minimalConfig()).onInit).toBeUndefined()
+  it('does not warn when the field is present and no tenant scoping applies', async () => {
+    // onInit is now always installed (D2's tenant-scoping check must run at init
+    // on every install, since tenant fields don't exist yet at plugin time), but
+    // a clean default install must still produce zero diagnostic noise.
+    const config = payloadReserve({})(minimalConfig())
+    const warn = vi.fn()
+    await config.onInit!({
+      config: { collections: config.collections },
+      logger: { warn },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    expect(warn).not.toHaveBeenCalled()
   })
 })

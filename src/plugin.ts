@@ -21,6 +21,7 @@ import { createResourceAvailabilityEndpoint } from './endpoints/resourceAvailabi
 import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
 import { type PluginT, translations } from './translations/index.js'
 import { applyCollectionOverride } from './utilities/collectionOverrides.js'
+import { collectionHasTenantField } from './utilities/tenantFilter.js'
 
 /**
  * All named field paths reachable from a field list, descending through
@@ -206,24 +207,52 @@ export const payloadReserve =
       return config
     }
 
-    // The Services `resources` join is omitted when a collectionOverrides.resources
-    // override removed, renamed, or nested `services` inside a NAMED group/tab.
-    // hasResourceServicesField is only ever false because of such an override — the
-    // default Resources collection always carries the field — so this cannot fire
-    // spuriously. Warn rather than throw: restructuring your own collection is a
-    // supported customization, not invalid config.
-    if (!resolved.hasResourceServicesField) {
-      const hostOnInit = config.onInit
-      config.onInit = async (payload) => {
-        await hostOnInit?.(payload)
-        try {
+    // Boot diagnostics. ONE wrapper for all of them so a second condition can
+    // never double-wrap onInit. Each check is evaluated at init, not here:
+    // payloadReserve runs BEFORE multi-tenant, so at plugin time no tenant
+    // field exists on anything yet.
+    const hostOnInit = config.onInit
+    config.onInit = async (payload) => {
+      await hostOnInit?.(payload)
+      try {
+        // The Services `resources` join is omitted when a collectionOverrides.resources
+        // override removed, renamed, or nested `services` inside a NAMED group/tab.
+        // hasResourceServicesField is only ever false because of such an override —
+        // the default Resources collection always carries the field — so this cannot
+        // fire spuriously. Warn rather than throw: restructuring your own collection
+        // is a supported customization, not invalid config.
+        if (!resolved.hasResourceServicesField) {
           payload.logger.warn(
             `payload-reserve: the "${resolved.slugs.services}" collection's read-only "resources" join was skipped because "${resolved.slugs.resources}.services" is not a top-level relationship field. A collectionOverrides.resources override removed, renamed, or nested it inside a named group or tab.`,
           )
-        } catch {
-          // A diagnostic must never break boot — that is the whole reason this
-          // is a warning and not a throw.
         }
+
+        // Multi-tenant only scopes collections listed in ITS OWN `collections`
+        // option, and stays silent about slugs you never listed. So a consumer
+        // can enable multi-tenant, forget these collections, and get no signal
+        // while every booking stays globally readable.
+        const tenantField = resolved.multiTenant.tenantField
+        const all = (payload.config.collections ?? []) as Array<{ fields?: unknown[]; slug: string }>
+        const scoped = all.filter((c) => collectionHasTenantField(c, tenantField))
+        if (scoped.length > 0) {
+          const unscoped = [
+            resolved.slugs.reservations,
+            resolved.slugs.resources,
+            resolved.slugs.schedules,
+            resolved.slugs.services,
+          ].filter((slug) => {
+            const collection = all.find((c) => c.slug === slug)
+            return collection && !collectionHasTenantField(collection, tenantField)
+          })
+          if (unscoped.length > 0) {
+            payload.logger.warn(
+              `payload-reserve: these collections are NOT tenant-scoped: ${unscoped.join(', ')}. Other collections in this config carry a "${tenantField}" field, so multi-tenancy appears to be enabled — add these slugs to the multi-tenant plugin's "collections" option, or every booking stays readable across tenants.`,
+            )
+          }
+        }
+      } catch {
+        // A diagnostic must never break boot — that is the whole reason these
+        // are warnings and not throws. The host onInit await stays OUTSIDE.
       }
     }
 
