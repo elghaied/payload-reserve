@@ -24,6 +24,31 @@ import { applyCollectionOverride } from './utilities/collectionOverrides.js'
 import { collectionHasTenantField } from './utilities/tenantFilter.js'
 
 /**
+ * The array field `@payloadcms/plugin-multi-tenant` pushes onto the admin users
+ * collection to hold a user's tenant memberships. Its own default
+ * (`plugin-multi-tenant/dist/defaults.js`); consumers can rename it, which is
+ * one of the blind spots the boot diagnostic's comment calls out.
+ */
+const MT_TENANTS_ARRAY_FIELD = 'tenants'
+
+/** True if the collection has a top-level `array` field named `fieldName`. */
+function collectionHasArrayField(
+  collection: { fields?: unknown[] } | null | undefined,
+  fieldName: string,
+): boolean {
+  if (!collection || !Array.isArray(collection.fields)) {
+    return false
+  }
+  return collection.fields.some((f) => {
+    if (typeof f !== 'object' || f === null) {
+      return false
+    }
+    const field = f as { name?: string; type?: string }
+    return field.name === fieldName && field.type === 'array'
+  })
+}
+
+/**
  * All named field paths reachable from a field list, descending through
  * presentational containers (tabs, rows, collapsibles, unnamed groups) that
  * don't create their own data nesting — so dedup catches a field declared
@@ -231,22 +256,53 @@ export const payloadReserve =
         // option, and stays silent about slugs you never listed. So a consumer
         // can enable multi-tenant, forget these collections, and get no signal
         // while every booking stays globally readable.
+        //
+        // Detecting "multi-tenant is enabled" is a HEURISTIC — the plugin
+        // exposes nothing at init to check directly — so we look for two
+        // independent traces of it and warn if EITHER shows up. Each covers the
+        // other's blind spot:
+        //   1. some collection carries a top-level `tenantField`. Misses the
+        //      consumer who scoped ONLY this plugin's collections and forgot
+        //      every one of them, leaving nothing else with the field.
+        //   2. an auth collection carries multi-tenant's `tenants` membership
+        //      array. Misses installs that set
+        //      `tenantsArrayField.includeDefaultField: false` or renamed it.
+        // Neither is exact, and the union can still fire on a config that
+        // merely looks tenant-shaped — hence a warning, never a throw.
         const tenantField = resolved.multiTenant.tenantField
-        const all = (payload.config.collections ?? []) as Array<{ fields?: unknown[]; slug: string }>
+        const all = (payload.config.collections ?? []) as Array<{
+          auth?: unknown
+          fields?: unknown[]
+          slug: string
+        }>
         const scoped = all.filter((c) => collectionHasTenantField(c, tenantField))
-        if (scoped.length > 0) {
-          const unscoped = [
+        const hasMembershipArray = all.some(
+          (c) => Boolean(c.auth) && collectionHasArrayField(c, MT_TENANTS_ARRAY_FIELD),
+        )
+        if (scoped.length > 0 || hasMembershipArray) {
+          const candidates = [
             resolved.slugs.reservations,
             resolved.slugs.resources,
             resolved.slugs.schedules,
             resolved.slugs.services,
-          ].filter((slug) => {
+          ]
+          // Standalone mode only. `customers` is then a plugin-generated auth
+          // collection holding the PII that customer-search reads, so leaving it
+          // unscoped leaks every tenant's customers — the case most worth
+          // catching. Under `userCollection` that slug points at the HOST's auth
+          // collection, which multi-tenant scopes via the `tenants` membership
+          // array rather than a flat field, so checking it would always
+          // false-positive.
+          if (!resolved.userCollection) {
+            candidates.push(resolved.slugs.customers)
+          }
+          const unscoped = candidates.filter((slug) => {
             const collection = all.find((c) => c.slug === slug)
             return collection && !collectionHasTenantField(collection, tenantField)
           })
           if (unscoped.length > 0) {
             payload.logger.warn(
-              `payload-reserve: these collections are NOT tenant-scoped: ${unscoped.join(', ')}. Other collections in this config carry a "${tenantField}" field, so multi-tenancy appears to be enabled — add these slugs to the multi-tenant plugin's "collections" option, or every booking stays readable across tenants.`,
+              `payload-reserve: these collections are NOT tenant-scoped: ${unscoped.join(', ')}. This config looks like it enables multi-tenancy (another collection carries a "${tenantField}" field, or an auth collection carries a "${MT_TENANTS_ARRAY_FIELD}" membership array) — detection is a heuristic, so disregard this if you are not using multi-tenancy. Otherwise add these slugs to the multi-tenant plugin's "collections" option, or their documents stay readable across tenants.`,
             )
           }
         }

@@ -341,7 +341,7 @@ describe('resources join gate warns at init', () => {
     const config = dropServicesField()(minimalConfig())
     const warn = vi.fn()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await config.onInit!({ logger: { warn } } as any)
+    await config.onInit!({ config: { collections: [] }, logger: { warn } } as any)
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/join was skipped/i))
   })
 
@@ -353,8 +353,11 @@ describe('resources join gate warns at init', () => {
       calls.push('host')
     }
     const config = dropServicesField()(hostConfig)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await config.onInit!({ logger: { warn: () => calls.push('warn') } } as any)
+    await config.onInit!({
+      config: { collections: [] },
+      logger: { warn: () => calls.push('warn') },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
     expect(calls).toEqual(['host', 'warn'])
   })
 
@@ -368,6 +371,7 @@ describe('resources join gate warns at init', () => {
     const config = dropServicesField()(hostConfig)
     await expect(
       config.onInit!({
+        config: { collections: [] },
         logger: {
           warn: () => {
             throw new Error('logger exploded')
