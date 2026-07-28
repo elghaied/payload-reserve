@@ -193,7 +193,18 @@ const buildConfigWithMemoryDB = async () => {
   if (MT) {
     plugins.push(
       multiTenantPlugin({
-        collections: { reservations: {}, resources: {}, schedules: {}, services: {} },
+        // `customers` is listed because this dev config runs payloadReserve in
+        // STANDALONE mode (no userCollection), so `customers` is a
+        // plugin-generated auth collection holding PII. Leaving it out would
+        // make /api/reservation-customer-search return every tenant's
+        // customers — and the boot diagnostic now says so.
+        collections: {
+          customers: {},
+          reservations: {},
+          resources: {},
+          schedules: {},
+          services: {},
+        },
         tenantsArrayField: { includeDefaultField: false },
         userHasAccessToAllTenants: (user) => Boolean((user as { superAdmin?: boolean })?.superAdmin),
       }),
