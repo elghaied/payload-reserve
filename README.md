@@ -408,10 +408,25 @@ payloadReserve({
 
 ### Endpoints enforce collection access control
 
-The public endpoints that read or write reservation data — `/api/reservation-customer-search`, `/api/reserve/resource-availability`, `/api/reserve/cancel`, and `/api/reserve/effective-timezone` — now go through Payload's normal access-control pipeline (`overrideAccess: false` + `req`) instead of reading privileged.
+Four endpoints now gate the request through Payload's normal access-control pipeline (`overrideAccess: false` + `req`) instead of reading privileged. The governing rule is **gate the request with one explicit access-checked call, then keep the derived reads privileged** — an endpoint authorizes *what you asked for*, and once you are past that gate it still assembles a complete answer. So this is deliberately a per-path change, not a blanket flip:
+
+| Endpoint | What delegates to access control | What stays privileged | Why |
+|---|---|---|---|
+| `/api/reservation-customer-search` | the customer query itself | — | The whole endpoint is the read; nothing is derived from it. |
+| `/api/reserve/resource-availability` | a `findByID` probe of the requested resource (404 on denial) | the four reads that build the grid (schedules, reservations, services, resources) | The probe decides *whether you may see this resource*. The grid must then show every conflicting booking, including other tenants' and other owners' — a busy slot you can't see is a double-booking. |
+| `/api/reserve/cancel` | the update, **only** on the privileged-non-owner path | the reservation read, and the update on the owner and guest-token paths | For a guest the cancellation token *is* the authorization. For an owner, `resourceOwnerMode`'s `update: adminOnly` would otherwise block a customer cancelling their own booking. Ownership and token matching are checked in the endpoint before either path is taken. |
+| `/api/reserve/effective-timezone` | the tenant-document read (falls back to the global zone on denial) | — | Prevents a forged tenant cookie resolving a zone you have no membership in. |
 
 - **Plain installs** (no `resourceOwnerMode`, no `multiTenant`, and no custom `access` overrides) are unaffected: Payload's own built-in default is `read: ({ req: { user } }) => Boolean(user)`, so any authenticated user still passes.
 - **A `userCollection` with a restrictive `read` rule now narrows customer search accordingly.** If the existing auth collection you pointed `userCollection` at defines its own `access.read` — for example, one that scopes a user to their own record or to a department — `/api/reservation-customer-search` now respects it, because the endpoint no longer out-permissions the collection it reads from. If staff stop seeing customers they used to see, the fix is in that collection's own `access.read`, not in the plugin.
+
+#### `/api/reserve/book` is intentionally **not** access-checked
+
+`POST /api/reserve/book` still calls `payload.create` privileged, by design: anonymous guest bookings have no `req.user` to authorize, and under `resourceOwnerMode` a `create: adminOnly` rule would block an authenticated customer booking for themselves. It needs the same per-path treatment `/api/reserve/cancel` got, which is its own piece of work.
+
+> **Known limitation.** Because the create is privileged, under `multiTenant` an authenticated caller belonging to tenant A can `POST` an explicit `tenant: <tenant-B-id>` in the request body and have the reservation land in tenant B. The multi-tenant plugin's tenant-field `validate` only checks that a value is present, and its membership-checked `defaultValue` applies only when no value was supplied. If you expose this endpoint to untrusted authenticated users in a multi-tenant install, strip or pin `tenant` in a `beforeBookingCreate` hook until this is fixed.
+
+The reservations collection's own REST API (`POST /api/reservations`) is unaffected — it goes through Payload's access control as normal.
 
 ### `resourceOwnerMode`: the availability grid now matches the Resources collection
 
@@ -435,17 +450,29 @@ The admin Calendar's grid instants, click targets, day-key sequences, and month/
 plugins: [
   payloadReserve({ /* ... */ }),
   multiTenantPlugin({
-    collections: { reservations: {}, resources: {}, schedules: {}, services: {} },
+    collections: {
+      // `customers` only exists in standalone mode (no `userCollection`).
+      // Leaving it out means /api/reservation-customer-search keeps
+      // returning every tenant's customers — there is no tenant field for
+      // it to filter on.
+      customers: {},
+      reservations: {},
+      resources: {},
+      schedules: {},
+      services: {},
+    },
     // ...
   }),
 ]
 ```
 
-At `payloadReserve`'s own plugin-time no tenant field exists on any collection yet (multi-tenant hasn't run), and multi-tenant only ever scopes the collections named in its own `collections` option — it never discovers them. So if you enable multi-tenant elsewhere in your config but forget to list payload-reserve's collections there, bookings silently stay readable across every tenant. The plugin now detects this at boot and logs a warning naming the unscoped slugs, but only when *other* collections in your config already carry the tenant field (i.e., multi-tenancy is clearly active elsewhere):
+At `payloadReserve`'s own plugin-time no tenant field exists on any collection yet (multi-tenant hasn't run), and multi-tenant only ever scopes the collections named in its own `collections` option — it never discovers them. So if you enable multi-tenant elsewhere in your config but forget to list payload-reserve's collections there, those documents silently stay readable across every tenant. The plugin now detects this at boot and logs a warning naming the unscoped slugs:
 
 ```
-payload-reserve: these collections are NOT tenant-scoped: reservations, resources, schedules, services. Other collections in this config carry a "tenant" field, so multi-tenancy appears to be enabled — add these slugs to the multi-tenant plugin's "collections" option, or every booking stays readable across tenants.
+payload-reserve: these collections are NOT tenant-scoped: reservations, resources, schedules, services, customers. This config looks like it enables multi-tenancy (another collection carries a "tenant" field, or an auth collection carries a "tenants" membership array) — detection is a heuristic, so disregard this if you are not using multi-tenancy. Otherwise add these slugs to the multi-tenant plugin's "collections" option, or their documents stay readable across tenants.
 ```
+
+Detection is a **heuristic** — the multi-tenant plugin exposes nothing at init to check directly — so the warning arms on either of two independent signals: some collection in your config carries a top-level tenant field, or an auth collection carries multi-tenant's `tenants` membership array. Each covers the other's blind spot (scoping *only* these collections and forgetting them all leaves nothing else carrying the field; `tenantsArrayField.includeDefaultField: false` removes the array). Neither is exact, so the warning can fire on a config that merely looks tenant-shaped — it is only ever a warning and never blocks boot.
 
 ---
 
