@@ -10,6 +10,7 @@ import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 import {
   dayKeySequence,
   displayDateForDayKey,
+  gridInstant,
   instantAtHour,
   monthGridStartDayKey,
   startOfWeekDayKey,
@@ -107,15 +108,6 @@ function computeHourWindow(
     }
   }
   return { endHour: Math.min(endHour, 24), startHour: Math.max(startHour, 0) }
-}
-
-/**
- * Instant of `hour`:00 on `dayKey` in the BUSINESS timezone, tolerating the
- * hour 24 that `computeHourWindow` can return: 24 is not a wall-clock time, it
- * means midnight starting the following day, so carry it onto the next day key.
- */
-function gridInstant(dayKey: string, hour: number, timeZone: string): Date {
-  return instantAtHour(addDaysToDayKey(dayKey, Math.floor(hour / 24)), hour % 24, timeZone)
 }
 
 export const CalendarView: React.FC<AdminViewServerProps> = () => {
@@ -338,7 +330,10 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         limit: String(MAX_LIST_LIMIT),
         sort: 'startTime',
         'where[startTime][greater_than_equal]': rangeStart.toISOString(),
-        'where[startTime][less_than_equal]': rangeEnd.toISOString(),
+        // rangeEnd is exclusive (midnight starting the day after the last
+        // rendered day), so the bound must be too — a reservation starting
+        // exactly at that midnight belongs to the next span, not this one.
+        'where[startTime][less_than]': rangeEnd.toISOString(),
         ...reservationTenantParams,
       })
       const response = await fetch(`${apiUrl}?${params}`)
@@ -1289,16 +1284,35 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     )
   }
 
+  // The header must name the same span the grid renders, so it resolves the
+  // month/week in the BUSINESS zone exactly as renderMonthView/renderWeekView do.
+  // Deriving it from viewer-zone Date math instead lets the label drift a day —
+  // and, at a week boundary, a whole week — away from the cells below it.
   const dateLabel = useMemo(() => {
     if (viewMode === 'month') {
-      return currentDate.toLocaleDateString([], { month: 'long', year: 'numeric' })
+      return currentDate.toLocaleDateString([], {
+        month: 'long',
+        timeZone: reservationTimezone,
+        year: 'numeric',
+      })
     }
     if (viewMode === 'week') {
-      const startOfWeek = new Date(currentDate)
-      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
-      const endOfWeek = new Date(startOfWeek)
-      endOfWeek.setDate(endOfWeek.getDate() + 6)
-      return `${startOfWeek.toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: reservationTimezone })} - ${endOfWeek.toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: reservationTimezone, year: 'numeric' })}`
+      const startKey = startOfWeekDayKey(getDayKeyInTimezone(currentDate, reservationTimezone))
+      const start = displayDateForDayKey(startKey, reservationTimezone).toLocaleDateString([], {
+        day: 'numeric',
+        month: 'short',
+        timeZone: reservationTimezone,
+      })
+      const end = displayDateForDayKey(
+        addDaysToDayKey(startKey, 6),
+        reservationTimezone,
+      ).toLocaleDateString([], {
+        day: 'numeric',
+        month: 'short',
+        timeZone: reservationTimezone,
+        year: 'numeric',
+      })
+      return `${start} - ${end}`
     }
     return currentDate.toLocaleDateString([], {
       day: 'numeric',

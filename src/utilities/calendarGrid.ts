@@ -51,6 +51,20 @@ export function instantAtHour(dayKey: string, hour: number, timeZone: string): D
 }
 
 /**
+ * Like `instantAtHour`, but tolerates the exclusive end hour a grid window can
+ * carry: hour 24 is not a wall-clock time (`combineDayKeyAndTime` rejects
+ * "24:00"), it means midnight starting the FOLLOWING day, so carry it onto the
+ * next day key.
+ *
+ * The carry is deliberately a day-key increment rather than `+24h` on the day's
+ * start: on a DST-transition day the grid spans 23 or 25 real hours, and only
+ * re-resolving midnight in the business zone lands on the right instant.
+ */
+export function gridInstant(dayKey: string, hour: number, timeZone: string): Date {
+  return instantAtHour(addDaysToDayKey(dayKey, Math.floor(hour / 24)), hour % 24, timeZone)
+}
+
+/**
  * A Date safe to hand to Intl for rendering `dayKey`'s calendar date.
  *
  * Noon is deliberate: far enough from both midnights that formatting it back
