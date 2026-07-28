@@ -75,6 +75,23 @@ describe('calendarGrid — instants are built in the BUSINESS zone', () => {
     }
   })
 
+  it('renders as noon, not midnight, in the business zone', () => {
+    // The date-only round-trip above can't tell noon from midnight apart —
+    // both land on the same calendar day. Pin the wall-clock hour directly;
+    // 2026-11-01 is the US fall-back date, so this also can't be faked with
+    // an elapsed-milliseconds check (midnight->noon is 13h in LA that day).
+    for (const zone of [LA, AKL]) {
+      for (const key of ['2026-01-01', '2026-06-15', '2026-11-01']) {
+        const hour = new Intl.DateTimeFormat('en-GB', {
+          hour: '2-digit',
+          hourCycle: 'h23',
+          timeZone: zone,
+        }).format(displayDateForDayKey(key, zone))
+        expect(hour).toBe('12')
+      }
+    }
+  })
+
   it('handles a spring-forward day without drifting', () => {
     // US DST begins 2026-03-08. 02:00 does not exist locally.
     const before = instantAtHour('2026-03-08', 1, LA)

@@ -53,8 +53,14 @@ export function instantAtHour(dayKey: string, hour: number, timeZone: string): D
 /**
  * A Date safe to hand to Intl for rendering `dayKey`'s calendar date.
  *
- * Noon is deliberate: far enough from both midnights that formatting with any
- * timeZone can never render the adjacent date, DST included.
+ * Noon is deliberate: far enough from both midnights that formatting it back
+ * with the SAME `timeZone` it was built with can never render the adjacent
+ * date, DST included — which is how every caller in this codebase uses it
+ * (construct and format in the one business zone). The margin is only ±12h
+ * from that zone's own offset, not unconditional: formatting in a *different*
+ * zone whose offset differs from `timeZone`'s by more than ~12h (e.g. noon
+ * built in Pacific/Auckland, UTC+12/+13, formatted in a UTC-11 zone) can still
+ * land on the adjacent day.
  */
 export function displayDateForDayKey(dayKey: string, timeZone: string): Date {
   return combineDayKeyAndTime(dayKey, '12:00', timeZone)
