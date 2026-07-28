@@ -303,6 +303,26 @@ export function createResourceAvailabilityEndpoint(
         return Response.json({ error: 'Date range too large (max 90 days)' }, { status: 400 })
       }
 
+      // Authorization boundary. Delegating to collection access here is what
+      // makes owner-mode ownership AND multi-tenant isolation apply — the four
+      // reads inside buildResourceAvailability deliberately stay privileged so
+      // the busy grid stays complete (see the spec, A4). depth:0 is required:
+      // at depth 1 an access-denied `services` relationship populates as null
+      // and the requiredResources loop throws on `typeof null === 'object'`.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const permitted = await (req.payload.findByID as any)({
+        id: resource,
+        collection: config.slugs.resources,
+        depth: 0,
+        overrideAccess: false,
+        req,
+      }).catch(() => null)
+
+      if (!permitted) {
+        dbg.dbg('response', { endpoint: 'resource-availability', reason: 'resource_not_found' })
+        return Response.json({ error: 'Resource not found' }, { status: 404 })
+      }
+
       // In multiTenant mode, resolve day-boundaries in the SELECTED tenant's zone
       // (tenant timezone → global → UTC). Degrades to the global zone for plain
       // installs: no tenant relationship on reservations / no tenant cookie ⇒ no
