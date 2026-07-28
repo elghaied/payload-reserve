@@ -1,5 +1,7 @@
 import { ValidationError } from 'payload'
 
+import { doRangesOverlap } from './slotUtils.js'
+
 export type ResolvedItem = {
   endTime: string
   /** True when this item was synthesised from the top-level resource/startTime. */
@@ -13,7 +15,11 @@ export type ResolvedItem = {
 /**
  * Normalize reservation data into a list of resource-level items.
  *
- * - If items[] is populated -> return items (filling defaults from parent).
+ * - If items[] is populated -> return items (filling defaults from parent), then
+ *   append a synthesised item for the top-level resource/startTime/endTime UNLESS
+ *   an items[] entry can already be shown to cover that same window (see B1 in
+ *   the synthesis step below) — this is what makes the top-level `resource`
+ *   conflict-checked even when items[] never names it.
  *   Items missing startTime or resource throw a ValidationError.
  *   Duplicate (resource, startTime) pairs throw a ValidationError.
  * - If items[] is empty/absent -> return single item from top-level fields
@@ -79,36 +85,63 @@ export function resolveReservationItems(data: Record<string, unknown>): Resolved
 
     // The stored row occupies its top-level `resource` for every OTHER booking's
     // conflict check (buildCoarseOverlapQuery matches top level OR items[]), so
-    // it must occupy it for its own check too. Skipped whenever an items[] entry
-    // already targets the same resource — that entry's own window already
-    // accounts for the occupancy. Dedup is by resource id, not an exact
-    // (resource, startTime) match: calculateEndTime's multi-resource branch can
-    // overwrite the top-level startTime/endTime to span every item, so by the
-    // time this function runs a second time (e.g. from validateConflicts), the
-    // top-level startTime is no longer reliably the parent resource's own
-    // window — matching on id alone stays correct regardless.
+    // it must occupy it for its own check too. Sharing a resource id with an
+    // items[] entry is NOT sufficient to skip synthesis — an items[] entry for
+    // the same resource at an unrelated time is a genuinely separate occupancy,
+    // and treating "same resource anywhere" as "already covered" reopens the
+    // exact double-booking class this function exists to close (a caller can
+    // list resource A at one time in items[] while the top-level fields book A
+    // at a completely different, uncovered time). Synthesis is skipped only
+    // when an items[] entry for the SAME resource can be shown to cover the
+    // SAME window:
+    //  (a) an exact startTime match — needs no endTime, so it still works when
+    //      this function runs before endTime is computed (validateActive and
+    //      calculateEndTime both call it before calculateEndTime has run); or
+    //  (b) both endTimes are known and the windows overlap — covers
+    //      calculateEndTime's multi-resource branch, which can overwrite the
+    //      top-level startTime/endTime to SPAN every item, so by the time this
+    //      function runs again (e.g. from validateConflicts) the parent's
+    //      window no longer starts at the same instant as any one item even
+    //      though that item's own window is fully contained in it.
+    // When neither can be shown, synthesize: a redundant-but-harmless extra
+    // check is far cheaper than a silently missed one.
     const parentResource = extractId(data.resource)
     const parentStart = data.startTime as string
-    // String-compare ids: a raw id (string for Mongo, number for Postgres) and a
-    // populated relationship's extracted `.id` should match even if one side
-    // came through as a different primitive type than the other.
-    const parentAlreadyItemized = resolved.some(
-      (item) => String(item.resource) === String(parentResource),
-    )
-    if (
-      parentResource !== undefined &&
-      parentResource !== '' &&
-      parentStart &&
-      !parentAlreadyItemized
-    ) {
-      resolved.push({
-        endTime: data.endTime as string,
-        fromParent: true,
-        guestCount: (data.guestCount as number) ?? 1,
-        resource: parentResource,
-        service: extractId(data.service),
-        startTime: parentStart,
+    const parentEnd = data.endTime as string | undefined
+
+    if (parentResource !== undefined && parentResource !== '' && parentStart) {
+      const parentAlreadyItemized = resolved.some((item) => {
+        // String-compare ids: a raw id (string for Mongo, number for Postgres)
+        // and a populated relationship's extracted `.id` should match even if
+        // one side came through as a different primitive type than the other.
+        if (String(item.resource) !== String(parentResource)) {
+          return false
+        }
+        if (item.startTime === parentStart) {
+          return true
+        }
+        return Boolean(
+          parentEnd &&
+            item.endTime &&
+            doRangesOverlap(
+              new Date(parentStart),
+              new Date(parentEnd),
+              new Date(item.startTime),
+              new Date(item.endTime),
+            ),
+        )
       })
+
+      if (!parentAlreadyItemized) {
+        resolved.push({
+          endTime: parentEnd as string,
+          fromParent: true,
+          guestCount: (data.guestCount as number) ?? 1,
+          resource: parentResource,
+          service: extractId(data.service),
+          startTime: parentStart,
+        })
+      }
     }
 
     return resolved

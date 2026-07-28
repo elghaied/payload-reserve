@@ -126,8 +126,7 @@ export const validateConflicts =
           errors: [
             {
               message: result.reason ?? (req.t as PluginT)('reservation:errorConflict'),
-              path:
-                items.length > 1 && !items[i].fromParent ? `items.${i}.startTime` : 'startTime',
+              path: items.length > 1 && !item.fromParent ? `items.${i}.startTime` : 'startTime',
             },
           ],
         })
