@@ -1,7 +1,8 @@
-import type { Endpoint, Payload, PayloadRequest } from 'payload'
+import type { Endpoint, Payload, PayloadRequest, Where } from 'payload'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { fetchDashboardStats } from '../src/components/DashboardWidget/fetchDashboardStats.js'
 import { buildCustomerScopedPayload } from './helpers/customerScopedPayload.js'
 
 // Reuses the customer-scoped harness: payloadReserve in standalone mode (so a
@@ -146,5 +147,118 @@ describe('cancel — privileged non-owner delegates to access control (A5)', () 
   it('allows a privileged caller in the reservation own tenant', async () => {
     const res = await cancelAs(staffA)
     expect(res.status).toBe(200)
+  })
+})
+
+describe('effective-timezone — tenant membership is enforced (A7)', () => {
+  let tzHandler: Endpoint['handler']
+
+  beforeAll(async () => {
+    tzHandler = endpoint('/reserve/effective-timezone')
+    await payload.update({
+      id: tenantB,
+      collection: 'tenants',
+      data: { timezone: 'Pacific/Auckland' } as Record<string, unknown>,
+    })
+  }, 60_000)
+
+  const timezoneFor = async (user: Record<string, unknown>, cookieTenant: string) => {
+    const req = {
+      headers: new Headers({ cookie: `payload-tenant=${cookieTenant}` }),
+      payload,
+      url: 'http://localhost:3000/api/reserve/effective-timezone',
+      user: { ...user, collection: 'users' },
+    } as unknown as PayloadRequest
+    const res = await tzHandler(req)
+    const body = (await res.json()) as { timeZone: string }
+    return body.timeZone
+  }
+
+  it('resolves the tenant zone for a member', async () => {
+    expect(await timezoneFor(staffB, tenantB)).toBe('Pacific/Auckland')
+  })
+
+  it('falls back to the global zone for a forged cookie', async () => {
+    expect(await timezoneFor(staffA, tenantB)).toBe('UTC')
+  })
+})
+
+describe('dashboard stats — aggregates scope to the caller (A6)', () => {
+  // A fixed absolute window, deliberately far from every other reservation in
+  // this file, so the counts cannot be polluted by neighbouring describes.
+  const START = '2027-05-04T10:00:00.000Z'
+  const WINDOW_FROM = '2027-05-04T00:00:00.000Z'
+  const WINDOW_TO = '2027-05-05T00:00:00.000Z'
+
+  let base: {
+    blockingStatuses: string[]
+    now: Date
+    payload: Payload
+    reservationsSlug: string
+    terminalStatuses: string[]
+    where: Where
+  }
+
+  beforeAll(async () => {
+    const service = await payload.create({
+      collection: 'services',
+      data: { name: 'Stats A', duration: 30, durationType: 'fixed', tenant: tenantA } as Record<
+        string,
+        unknown
+      >,
+    })
+    const customer = await payload.create({
+      collection: 'customers',
+      data: {
+        email: 'stats-a@test.com',
+        firstName: 'Stats',
+        lastName: 'A',
+        password: 'testpass123',
+        tenant: tenantA,
+      } as Record<string, unknown>,
+    })
+    await payload.create({
+      collection: 'reservations',
+      data: {
+        customer: customer.id,
+        resource: resourceA.id,
+        service: service.id,
+        startTime: START,
+        tenant: tenantA,
+      } as Record<string, unknown>,
+    })
+
+    base = {
+      blockingStatuses: ['pending', 'confirmed'],
+      now: new Date('2027-05-04T00:00:00.000Z'),
+      payload,
+      reservationsSlug: 'reservations',
+      terminalStatuses: ['completed', 'cancelled', 'no-show'],
+      where: { startTime: { greater_than_equal: WINDOW_FROM, less_than: WINDOW_TO } },
+    }
+  }, 60_000)
+
+  const statsFor = (user: Record<string, unknown>) =>
+    fetchDashboardStats({
+      ...base,
+      req: {
+        headers: new Headers(),
+        payload,
+        user: { ...user, collection: 'users' },
+      } as unknown as PayloadRequest,
+    })
+
+  it('counts the reservation for a caller in its tenant', async () => {
+    const stats = await statsFor(staffA)
+    expect(stats.total).toBe(1)
+    expect(stats.upcoming).toBe(1)
+    expect(stats.nextAppointment).toBeDefined()
+  })
+
+  it('counts nothing for a caller in another tenant', async () => {
+    const stats = await statsFor(staffB)
+    expect(stats.total).toBe(0)
+    expect(stats.upcoming).toBe(0)
+    expect(stats.nextAppointment).toBeUndefined()
   })
 })

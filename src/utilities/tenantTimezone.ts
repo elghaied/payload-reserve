@@ -1,4 +1,4 @@
-import type { Payload } from 'payload'
+import type { Payload, PayloadRequest } from 'payload'
 
 import { isValidTimezone } from './timezoneUtils.js'
 
@@ -60,12 +60,14 @@ export function tenantCollectionSlug(collection: CollectionLike, tenantField: st
 export async function getEffectiveTenantTimezone(args: {
   globalTimezone: string
   payload: Payload
+  req?: PayloadRequest
   scopedCollection: CollectionLike
   tenantField: string
   tenantId: null | string
   timezoneField: string
 }): Promise<string> {
-  const { globalTimezone, payload, scopedCollection, tenantField, tenantId, timezoneField } = args
+  const { globalTimezone, payload, req, scopedCollection, tenantField, tenantId, timezoneField } =
+    args
   if (!tenantId) {
     return resolveTenantTimezone({ globalTimezone })
   }
@@ -75,11 +77,16 @@ export async function getEffectiveTenantTimezone(args: {
   }
   let tenantTimezone: null | string = null
   try {
+    // The tenant id comes from a cookie, so the read must be access-checked —
+    // multi-tenant constrains its tenants collection by `id`, which turns this
+    // into a membership check. Without a req we cannot check, so stay privileged
+    // and let the caller's own gate apply.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tenant = await (payload.findByID as any)({
       id: tenantId,
       collection: tenantSlug,
       depth: 0,
+      ...(req ? { overrideAccess: false, req } : {}),
     })
     const raw = (tenant as null | Record<string, unknown>)?.[timezoneField]
     tenantTimezone = typeof raw === 'string' ? raw : null

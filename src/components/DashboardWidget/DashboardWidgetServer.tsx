@@ -11,6 +11,7 @@ import {
   getDayKeyInTimezone,
 } from '../../utilities/timezoneUtils.js'
 import styles from './DashboardWidget.module.css'
+import { fetchDashboardStats } from './fetchDashboardStats.js'
 
 export const DashboardWidgetServer = async (props: WidgetServerProps) => {
   const { req } = props
@@ -42,14 +43,13 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
     payload.config.admin?.custom?.reservationStatusMachine
   const blockingStatuses: string[] = statusMachine?.blockingStatuses ?? []
   const terminalStatuses: string[] = statusMachine?.terminalStatuses ?? []
-  const blockingSet = new Set(blockingStatuses)
-  const terminalSet = new Set(terminalStatuses)
 
   // "Today" is the business timezone's calendar day, not the server's — and in
   // multiTenant mode that's the SELECTED tenant's zone (tenant → global → UTC).
   const reservationTimezone: string = await getEffectiveTenantTimezone({
     globalTimezone: payload.config.admin?.custom?.reservationTimezone ?? 'UTC',
     payload,
+    req,
     scopedCollection: reservationsCollection as { fields?: unknown[] } | undefined,
     tenantField,
     tenantId,
@@ -70,51 +70,15 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
     Object.assign(where, tenantWhere)
   }
 
-  // Stats are computed with count queries rather than a capped fetch+filter,
-  // so they stay accurate past 100 reservations/day (review D7).
-  const blocking = Array.from(blockingSet)
-  const terminalArr = Array.from(terminalSet)
-  const countWhere = (extra?: Where): Where => (extra ? { and: [where, extra] } : where)
-
-  const [total, active, terminal, upcoming, nextResult] = await Promise.all([
-    payload.count({ collection: slugs.reservations, where }).then((r) => r.totalDocs),
-    blocking.length
-      ? payload
-          .count({ collection: slugs.reservations, where: countWhere({ status: { in: blocking } }) })
-          .then((r) => r.totalDocs)
-      : Promise.resolve(0),
-    terminalArr.length
-      ? payload
-          .count({
-            collection: slugs.reservations,
-            where: countWhere({ status: { in: terminalArr } }),
-          })
-          .then((r) => r.totalDocs)
-      : Promise.resolve(0),
-    blocking.length
-      ? payload
-          .count({
-            collection: slugs.reservations,
-            where: countWhere({
-              and: [{ status: { in: blocking } }, { startTime: { greater_than: now.toISOString() } }],
-            }),
-          })
-          .then((r) => r.totalDocs)
-      : Promise.resolve(0),
-    blocking.length
-      ? payload.find({
-          collection: slugs.reservations,
-          limit: 1,
-          sort: 'startTime',
-          where: countWhere({
-            and: [{ status: { in: blocking } }, { startTime: { greater_than: now.toISOString() } }],
-          }),
-        })
-      : Promise.resolve({ docs: [] as Record<string, unknown>[] }),
-  ])
-
-  // Next appointment = the earliest upcoming blocking reservation
-  const nextAppointment = nextResult.docs[0] as Record<string, unknown> | undefined
+  const { active, nextAppointment, terminal, total, upcoming } = await fetchDashboardStats({
+    blockingStatuses,
+    now,
+    payload,
+    req,
+    reservationsSlug: slugs.reservations,
+    terminalStatuses,
+    where,
+  })
 
   return (
     <div className={styles.wrapper}>

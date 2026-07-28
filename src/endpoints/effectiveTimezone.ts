@@ -31,6 +31,7 @@ export function createEffectiveTimezoneEndpoint(
       const timeZone = await getEffectiveTenantTimezone({
         globalTimezone: config.timezone,
         payload: req.payload,
+        req,
         scopedCollection: reservationsCollection as { fields?: unknown[] } | undefined,
         tenantField: config.multiTenant.tenantField,
         tenantId: readCookie(req.headers?.get('cookie'), config.multiTenant.cookieName),

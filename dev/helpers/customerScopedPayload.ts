@@ -43,7 +43,11 @@ export async function buildCustomerScopedPayload(): Promise<{
       {
         slug: 'tenants',
         admin: { useAsTitle: 'name' },
-        fields: [{ name: 'name', type: 'text', required: true }],
+        fields: [
+          { name: 'name', type: 'text', required: true },
+          // Per-tenant IANA timezone — exercised by the A7 access test.
+          { name: 'timezone', type: 'text' },
+        ],
       },
       {
         slug: 'media',
