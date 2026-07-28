@@ -261,4 +261,27 @@ describe('dashboard stats — aggregates scope to the caller (A6)', () => {
     expect(stats.upcoming).toBe(0)
     expect(stats.nextAppointment).toBeUndefined()
   })
+
+  // The tests above only exercise the CONSTRAINT path: staffA/staffB each hold a
+  // tenant membership, so multi-tenant's withTenantAccess returns a `Where` and
+  // the read succeeds with zero matches. A user with NO memberships trips the
+  // other branch — withTenantAccess returns boolean `false` outright — which
+  // makes executeAccess throw `Forbidden` unless `disableErrors` is set. That
+  // throw would propagate out of an async RSC and fail the whole dashboard
+  // render, so the helper must degrade to zeros instead.
+  it('resolves with zeros for a caller with no tenant memberships', async () => {
+    const tenantless = (await payload.create({
+      collection: 'users',
+      data: { email: 'stats-none@test.com', password: 'testpass123' },
+    })) as unknown as Record<string, unknown>
+
+    const stats = await statsFor(tenantless)
+    expect(stats).toEqual({
+      active: 0,
+      nextAppointment: undefined,
+      terminal: 0,
+      total: 0,
+      upcoming: 0,
+    })
+  })
 })
