@@ -89,7 +89,12 @@ export function resolveReservationItems(data: Record<string, unknown>): Resolved
     // window — matching on id alone stays correct regardless.
     const parentResource = extractId(data.resource)
     const parentStart = data.startTime as string
-    const parentAlreadyItemized = resolved.some((item) => item.resource === parentResource)
+    // String-compare ids: a raw id (string for Mongo, number for Postgres) and a
+    // populated relationship's extracted `.id` should match even if one side
+    // came through as a different primitive type than the other.
+    const parentAlreadyItemized = resolved.some(
+      (item) => String(item.resource) === String(parentResource),
+    )
     if (
       parentResource !== undefined &&
       parentResource !== '' &&
