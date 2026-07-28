@@ -28,6 +28,14 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         req,
       })
 
+      // Chosen per authorization path, then applied to the update below:
+      //  - guest with a matching token: the token IS the authorization
+      //  - owner: owner-mode's `update: adminOnly` would otherwise wrongly
+      //    block a customer cancelling their own booking
+      //  - privileged non-owner: delegate, so owner-mode AND multi-tenant
+      //    isolation both apply
+      let delegateAccess = false
+
       if (req.user) {
         // Authenticated path: owner (customer === req.user) or admin/staff.
         const customerId =
@@ -38,6 +46,7 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         if (!isOwner && !isAdmin) {
           return Response.json({ message: 'Forbidden' }, { status: 403 })
         }
+        delegateAccess = !isOwner
       } else {
         // Guest path: match the cancellation token.
         if (!token || !existing.cancellationToken || token !== existing.cancellationToken) {
@@ -45,25 +54,30 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const reservation = await (req.payload.update as any)({
-        id: reservationId,
-        collection: config.slugs.reservations,
-        data: {
-          cancellationReason: reason,
-          status: config.statusMachine.cancelStatus,
-        },
-        // Authorization (owner / admin / matching token) is already enforced above.
-        // overrideAccess lets the write proceed for anonymous guest cancellations,
-        // and avoids a spurious 500 when resourceOwnerMode restricts update access.
-        overrideAccess: true,
-        req,
-      })
+      let reservation: Record<string, unknown>
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        reservation = await (req.payload.update as any)({
+          id: reservationId,
+          collection: config.slugs.reservations,
+          data: {
+            cancellationReason: reason,
+            status: config.statusMachine.cancelStatus,
+          },
+          overrideAccess: !delegateAccess,
+          req,
+        })
+      } catch (err) {
+        // A denied delegate write is an authorization failure, not a 500.
+        if ((err as { status?: number })?.status === 403) {
+          return Response.json({ message: 'Forbidden' }, { status: 403 })
+        }
+        throw err
+      }
 
       // Strip the cancellation token from the response, consistent with the book
       // endpoint — it must never be echoed back over HTTP.
-      const { cancellationToken: _cancellationToken, ...safeReservation } =
-        reservation as Record<string, unknown>
+      const { cancellationToken: _cancellationToken, ...safeReservation } = reservation
 
       return Response.json(safeReservation)
     },

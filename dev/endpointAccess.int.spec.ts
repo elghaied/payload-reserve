@@ -89,3 +89,62 @@ describe('resource-availability — per-resource authorization (A3)', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('cancel — privileged non-owner delegates to access control (A5)', () => {
+  let reservationId: number | string
+  let cancelHandler: Endpoint['handler']
+
+  beforeAll(async () => {
+    cancelHandler = endpoint('/reserve/cancel')
+
+    const service = await payload.create({
+      collection: 'services',
+      data: { name: 'Cut A', duration: 30, durationType: 'fixed', tenant: tenantA } as Record<
+        string,
+        unknown
+      >,
+    })
+    const customer = await payload.create({
+      collection: 'customers',
+      data: {
+        email: 'cancel-a@test.com',
+        firstName: 'Cancel',
+        lastName: 'A',
+        password: 'testpass123',
+        tenant: tenantA,
+      } as Record<string, unknown>,
+    })
+    const reservation = await payload.create({
+      collection: 'reservations',
+      data: {
+        customer: customer.id,
+        resource: resourceA.id,
+        service: service.id,
+        startTime: new Date(Date.now() + 96 * 3600_000).toISOString(),
+        tenant: tenantA,
+      } as Record<string, unknown>,
+    })
+    reservationId = reservation.id
+  }, 60_000)
+
+  const cancelAs = (user: Record<string, unknown>) => {
+    const req = {
+      headers: new Headers(),
+      json: () => Promise.resolve({ reservationId: String(reservationId) }),
+      payload,
+      url: 'http://localhost:3000/api/reserve/cancel',
+      user: { ...user, collection: 'users' },
+    } as unknown as PayloadRequest
+    return cancelHandler(req)
+  }
+
+  it('refuses a privileged caller from another tenant', async () => {
+    const res = await cancelAs(staffB)
+    expect(res.status).toBe(403)
+  })
+
+  it('allows a privileged caller in the reservation own tenant', async () => {
+    const res = await cancelAs(staffA)
+    expect(res.status).toBe(200)
+  })
+})
