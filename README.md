@@ -404,6 +404,51 @@ payloadReserve({
 
 ---
 
+## Access Control & Booking Correctness
+
+### Endpoints enforce collection access control
+
+The public endpoints that read or write reservation data — `/api/reservation-customer-search`, `/api/reserve/resource-availability`, `/api/reserve/cancel`, and `/api/reserve/effective-timezone` — now go through Payload's normal access-control pipeline (`overrideAccess: false` + `req`) instead of reading privileged.
+
+- **Plain installs** (no `resourceOwnerMode`, no `multiTenant`, and no custom `access` overrides) are unaffected: Payload's own built-in default is `read: ({ req: { user } }) => Boolean(user)`, so any authenticated user still passes.
+- **A `userCollection` with a restrictive `read` rule now narrows customer search accordingly.** If the existing auth collection you pointed `userCollection` at defines its own `access.read` — for example, one that scopes a user to their own record or to a department — `/api/reservation-customer-search` now respects it, because the endpoint no longer out-permissions the collection it reads from. If staff stop seeing customers they used to see, the fix is in that collection's own `access.read`, not in the plugin.
+
+### `resourceOwnerMode`: the availability grid now matches the Resources collection
+
+Under `resourceOwnerMode`, a staff user (a role listed in `staffRoles` but **not** in `adminRoles`) can now only pull `/api/reserve/resource-availability` for their **own** resource — the same restriction the Resources collection already applies to ordinary reads. Add the role to `adminRoles` to restore the wider (all-resources) view for that user.
+
+### Multi-resource conflict detection now covers the top-level `resource`
+
+A booking's top-level `resource` field is now conflict-checked even when the request also supplies an explicit `items[]` that never names it. Previously, a caller could put resource A in the top-level fields and only *other* resources in `items[]`, and A itself was never checked for overlaps — even though every other booking's conflict check already treats A as occupied by this one. Overlaps against the top-level resource that were previously accepted are now rejected.
+
+If you call `resolveReservationItems` directly (it's exported from the package root), note that its returned array can now contain one more entry than before — one synthesized from the top-level `resource`/`startTime`/`endTime` and flagged `fromParent: true` — unless an `items[]` entry for that same resource already, demonstrably, covers the same window.
+
+### Calendar clicks and slot windows resolve in the business timezone
+
+The admin Calendar's grid instants, click targets, day-key sequences, and month/week header labels are now computed in the plugin's business timezone (`timezone`, or the selected tenant's zone under `multiTenant`) rather than the browser's local timezone. Previously, viewing the calendar from a timezone different than the business's could make clicking a displayed time slot book a different wall-clock hour than the one shown.
+
+### Plugin order matters under `multiTenant`
+
+`payloadReserve()` must be listed **before** `multiTenantPlugin()` in the `plugins` array, and this plugin's collection slugs must appear in the multi-tenant plugin's own `collections` option:
+
+```typescript
+plugins: [
+  payloadReserve({ /* ... */ }),
+  multiTenantPlugin({
+    collections: { reservations: {}, resources: {}, schedules: {}, services: {} },
+    // ...
+  }),
+]
+```
+
+At `payloadReserve`'s own plugin-time no tenant field exists on any collection yet (multi-tenant hasn't run), and multi-tenant only ever scopes the collections named in its own `collections` option — it never discovers them. So if you enable multi-tenant elsewhere in your config but forget to list payload-reserve's collections there, bookings silently stay readable across every tenant. The plugin now detects this at boot and logs a warning naming the unscoped slugs, but only when *other* collections in your config already carry the tenant field (i.e., multi-tenancy is clearly active elsewhere):
+
+```
+payload-reserve: these collections are NOT tenant-scoped: reservations, resources, schedules, services. Other collections in this config carry a "tenant" field, so multi-tenancy appears to be enabled — add these slugs to the multi-tenant plugin's "collections" option, or every booking stays readable across tenants.
+```
+
+---
+
 ## Internationalization
 
 Every admin string the plugin renders — field labels, descriptions, select options, calendar/dashboard components, and validation errors — is translatable. The plugin ships **12 languages**: English, French (`fr`), German (`de`), Spanish (`es`), Russian (`ru`), Polish (`pl`), Turkish (`tr`), Arabic (`ar`), Simplified Chinese (`zh`), Indonesian (`id`), Persian/Farsi (`fa`), and Hindi (`hi`). All but Hindi ship in Payload core and appear in the admin language switcher automatically.
