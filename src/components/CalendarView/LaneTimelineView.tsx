@@ -5,12 +5,22 @@ import React from 'react'
 import type { PluginT } from '../../translations/index.js'
 import type { SlotState } from '../../utilities/computeSlotStates.js'
 
+import { instantAtHour } from '../../utilities/calendarGrid.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
-import { getDayKeyInTimezone } from '../../utilities/timezoneUtils.js'
+import { addDaysToDayKey, getDayKeyInTimezone } from '../../utilities/timezoneUtils.js'
 import styles from './CalendarView.module.css'
 import { useResourceAvailability } from './useResourceAvailability.js'
 
 type LaneResource = { id: string; name: string }
+
+/**
+ * Instant of `hour`:00 on `dayKey` in the BUSINESS timezone, tolerating the
+ * hour 24 the calendar's hour window can end on: 24 is not a wall-clock time,
+ * it means midnight starting the following day.
+ */
+function gridInstant(dayKey: string, hour: number, timeZone: string): Date {
+  return instantAtHour(addDaysToDayKey(dayKey, Math.floor(hour / 24)), hour % 24, timeZone)
+}
 
 const SLOT_STATE_KEYS: Record<SlotState, string> = {
   external: 'reservation:slotExternal',
@@ -40,13 +50,11 @@ function Lane({
   const { t: _t } = useTranslation()
   const t = _t as PluginT
 
-  const dayStart = new Date(day)
-  dayStart.setHours(startHour, 0, 0, 0)
-  const dayEnd = new Date(day)
-  dayEnd.setHours(endHour, 0, 0, 0)
+  const isoDay = getDayKeyInTimezone(day, timeZone)
+  const dayStart = gridInstant(isoDay, startHour, timeZone)
+  const dayEnd = gridInstant(isoDay, endHour, timeZone)
 
   const { data } = useResourceAvailability(apiBase, resource.id, dayStart, dayEnd)
-  const isoDay = getDayKeyInTimezone(day, timeZone)
   const dayAvail = data?.days.find((d) => d.date === isoDay)
 
   const slots = dayAvail

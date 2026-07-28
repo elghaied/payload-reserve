@@ -7,11 +7,22 @@ import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } fr
 import type { PluginT } from '../../translations/index.js'
 import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 
+import {
+  dayKeySequence,
+  displayDateForDayKey,
+  instantAtHour,
+  monthGridStartDayKey,
+  startOfWeekDayKey,
+} from '../../utilities/calendarGrid.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { externalPillLabel } from '../../utilities/externalPillLabel.js'
 import { statusToI18nKey } from '../../utilities/i18nUtils.js'
 import { reservationMatchesResource, sameId } from '../../utilities/reservationResourceFilter.js'
-import { getDayKeyInTimezone, getHourInTimezone } from '../../utilities/timezoneUtils.js'
+import {
+  addDaysToDayKey,
+  getDayKeyInTimezone,
+  getHourInTimezone,
+} from '../../utilities/timezoneUtils.js'
 import { useTenantFilter } from '../../utilities/useTenantFilter.js'
 import styles from './CalendarView.module.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
@@ -96,6 +107,15 @@ function computeHourWindow(
     }
   }
   return { endHour: Math.min(endHour, 24), startHour: Math.max(startHour, 0) }
+}
+
+/**
+ * Instant of `hour`:00 on `dayKey` in the BUSINESS timezone, tolerating the
+ * hour 24 that `computeHourWindow` can return: 24 is not a wall-clock time, it
+ * means midnight starting the following day, so carry it onto the next day key.
+ */
+function gridInstant(dayKey: string, hour: number, timeZone: string): Date {
+  return instantAtHour(addDaysToDayKey(dayKey, Math.floor(hour / 24)), hour % 24, timeZone)
 }
 
 export const CalendarView: React.FC<AdminViewServerProps> = () => {
@@ -279,26 +299,27 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   }, [config.routes.api, config.serverURL, resourceSlug, resourceTenantParams])
 
   const { rangeEnd, rangeStart } = useMemo(() => {
-    const start = new Date(currentDate)
-    const end = new Date(currentDate)
-
+    const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
+    let startKey: string
+    let dayCount: number
     if (viewMode === 'month') {
-      start.setDate(1)
-      start.setDate(start.getDate() - start.getDay())
-      // The grid always renders 42 cells (6 weeks) from `start`; fetch the same
-      // span so trailing weeks aren't silently empty (review D1).
-      end.setTime(start.getTime())
-      end.setDate(start.getDate() + 41)
+      // The grid always renders 42 cells (6 weeks); fetch the same span so
+      // trailing weeks aren't silently empty (review D1).
+      startKey = monthGridStartDayKey(currentKey)
+      dayCount = 42
     } else if (viewMode === 'week') {
-      const dayOfWeek = start.getDay()
-      start.setDate(start.getDate() - dayOfWeek)
-      end.setDate(start.getDate() + 6)
+      startKey = startOfWeekDayKey(currentKey)
+      dayCount = 7
+    } else {
+      startKey = currentKey
+      dayCount = 1
     }
-    start.setHours(0, 0, 0, 0)
-    end.setHours(23, 59, 59, 999)
 
-    return { rangeEnd: end, rangeStart: start }
-  }, [currentDate, viewMode])
+    return {
+      rangeEnd: instantAtHour(addDaysToDayKey(startKey, dayCount), 0, reservationTimezone),
+      rangeStart: instantAtHour(startKey, 0, reservationTimezone),
+    }
+  }, [currentDate, reservationTimezone, viewMode])
 
   // Availability data for the selected resource (null when no resource selected — grid unshaded)
   const { data: availability } = useResourceAvailability(
@@ -739,13 +760,11 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     )
   }
 
-  const renderCurrentTimeLine = (cellDate: Date, cellHour: number) => {
+  const renderCurrentTimeLine = (cellDayKey: string, cellHour: number) => {
     const now = new Date()
     if (
-      now.getFullYear() !== cellDate.getFullYear() ||
-      now.getMonth() !== cellDate.getMonth() ||
-      now.getDate() !== cellDate.getDate() ||
-      now.getHours() !== cellHour
+      getDayKeyInTimezone(now, reservationTimezone) !== cellDayKey ||
+      getHourInTimezone(now, reservationTimezone) !== cellHour
     ) {
       return null
     }
@@ -754,16 +773,8 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   }
 
   const renderMonthView = () => {
-    const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-    const startDay = new Date(firstDay)
-    startDay.setDate(startDay.getDate() - startDay.getDay())
-
-    const days: Date[] = []
-    const d = new Date(startDay)
-    for (let i = 0; i < 42; i++) {
-      days.push(new Date(d))
-      d.setDate(d.getDate() + 1)
-    }
+    const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
+    const dayKeys = dayKeySequence(monthGridStartDayKey(currentKey), 42)
 
     const today = new Date()
     const todayStr = getDayKeyInTimezone(today, reservationTimezone)
@@ -783,11 +794,9 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             {d}
           </div>
         ))}
-        {days.map((day, i) => {
-          const dayKey = getDayKeyInTimezone(day, reservationTimezone)
+        {dayKeys.map((dayKey, i) => {
           const isToday = dayKey === todayStr
-          const isOtherMonth =
-            dayKey.slice(0, 7) !== getDayKeyInTimezone(currentDate, reservationTimezone).slice(0, 7)
+          const isOtherMonth = dayKey.slice(0, 7) !== currentKey.slice(0, 7)
           const dayReservations = filteredReservations.filter((r) => {
             const rKey = getDayKeyInTimezone(new Date(r.startTime), reservationTimezone)
             return rKey === dayKey
@@ -806,8 +815,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             return startKey <= dayKey && dayKey <= endKey
           })
 
-          const clickDate = new Date(day)
-          clickDate.setHours(9, 0, 0, 0)
+          const clickDate = instantAtHour(dayKey, 9, reservationTimezone)
 
           return (
             <div
@@ -823,7 +831,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               role="button"
               tabIndex={0}
             >
-              <div className={styles.dayNumber}>{day.getDate()}</div>
+              <div className={styles.dayNumber}>{Number(dayKey.slice(8, 10))}</div>
               {dayReservations.map((r) => renderEventItem(r, true))}
               {dayExternal.map((ev, j) => (
                 <div
@@ -844,21 +852,13 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   }
 
   const renderWeekView = () => {
-    const startOfWeek = new Date(currentDate)
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
-    startOfWeek.setHours(0, 0, 0, 0)
-
-    const weekDays: Date[] = []
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfWeek)
-      d.setDate(d.getDate() + i)
-      weekDays.push(d)
-    }
+    const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
+    const weekDayKeys = dayKeySequence(startOfWeekDayKey(currentKey), 7)
 
     // Visible-hour window derived from the week's bookings (review D8)
     const weekReservations = filteredReservations.filter((r) => {
       const k = getDayKeyInTimezone(new Date(r.startTime), reservationTimezone)
-      return weekDays.some((d) => getDayKeyInTimezone(d, reservationTimezone) === k)
+      return weekDayKeys.includes(k)
     })
     const { endHour: gridEndHour, startHour: gridStartHour } = computeHourWindow(
       weekReservations,
@@ -870,13 +870,10 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     // Build per-day slot-state maps when a resource is selected
     const daySlotMaps = availability
       ? new Map(
-          weekDays.map((day) => {
-            const isoDay = getDayKeyInTimezone(day, reservationTimezone)
+          weekDayKeys.map((isoDay) => {
             const dayAvail = availability.days.find((d) => d.date === isoDay)
-            const dayStart = new Date(day)
-            dayStart.setHours(gridStartHour, 0, 0, 0)
-            const dayEnd = new Date(day)
-            dayEnd.setHours(gridEndHour, 0, 0, 0)
+            const dayStart = gridInstant(isoDay, gridStartHour, reservationTimezone)
+            const dayEnd = gridInstant(isoDay, gridEndHour, reservationTimezone)
             const slots = dayAvail
               ? computeSlotStates({
                   busy: availability.busy,
@@ -901,9 +898,9 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     return (
       <div className={styles.weekView}>
         <div className={styles.dayHeader} />
-        {weekDays.map((d, i) => (
+        {weekDayKeys.map((dayKey, i) => (
           <div className={styles.dayHeader} key={i}>
-            {d.toLocaleDateString([], {
+            {displayDateForDayKey(dayKey, reservationTimezone).toLocaleDateString([], {
               day: 'numeric',
               month: 'numeric',
               timeZone: reservationTimezone,
@@ -916,8 +913,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             <div className={styles.timeLabel}>
               {hour.toString().padStart(2, '0')}:00
             </div>
-            {weekDays.map((day, di) => {
-              const isoDay = getDayKeyInTimezone(day, reservationTimezone)
+            {weekDayKeys.map((isoDay, di) => {
               const cellReservations = filteredReservations.filter((r) => {
                 const rDate = new Date(r.startTime)
                 return (
@@ -925,8 +921,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   getHourInTimezone(rDate, reservationTimezone) === hour
                 )
               })
-              const clickDate = new Date(day)
-              clickDate.setHours(hour, 0, 0, 0)
+              const clickDate = instantAtHour(isoDay, hour, reservationTimezone)
 
               // Slot state (only when a resource is selected)
               const slotMap = daySlotMaps?.get(isoDay)
@@ -991,7 +986,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   role="button"
                   tabIndex={isNonInteractive ? -1 : 0}
                 >
-                  {renderCurrentTimeLine(day, hour)}
+                  {renderCurrentTimeLine(isoDay, hour)}
                   {timeOffLabel && (
                     <span className={styles.timeOffLabel}>{timeOffLabel}</span>
                   )}
@@ -1028,10 +1023,8 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     if (availability) {
       const isoDay = currentDayKey
       const dayAvail = availability.days.find((d) => d.date === isoDay)
-      const dayStart = new Date(currentDate)
-      dayStart.setHours(gridStartHour, 0, 0, 0)
-      const dayEnd = new Date(currentDate)
-      dayEnd.setHours(gridEndHour, 0, 0, 0)
+      const dayStart = gridInstant(isoDay, gridStartHour, reservationTimezone)
+      const dayEnd = gridInstant(isoDay, gridEndHour, reservationTimezone)
       const slots = dayAvail
         ? computeSlotStates({
             busy: availability.busy,
@@ -1059,8 +1052,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               getHourInTimezone(rDate, reservationTimezone) === hour
             )
           })
-          const clickDate = new Date(currentDate)
-          clickDate.setHours(hour, 0, 0, 0)
+          const clickDate = instantAtHour(currentDayKey, hour, reservationTimezone)
 
           // Slot state (only when a resource is selected)
           const slotInfo = daySlotMap?.get(clickDate.toISOString()) ?? null
@@ -1126,7 +1118,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                 role="button"
                 tabIndex={isNonInteractive ? -1 : 0}
               >
-                {renderCurrentTimeLine(currentDate, hour)}
+                {renderCurrentTimeLine(currentDayKey, hour)}
                 {timeOffLabel && (
                   <span className={styles.timeOffLabel}>{timeOffLabel}</span>
                 )}
