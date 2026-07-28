@@ -111,7 +111,13 @@ export function createCustomerSearchEndpoint(
       const result = await (req.payload.find as any)({
         collection: config.slugs.customers,
         limit,
+        // Delegate isolation to collection access control. The multi-tenant
+        // plugin enforces tenancy through the user's memberships, which the
+        // cookie clause above structurally cannot express — with userCollection
+        // set, tenancy lives on a `tenants` ARRAY, not a flat `tenant` field.
+        overrideAccess: false,
         page,
+        req,
         where,
       })
 
