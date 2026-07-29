@@ -263,6 +263,15 @@ const buildConfigWithMemoryDB = async () => {
         ? sqliteAdapter({
             client: { url: process.env.SQLITE_URL || 'file::memory:?cache=shared' },
             push: true,
+            // Required: @payloadcms/db-sqlite wires up a real `beginTransaction`
+            // only when `transactionOptions` is truthy — without it,
+            // `beginTransaction` is a hard-coded no-op that always resolves
+            // `null` (unlike db-postgres, which defaults transactions ON and
+            // needs `transactionOptions: false` to opt OUT). Without this, the
+            // booking lock never runs inside a real transaction and serializes
+            // nothing — concurrent bookings silently double-book. `{}` is
+            // enough to switch it on; see README's adapter-support matrix.
+            transactionOptions: {},
           })
         : mongooseAdapter({
             ensureIndexes: true,

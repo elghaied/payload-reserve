@@ -318,7 +318,7 @@ export const payloadReserve =
         // no error anywhere. Say so at boot; there is no runtime signal.
         if (!resolved.disabled && !(await supportsTransactions(payload))) {
           payload.logger.warn(
-            'payload-reserve: this database does not support transactions, so concurrent bookings for the same slot can double-book. MongoDB needs a replica set (even single-node) for transaction support. Postgres and SQLite support them by default.',
+            'payload-reserve: this database does not support transactions, so concurrent bookings for the same slot can double-book. MongoDB needs a replica set (even single-node) for transaction support. Postgres supports transactions by default. SQLite requires transactionOptions to be set on the adapter, or it silently runs without them.',
           )
         }
       } catch {

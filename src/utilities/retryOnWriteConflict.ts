@@ -21,12 +21,45 @@ const MONGO_WRITE_CONFLICT = 112
 const POSTGRES_SERIALIZATION_FAILURES = new Set(['40P01', '40001'])
 
 /**
+ * SQLite/libsql busy-or-locked family. Only reachable when the adapter is
+ * given a truthy `transactionOptions` — otherwise `beginTransaction` is a
+ * no-op and nothing ever contends. `SQLITE_BUSY` and plain `SQLITE_LOCKED`
+ * are the same family as the qualified variant measured below; prefix match
+ * (not an exact-set lookup like the Postgres codes above) because
+ * SQLite/libsql qualify the base code with a reason suffix (`_SHAREDCACHE`,
+ * `_SNAPSHOT`, ...) — the prefix is still the driver's own structured
+ * signal, never message text.
+ *
+ * KNOWN GAP, confirmed by direct inspection, not assumption: for a loser
+ * that aborts at `beginTransaction` itself (SQLite's actual failure mode —
+ * a second write transaction cannot even open while one is held, rather
+ * than queuing for it), this check can never fire in practice. The real
+ * driver error — a `LibsqlError` with `code: 'SQLITE_LOCKED_SHAREDCACHE'` —
+ * is caught *inside* `@payloadcms/drizzle`'s own `beginTransaction.js` (a
+ * Payload-core dependency, not this plugin) and re-thrown as a bare
+ * `new Error('Error: cannot begin transaction: ...')`: no `code`, no
+ * `cause`, generic `name`. By the time it reaches this function the
+ * structured signal is already gone, so retry never engages for that path
+ * — measured: burst of 8 against a `quantity: 3` resource with retry
+ * recovers only 1 of 3, identical to no retry at all, and raising the
+ * retry budget from 5 to 30 attempts makes no difference. This match is
+ * kept because it is still correct for any SQLite/libsql error shape that
+ * *does* preserve `code` (a mid-transaction conflict would be a different
+ * code path), and matching on the wrapped error's message text to plug this
+ * specific gap is exactly what this project's structured-signal-only
+ * constraint forbids.
+ */
+const SQLITE_BUSY_OR_LOCKED_PREFIXES = ['SQLITE_BUSY', 'SQLITE_LOCKED']
+
+/**
  * Whether an error means "the database refused this transaction because
  * another one touched the same rows; running it again may succeed."
  *
  * Detection is by the driver's own structured signals, never by message text.
  * MongoDB tags exactly this class with the `TransientTransactionError` label,
- * which is the retry contract its drivers document; Postgres uses SQLSTATE.
+ * which is the retry contract its drivers document; Postgres uses SQLSTATE;
+ * SQLite/libsql use a `code` string in the `SQLITE_BUSY`/`SQLITE_LOCKED*`
+ * family.
  */
 export function isTransientWriteConflict(error: unknown): boolean {
   if (!error || typeof error !== 'object') {
@@ -43,7 +76,14 @@ export function isTransientWriteConflict(error: unknown): boolean {
     return true
   }
 
-  return typeof code === 'string' && POSTGRES_SERIALIZATION_FAILURES.has(code)
+  if (typeof code !== 'string') {
+    return false
+  }
+
+  return (
+    POSTGRES_SERIALIZATION_FAILURES.has(code) ||
+    SQLITE_BUSY_OR_LOCKED_PREFIXES.some((prefix) => code.startsWith(prefix))
+  )
 }
 
 /**
