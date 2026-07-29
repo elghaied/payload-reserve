@@ -21,8 +21,18 @@ import type { ResolvedReservationPluginConfig } from '../../types.js'
  * `extraChecks` lets a caller add more referencing collections beyond
  * Reservations — e.g. Resources is also referenced by Schedules.resource,
  * which has no items[]-style nesting so a plain field-equals check suffices.
- * Every check is a single `count` query (one query per related collection,
- * run in parallel), never one query per referencing document.
+ * Every check is a single `count` query (one query per related collection),
+ * never one query per referencing document.
+ *
+ * The counts run SEQUENTIALLY, and that is load-bearing rather than an
+ * oversight. This hook runs inside the transaction `deleteByID` opened, on the
+ * caller's `req`, and a MongoDB ClientSession cannot carry concurrent operations
+ * inside a transaction. Running these as a `Promise.all` made two `count`s share
+ * one session: the loser's `count` calls `killTransaction` from its own catch,
+ * which rolls back and clears the transaction the DELETE owns, and the delete
+ * then fails with `NoSuchTransaction` ("transaction number N does not match any
+ * in-progress transactions") instead of this hook's actionable 400. Two count
+ * queries do not need parallelism.
  */
 export function preventDeleteWhenReferenced({
   config,
@@ -41,27 +51,29 @@ export function preventDeleteWhenReferenced({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const countFn = req.payload.count as any
 
-    const [reservations, ...extras] = await Promise.all([
-      countFn({
-        collection: config.slugs.reservations,
-        req,
-        where: {
-          or: [{ [field]: { equals: id } }, { [`items.${field}`]: { equals: id } }],
-        },
-      }),
-      ...extraChecks.map((check) =>
-        countFn({
+    const reservations = (await countFn({
+      collection: config.slugs.reservations,
+      req,
+      where: {
+        or: [{ [field]: { equals: id } }, { [`items.${field}`]: { equals: id } }],
+      },
+    })) as { totalDocs: number }
+
+    const extras: Array<{ totalDocs: number }> = []
+    for (const check of extraChecks) {
+      extras.push(
+        (await countFn({
           collection: check.collection,
           req,
           where: { [check.field]: { equals: id } },
-        }),
-      ),
-    ])
+        })) as { totalDocs: number },
+      )
+    }
 
     const blocking = [
-      { count: reservations.totalDocs as number, label: 'reservation' },
+      { count: reservations.totalDocs, label: 'reservation' },
       ...extraChecks.map((check, index) => ({
-        count: extras[index].totalDocs as number,
+        count: extras[index].totalDocs,
         label: check.label,
       })),
     ].filter((entry) => entry.count > 0)
