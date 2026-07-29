@@ -115,4 +115,24 @@ describe('deleting a referenced service or resource', () => {
       payload.delete({ id: itemsOnlyResource.id, collection: col('resources') }),
     ).rejects.toThrow(/reservation/i)
   })
+
+  // Schedules.resource is also required: true — same NOT NULL / ON DELETE SET
+  // NULL contradiction as Reservations, one relationship over. A resource can
+  // be scheduled with zero reservations against it; the guard must still
+  // block the delete, and name "schedule" rather than a generic message.
+  test('a resource with schedules but zero reservations cannot be deleted, and says so', async () => {
+    const { resource } = await seed('sched')
+    await payload.create({
+      collection: col('schedules'),
+      data: { name: 'Delete Schedule sched', resource: resource.id },
+    })
+
+    await expect(
+      payload.delete({ id: resource.id, collection: col('resources') }),
+    ).rejects.toThrow(/1 schedule/i)
+
+    // Still there — the guard rejected rather than partially applying.
+    const still = await payload.findByID({ id: resource.id, collection: col('resources') })
+    expect(still.id).toBe(resource.id)
+  })
 })

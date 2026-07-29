@@ -5,24 +5,33 @@ import { APIError } from 'payload'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 /**
- * Refuse to delete a Service or Resource that reservations still point at.
+ * Refuse to delete a Service or Resource that other documents still point at.
  *
  * Without this the two databases disagree, and neither behaviour was designed.
- * `service` and `resource` are required on Reservations, so Postgres makes those
- * columns NOT NULL while the drizzle adapter emits ON DELETE SET NULL — the
- * delete fails with a raw 23502 that means nothing to the person clicking the
- * button. Mongo has no such constraint, so the same delete succeeds and leaves
- * reservations pointing at a document that no longer exists.
+ * The referencing fields (Reservations.service/resource, Schedules.resource)
+ * are `required: true`, so Postgres and SQLite make those columns NOT NULL
+ * while the drizzle adapter emits ON DELETE SET NULL for both — the delete
+ * fails with a raw 23502/SQLITE_CONSTRAINT_NOTNULL that means nothing to the
+ * person clicking the button. Mongo has no such constraint, so the same
+ * delete succeeds and leaves the referencing document pointing at nothing.
  *
  * The plugin already ships `active` for retiring something without destroying
- * booking history, which is what the error points people at.
+ * booking (or schedule) history, which is what the error points people at.
+ *
+ * `extraChecks` lets a caller add more referencing collections beyond
+ * Reservations — e.g. Resources is also referenced by Schedules.resource,
+ * which has no items[]-style nesting so a plain field-equals check suffices.
+ * Every check is a single `count` query (one query per related collection,
+ * run in parallel), never one query per referencing document.
  */
 export function preventDeleteWhenReferenced({
   config,
+  extraChecks = [],
   field,
   label,
 }: {
   config: ResolvedReservationPluginConfig
+  extraChecks?: Array<{ collection: string; field: string; label: string }>
   field: 'resource' | 'service'
   label: string
 }): CollectionBeforeDeleteHook {
@@ -30,17 +39,42 @@ export function preventDeleteWhenReferenced({
     if (context?.skipReservationHooks) {return}
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { totalDocs } = await (req.payload.count as any)({
-      collection: config.slugs.reservations,
-      req,
-      where: {
-        or: [{ [field]: { equals: id } }, { [`items.${field}`]: { equals: id } }],
-      },
-    })
+    const countFn = req.payload.count as any
 
-    if (totalDocs > 0) {
+    const [reservations, ...extras] = await Promise.all([
+      countFn({
+        collection: config.slugs.reservations,
+        req,
+        where: {
+          or: [{ [field]: { equals: id } }, { [`items.${field}`]: { equals: id } }],
+        },
+      }),
+      ...extraChecks.map((check) =>
+        countFn({
+          collection: check.collection,
+          req,
+          where: { [check.field]: { equals: id } },
+        }),
+      ),
+    ])
+
+    const blocking = [
+      { count: reservations.totalDocs as number, label: 'reservation' },
+      ...extraChecks.map((check, index) => ({
+        count: extras[index].totalDocs as number,
+        label: check.label,
+      })),
+    ].filter((entry) => entry.count > 0)
+
+    if (blocking.length > 0) {
+      const total = blocking.reduce((sum, entry) => sum + entry.count, 0)
+      const parts = blocking
+        .map((entry) => `${entry.count} ${entry.label}${entry.count === 1 ? '' : 's'}`)
+        .join(' and ')
+      const verb = total === 1 ? 'still references' : 'still reference'
+
       throw new APIError(
-        `Cannot delete this ${label}: ${totalDocs} reservation${totalDocs === 1 ? '' : 's'} still reference${totalDocs === 1 ? 's' : ''} it. Uncheck "active" to retire it instead — that stops new bookings while keeping existing ones intact.`,
+        `Cannot delete this ${label}: ${parts} ${verb} it. Uncheck "active" to retire it instead — that stops new bookings while keeping existing ones intact.`,
         400,
       )
     }

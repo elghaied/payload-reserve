@@ -4767,85 +4767,97 @@ describe('Reservation plugin - checkAvailability debug traces', () => {
   })
 })
 
-describe('Reservation plugin - checkAvailability bufferFor error trace', () => {
-  let bufResId: string
+// Mongo-only by construction: this suite's fixture needs a genuinely dangling
+// service reference (delete the service a reservation still points at, via
+// the skipReservationHooks escape hatch, to force bufferFor's findByID into
+// NotFound). On Postgres/SQLite that delete now hits the database's own
+// NOT NULL constraint on the ON DELETE SET NULL foreign key regardless of
+// our hook — skipping our app-level guard cannot skip the database's — so
+// the dangling reference this fixture needs is structurally unreachable
+// once preventDeleteWhenReferenced exists. Not a bug to fix; the scenario
+// simply cannot occur on a SQL adapter, so the suite is meaningless there.
+describe.skipIf(Boolean(process.env.PG_URL || process.env.SQLITE))(
+  'Reservation plugin - checkAvailability bufferFor error trace',
+  () => {
+    let bufResId: string
 
-  beforeAll(async () => {
-    const service = await payload.create({
-      collection: col('services'),
-      data: { name: 'Dbg Buffer Service', active: true, duration: 60 },
-    })
-    const resource = await payload.create({
-      collection: col('resources'),
-      data: { name: 'Dbg Buffer Resource', active: true, quantity: 1, services: [service.id] },
-    })
-    bufResId = resource.id
+    beforeAll(async () => {
+      const service = await payload.create({
+        collection: col('services'),
+        data: { name: 'Dbg Buffer Service', active: true, duration: 60 },
+      })
+      const resource = await payload.create({
+        collection: col('resources'),
+        data: { name: 'Dbg Buffer Resource', active: true, quantity: 1, services: [service.id] },
+      })
+      bufResId = resource.id
 
-    // A blocking reservation referencing the service. Hooks are skipped so the
-    // explicit startTime/endTime/status are stored verbatim.
-    await payload.create({
-      collection: col('reservations'),
-      context: { skipReservationHooks: true },
-      data: {
-        endTime: new Date('2030-06-06T10:00:00.000Z').toISOString(),
-        resource: bufResId,
-        service: service.id,
-        startTime: new Date('2030-06-06T09:00:00.000Z').toISOString(),
-        status: 'confirmed',
-      },
-    })
+      // A blocking reservation referencing the service. Hooks are skipped so the
+      // explicit startTime/endTime/status are stored verbatim.
+      await payload.create({
+        collection: col('reservations'),
+        context: { skipReservationHooks: true },
+        data: {
+          endTime: new Date('2030-06-06T10:00:00.000Z').toISOString(),
+          resource: bufResId,
+          service: service.id,
+          startTime: new Date('2030-06-06T09:00:00.000Z').toISOString(),
+          status: 'confirmed',
+        },
+      })
 
-    // Delete the service the reservation still references. bufferFor's
-    // payload.findByID(service.id) now throws NotFound and must fail open.
-    await payload.delete({
-      id: service.id,
-      collection: col('services'),
-      // Deleting a referenced service is now blocked by design.
-      // This test needs the dangling reference as a FIXTURE to prove
-      // bufferFor degrades to defaults when its service is gone.
-      context: { skipReservationHooks: true },
-    })
-  })
-
-  it('logs a bufferFor error under err and still fails open', async () => {
-    const { checkAvailability } = await import('../src/services/AvailabilityService.js')
-    const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
-    const info = vi.spyOn(payload.logger, 'info')
-
-    const result = await checkAvailability({
-      blockingStatuses: ['pending', 'confirmed'],
-      bufferAfter: 0,
-      bufferBefore: 0,
-      debug: createReserveDebug(payload.logger, true, 'buf1'),
-      endTime: new Date('2030-06-06T10:00:00.000Z'),
-      guestCount: 1,
-      payload,
-      req: {} as Parameters<typeof checkAvailability>[0]['req'],
-      reservationSlug: 'reservations',
-      resourceId: bufResId,
-      resourceSlug: 'resources',
-      servicesSlug: 'services',
-      startTime: new Date('2030-06-06T09:00:00.000Z'),
+      // Delete the service the reservation still references. bufferFor's
+      // payload.findByID(service.id) now throws NotFound and must fail open.
+      await payload.delete({
+        id: service.id,
+        collection: col('services'),
+        // Deleting a referenced service is now blocked by design.
+        // This test needs the dangling reference as a FIXTURE to prove
+        // bufferFor degrades to defaults when its service is gone.
+        context: { skipReservationHooks: true },
+      })
     })
 
-    // Fails open: bufferFor's error doesn't stop checkAvailability from returning.
-    expect(result).toBeDefined()
-    expect(typeof result.available).toBe('boolean')
+    it('logs a bufferFor error under err and still fails open', async () => {
+      const { checkAvailability } = await import('../src/services/AvailabilityService.js')
+      const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
+      const info = vi.spyOn(payload.logger, 'info')
 
-    const errLine = info.mock.calls
-      .map(([o]) => o as Record<string, unknown>)
-      .find(
-        (o) =>
-          o?.event === 'reserve_debug' &&
-          o.traceId === 'buf1' &&
-          o.stage === 'error' &&
-          o.where === 'bufferFor',
-      )
-    expect(errLine).toBeDefined()
-    expect(errLine!.err).toBeInstanceOf(Error)
-    info.mockRestore()
-  })
-})
+      const result = await checkAvailability({
+        blockingStatuses: ['pending', 'confirmed'],
+        bufferAfter: 0,
+        bufferBefore: 0,
+        debug: createReserveDebug(payload.logger, true, 'buf1'),
+        endTime: new Date('2030-06-06T10:00:00.000Z'),
+        guestCount: 1,
+        payload,
+        req: {} as Parameters<typeof checkAvailability>[0]['req'],
+        reservationSlug: 'reservations',
+        resourceId: bufResId,
+        resourceSlug: 'resources',
+        servicesSlug: 'services',
+        startTime: new Date('2030-06-06T09:00:00.000Z'),
+      })
+
+      // Fails open: bufferFor's error doesn't stop checkAvailability from returning.
+      expect(result).toBeDefined()
+      expect(typeof result.available).toBe('boolean')
+
+      const errLine = info.mock.calls
+        .map(([o]) => o as Record<string, unknown>)
+        .find(
+          (o) =>
+            o?.event === 'reserve_debug' &&
+            o.traceId === 'buf1' &&
+            o.stage === 'error' &&
+            o.where === 'bufferFor',
+        )
+      expect(errLine).toBeDefined()
+      expect(errLine!.err).toBeInstanceOf(Error)
+      info.mockRestore()
+    })
+  },
+)
 
 describe('Reservation plugin - getAvailableSlots debug traces', () => {
   let svcId: string

@@ -177,7 +177,18 @@ export function createResourcesCollection(
     ],
     hooks: {
       beforeDelete: [
-        preventDeleteWhenReferenced({ config, field: 'resource', label: 'resource' }),
+        preventDeleteWhenReferenced({
+          config,
+          // Schedules.resource is also required: true — the exact same
+          // NOT NULL / ON DELETE SET NULL contradiction, one relationship
+          // over. A resource with schedules but zero reservations must be
+          // blocked too.
+          extraChecks: [
+            { collection: config.slugs.schedules, field: 'resource', label: 'schedule' },
+          ],
+          field: 'resource',
+          label: 'resource',
+        }),
       ],
     },
     labels: {
