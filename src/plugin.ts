@@ -23,6 +23,7 @@ import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
 import { type PluginT, translations } from './translations/index.js'
 import { applyCollectionOverride } from './utilities/collectionOverrides.js'
 import { collectionHasTenantField } from './utilities/tenantFilter.js'
+import { supportsTransactions } from './utilities/transactionSupport.js'
 
 /**
  * The array field `@payloadcms/plugin-multi-tenant` pushes onto the admin users
@@ -309,6 +310,16 @@ export const payloadReserve =
               `payload-reserve: these collections are NOT tenant-scoped: ${unscoped.join(', ')}. This config looks like it enables multi-tenancy (another collection carries a "${tenantField}" field, or an auth collection carries a "${MT_TENANTS_ARRAY_FIELD}" membership array) — detection is a heuristic, so disregard this if you are not using multi-tenancy. Otherwise add these slugs to the multi-tenant plugin's "collections" option, or their documents stay readable across tenants.`,
             )
           }
+        }
+
+        // The booking lock only serializes anything inside a transaction. On a
+        // standalone mongod Payload skips transactions entirely, so the lock
+        // degrades to a no-op and concurrent bookings double-book again — with
+        // no error anywhere. Say so at boot; there is no runtime signal.
+        if (!resolved.disabled && !(await supportsTransactions(payload))) {
+          payload.logger.warn(
+            'payload-reserve: this database does not support transactions, so concurrent bookings for the same slot can double-book. MongoDB needs a replica set (even single-node) for transaction support. Postgres and SQLite support them by default.',
+          )
         }
       } catch {
         // A diagnostic must never break boot — that is the whole reason these

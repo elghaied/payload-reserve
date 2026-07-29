@@ -9,7 +9,12 @@ type Warned = { messages: string[]; payload: Payload }
 function fakePayload(collections: Array<Record<string, unknown>>, throwOnWarn = false): Warned {
   const messages: string[] = []
   const payload = {
+    // A transactional stub so this file's tenant-scoping assertions aren't
+    // polluted by the unrelated no-transactions diagnostic (see
+    // transactionSupport.spec.ts for that check in isolation).
     config: { collections },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    db: { beginTransaction: async () => 'txn-1' },
     logger: {
       warn: (msg: string) => {
         if (throwOnWarn) {

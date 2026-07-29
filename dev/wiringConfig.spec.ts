@@ -337,11 +337,21 @@ describe('resources join gate warns at init', () => {
       },
     })
 
+  // A transactional stub so these assertions about the resources-join and
+  // tenant-scoping diagnostics aren't polluted by the unrelated no-transactions
+  // diagnostic (see transactionSupport.spec.ts for that check in isolation).
+  // eslint-disable-next-line @typescript-eslint/require-await
+  const transactionalDb = { beginTransaction: async () => 'txn-1' }
+
   it('warns when resources.services was overridden away', async () => {
     const config = dropServicesField()(minimalConfig())
     const warn = vi.fn()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await config.onInit!({ config: { collections: [] }, logger: { warn } } as any)
+    await config.onInit!({
+      config: { collections: [] },
+      db: transactionalDb,
+      logger: { warn },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/join was skipped/i))
   })
 
@@ -355,6 +365,7 @@ describe('resources join gate warns at init', () => {
     const config = dropServicesField()(hostConfig)
     await config.onInit!({
       config: { collections: [] },
+      db: transactionalDb,
       logger: { warn: () => calls.push('warn') },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any)
@@ -372,6 +383,7 @@ describe('resources join gate warns at init', () => {
     await expect(
       config.onInit!({
         config: { collections: [] },
+        db: transactionalDb,
         logger: {
           warn: () => {
             throw new Error('logger exploded')
@@ -391,6 +403,34 @@ describe('resources join gate warns at init', () => {
     const warn = vi.fn()
     await config.onInit!({
       config: { collections: config.collections },
+      db: transactionalDb,
+      logger: { warn },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    expect(warn).not.toHaveBeenCalled()
+  })
+})
+
+describe('transaction support diagnostic warns at init', () => {
+  it('warns when the database has no transaction support', async () => {
+    const config = payloadReserve({})(minimalConfig())
+    const warn = vi.fn()
+    await config.onInit!({
+      config: { collections: config.collections },
+      db: {},
+      logger: { warn },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/does not support transactions/i))
+  })
+
+  it('stays silent when the database supports transactions', async () => {
+    const config = payloadReserve({})(minimalConfig())
+    const warn = vi.fn()
+    await config.onInit!({
+      config: { collections: config.collections },
+      // eslint-disable-next-line @typescript-eslint/require-await
+      db: { beginTransaction: async () => 'txn-1' },
       logger: { warn },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any)
