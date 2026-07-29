@@ -1,7 +1,7 @@
 import type { Access, Field, Payload } from 'payload'
 
 import config from '@payload-config'
-import { getPayload } from 'payload'
+import { getPayload, ValidationError } from 'payload'
 import { afterAll, beforeAll, describe, expect, it, test, vi } from 'vitest'
 
 import { resolveConfig } from '../src/defaults.js'
@@ -1516,8 +1516,8 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
     })
 
     // Overlaps the malformed row's real item window (08:00-08:30) directly.
-    await expect(
-      payload.create({
+    const rejection = await payload
+      .create({
         collection: col('reservations'),
         data: {
           customer: customerId,
@@ -1527,8 +1527,25 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
           startTime: '2025-01-09T08:15:00.000Z',
           status: 'pending',
         },
-      }),
-    ).rejects.toThrow()
+      })
+      .then(
+        () => null,
+        (err: unknown) => err,
+      )
+
+    // Matched on the CONFLICT, not merely on "something threw". This assertion
+    // is the only automated guard against re-introducing the occupancy-dropping
+    // double-booking defect, and a bare `.rejects.toThrow()` would be satisfied
+    // by any failure at all — including one that never reached the conflict
+    // check. Payload puts the per-field message in `data.errors`, not in
+    // `error.message`, so it has to be read from there.
+    expect(rejection).toBeInstanceOf(ValidationError)
+    const errors =
+      (rejection as { data?: { errors?: Array<{ message?: string; path?: string }> } })?.data
+        ?.errors ?? []
+    expect(errors.map((e) => ({ message: e.message, path: e.path }))).toEqual([
+      { message: 'All units are booked for this time', path: 'startTime' },
+    ])
   })
 })
 

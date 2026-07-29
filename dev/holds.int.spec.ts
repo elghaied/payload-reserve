@@ -13,7 +13,9 @@ import { getPayload } from 'payload'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
 import { resolveConfig } from '../src/defaults.js'
+import { getAvailableSlots } from '../src/services/AvailabilityService.js'
 import { releaseHold, takeHold } from '../src/services/HoldService.js'
+import { retryOnWriteConflict } from '../src/utilities/retryOnWriteConflict.js'
 
 let payload: Payload
 
@@ -238,5 +240,138 @@ describe('Slot holds', () => {
     // all 8 callers would read "free" before any of them wrote, and all 8 would
     // be told they hold the slot.
     expect({ granted, totalDocs }).toEqual({ granted: 1, totalDocs: 1 })
+  })
+
+  test('retry recovers the FULL capacity of a quantity-3 resource under a burst of holds', async () => {
+    // A quantity:1 race (the test above) passes whether or not retry works —
+    // only one hold should ever be granted there — which is exactly how an inert
+    // retry wrapper went unnoticed. This case can only pass if retry genuinely
+    // re-runs a hold that lost the lock race: on MongoDB the loser aborts
+    // instead of waiting, so a bare burst grants 1 of 3 and two legitimately
+    // available holds are refused as "slot taken".
+    //
+    // Wrapped in retryOnWriteConflict exactly as POST /reserve/hold wraps it,
+    // and mirrors dev/concurrency.int.spec.ts's booking equivalent (8 against
+    // quantity 3) so the two paths are measured identically.
+    const { resource, service } = await seed('race-capacity', 3)
+    const startTime = new Date('2027-01-10T10:00:00.000Z')
+
+    const settled = await Promise.allSettled(
+      Array.from({ length: 8 }, () =>
+        retryOnWriteConflict(() =>
+          takeHold({
+            config: resolved,
+            req: reqFor(),
+            resourceId: resource.id,
+            serviceId: service.id,
+            startTime,
+          }),
+        ),
+      ),
+    )
+
+    const granted = settled.filter((r) => r.status === 'fulfilled' && r.value.ok === true).length
+
+    const { totalDocs } = await payload.count({
+      collection: col('reservation-holds'),
+      where: { resource: { equals: resource.id } },
+    })
+
+    // Exactly 3 — not fewer (retry recovered what the bare burst loses) and not
+    // more (retry did not defeat the lock).
+    expect({ granted, totalDocs }).toEqual({ granted: 3, totalDocs: 3 })
+  })
+
+  test('a held slot is absent from getAvailableSlots when holdsSlug is passed', async () => {
+    // The read path must agree with the write path. Before holdsSlug was
+    // threaded through getAvailableSlots, /reserve/availability, /reserve/slots
+    // and the admin slot picker all advertised a held slot as FREE and the
+    // customer who clicked it got a 409 from the booking they were invited to
+    // make. Asserted BOTH ways in one test so it cannot pass vacuously: the same
+    // call without holdsSlug still offers the slot, which is also the
+    // slotHolds-disabled behaviour.
+    const { resource, service } = await seed('read-path')
+    // A Thursday, matching the schedule below; UTC (dev config sets no timezone).
+    const dayKey = '2027-01-14'
+    await payload.create({
+      collection: col('schedules'),
+      data: {
+        name: 'Hold Read Path Schedule',
+        active: true,
+        recurringSlots: [{ day: 'thu', endTime: '17:00', startTime: '09:00' }],
+        resource: resource.id,
+        scheduleType: 'recurring',
+      },
+    })
+
+    const heldStart = `${dayKey}T10:00:00.000Z`
+    const held = await takeHold({
+      config: resolved,
+      req: reqFor(),
+      resourceId: resource.id,
+      serviceId: service.id,
+      startTime: new Date(heldStart),
+    })
+    if (!held.ok) {
+      throw new Error(`expected hold, got ${held.reason}`)
+    }
+
+    const args = {
+      blockingStatuses: resolved.statusMachine.blockingStatuses,
+      date: dayKey,
+      payload,
+      req: reqFor(),
+      reservationSlug: 'reservations',
+      resourceIds: [resource.id],
+      resourceSlug: 'resources',
+      scheduleSlug: 'schedules',
+      serviceId: service.id,
+      serviceSlug: 'services',
+    } as unknown as Parameters<typeof getAvailableSlots>[0]
+
+    const withHolds = await getAvailableSlots({ ...args, holdsSlug: resolved.slugs.holds })
+    const withoutHolds = await getAvailableSlots(args)
+
+    const starts = (r: { slots: Array<{ start: Date }> }) =>
+      r.slots.map((s) => s.start.toISOString())
+
+    expect(starts(withoutHolds)).toContain(heldStart)
+    expect(starts(withHolds)).not.toContain(heldStart)
+    // Only the held window disappears — the rest of the day is still bookable.
+    expect(starts(withHolds).length).toBeGreaterThan(0)
+  })
+
+  test('an authenticated non-privileged user cannot READ holds over the API', async () => {
+    // A hold's `token` is a bearer secret: whoever can read it can release
+    // someone else's hold or book their slot with it. `admin.hidden` only hides
+    // the nav link — Payload still mounts GET /api/reservation-holds — so the
+    // collection's own `read` access is the only thing standing in the way.
+    // overrideAccess:false is what the REST layer does; the plugin's own
+    // internal reads all stay privileged and are covered by every other test in
+    // this file.
+    const { customer, resource, service } = await seed('secret')
+    const held = await takeHold({
+      config: resolved,
+      req: reqFor(),
+      resourceId: resource.id,
+      serviceId: service.id,
+      startTime: new Date('2027-01-11T10:00:00.000Z'),
+    })
+    if (!held.ok) {
+      throw new Error(`expected hold, got ${held.reason}`)
+    }
+
+    const asCustomer = {
+      overrideAccess: false,
+      user: { ...customer, collection: 'customers' },
+    } as unknown as { overrideAccess: false }
+
+    await expect(
+      payload.find({ collection: col('reservation-holds'), ...asCustomer }),
+    ).rejects.toThrow(/not allowed to perform this action/i)
+
+    await expect(
+      payload.findByID({ id: held.hold.id, collection: col('reservation-holds'), ...asCustomer }),
+    ).rejects.toThrow(/not allowed to perform this action/i)
   })
 })

@@ -121,6 +121,39 @@ export function normalizeRelationshipId(value: unknown): null | number | string 
 }
 
 /**
+ * Every tenant id a tenant-field value names, as a list.
+ *
+ * Exists because multi-tenant supports a `hasMany` tenant field, so the value
+ * can legitimately be an ARRAY of relationship-shaped entries.
+ * {@link normalizeRelationshipId} returns null for an array, and the caller
+ * fails closed on null — which turned a supported multi-tenant configuration
+ * into a blanket 403 on every authenticated booking that carried an explicit
+ * tenant (a total booking outage for that install, with no diagnostic).
+ *
+ * - `[]` -> `[]`: an empty array writes no tenant, so there is nothing to
+ *   authorize; the caller permits it, exactly as it does for an absent value.
+ * - a one-or-many array -> one id per entry, all of which the caller must be
+ *   authorized for (any single unrecognized entry poisons the whole value).
+ * - a scalar / `{ id }` -> a single-element list.
+ * - anything else -> null, so the caller can still fail closed, loudly.
+ */
+export function normalizeRelationshipIds(value: unknown): Array<number | string> | null {
+  if (Array.isArray(value)) {
+    const ids: Array<number | string> = []
+    for (const entry of value) {
+      const id = normalizeRelationshipId(entry)
+      if (id === null) {
+        return null
+      }
+      ids.push(id)
+    }
+    return ids
+  }
+  const single = normalizeRelationshipId(value)
+  return single === null ? null : [single]
+}
+
+/**
  * Whether an authenticated caller may write the tenant value present in
  * `data[config.multiTenant.tenantField]` onto a new document in
  * `config.slugs.reservations`.
@@ -155,8 +188,12 @@ export function normalizeRelationshipId(value: unknown): null | number | string 
  * tenant-scoped at all, or `data` doesn't carry an explicit tenant value (MT's
  * own access-checked `defaultValue` applies in that case; see
  * `getEffectiveTenantTimezone`'s doc comment for why that path is already
- * safe). Returns false — fail closed — for an unrecognized value shape, a
- * probe that finds no matching tenant, or any error while probing.
+ * safe). Returns false — fail closed — for an unrecognized value shape (logged,
+ * since a shape this plugin cannot read refuses every such booking), a probe
+ * that finds no matching tenant, or any error while probing.
+ *
+ * A `hasMany` tenant field is supported: the value may be an array, and EVERY
+ * id in it is probed.
  */
 export async function callerMayUseTenant(args: {
   config: Pick<ResolvedReservationPluginConfig, 'multiTenant' | 'slugs'>
@@ -181,29 +218,46 @@ export async function callerMayUseTenant(args: {
     return true
   }
 
-  const tenantId = normalizeRelationshipId(rawTenant)
-  if (tenantId === null) {
+  // A `hasMany` tenant field is a supported multi-tenant configuration, so the
+  // value may be an array — every id in it must be authorized.
+  const tenantIds = normalizeRelationshipIds(rawTenant)
+  if (tenantIds === null) {
+    // Still fail closed, but say so: an unrecognized shape refuses the booking,
+    // and silently refusing every booking is indistinguishable from an outage.
+    // The value itself is caller-supplied and is deliberately NOT logged.
+    req.payload.logger.warn({
+      msg: `payload-reserve: refusing a booking because its "${tenantField}" value has an unrecognized shape. Expected an id, a { id } object, or an array of either (a "hasMany" tenant field). If your tenant field uses a shape this plugin does not recognize, every authenticated booking carrying an explicit tenant will be refused with a 403.`,
+      tenantValueShape: Array.isArray(rawTenant) ? 'array' : typeof rawTenant,
+    })
     return false
   }
 
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tenant = await (req.payload.findByID as any)({
-      id: tenantId,
-      collection: tenantSlug,
-      depth: 0,
-      overrideAccess: false,
-      req,
-    })
-    return Boolean(tenant)
-  } catch (err) {
-    // Forbidden/NotFound is exactly the "not a member" outcome this probe
-    // exists to detect — expected, not worth logging. Anything else (a DB
-    // outage, a genuine bug) still fails closed but is worth surfacing.
-    const status = (err as { status?: number } | undefined)?.status
-    if (status !== 403 && status !== 404) {
-      req.payload.logger.warn({ err, msg: 'payload-reserve: tenant membership probe failed' })
+  for (const tenantId of tenantIds) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tenant = await (req.payload.findByID as any)({
+        id: tenantId,
+        collection: tenantSlug,
+        depth: 0,
+        overrideAccess: false,
+        req,
+      })
+      if (!tenant) {
+        return false
+      }
+    } catch (err) {
+      // Forbidden/NotFound is exactly the "not a member" outcome this probe
+      // exists to detect — expected, not worth logging. Anything else (a DB
+      // outage, a genuine bug) still fails closed but is worth surfacing.
+      const status = (err as { status?: number } | undefined)?.status
+      if (status !== 403 && status !== 404) {
+        req.payload.logger.warn({ err, msg: 'payload-reserve: tenant membership probe failed' })
+      }
+      return false
     }
-    return false
   }
+
+  // Includes the empty-array case: no tenant is being written, so there is
+  // nothing to authorize.
+  return true
 }

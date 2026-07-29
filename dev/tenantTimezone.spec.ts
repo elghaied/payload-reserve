@@ -252,15 +252,94 @@ describe('callerMayUseTenant (DB-backed, id-shape and precondition coverage)', (
     expect(findByID).toHaveBeenCalledWith(expect.objectContaining({ id: 'tenant-b' }))
   })
 
-  it('fails closed for an unrecognized value shape, without probing', async () => {
+  // A `hasMany` tenant field is a supported multi-tenant configuration, so an
+  // ARRAY value is legitimate. Treating it as unrecognized (which this suite
+  // previously asserted) refused EVERY authenticated booking that carried an
+  // explicit tenant on such an install — a total booking outage, fail-closed but
+  // still a bug, and with no diagnostic to find it by.
+  it('probes a single-element hasMany array by its one id', async () => {
     const { findByID, req } = makeReq({})
     const permitted = await callerMayUseTenant({
       config: config as never,
       data: { tenant: ['tenant-b'] },
       req,
     })
+    expect(permitted).toBe(true)
+    expect(findByID).toHaveBeenCalledTimes(1)
+    expect(findByID).toHaveBeenCalledWith(expect.objectContaining({ id: 'tenant-b' }))
+  })
+
+  it('probes EVERY id of a multi-element hasMany array', async () => {
+    const { findByID, req } = makeReq({})
+    const permitted = await callerMayUseTenant({
+      config: config as never,
+      data: { tenant: ['tenant-b', { id: 'tenant-c' }, 4] },
+      req,
+    })
+    expect(permitted).toBe(true)
+    expect(findByID.mock.calls.map((c) => (c[0] as { id: unknown }).id)).toEqual([
+      'tenant-b',
+      'tenant-c',
+      4,
+    ])
+  })
+
+  it('fails closed when ANY id in a hasMany array is not a member', async () => {
+    const findByID = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 'tenant-b' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ id: 'tenant-d' })
+    const { req } = makeReq({ findByID })
+    const permitted = await callerMayUseTenant({
+      config: config as never,
+      data: { tenant: ['tenant-b', 'tenant-c', 'tenant-d'] },
+      req,
+    })
+    expect(permitted).toBe(false)
+    // Stopped at the first denial rather than probing the rest.
+    expect(findByID).toHaveBeenCalledTimes(2)
+  })
+
+  it('fails closed and WARNS for an unrecognized value shape, without probing', async () => {
+    const { findByID, req, warn } = makeReq({})
+    const permitted = await callerMayUseTenant({
+      config: config as never,
+      data: { tenant: true },
+      req,
+    })
     expect(permitted).toBe(false)
     expect(findByID).not.toHaveBeenCalled()
+    // Silently refusing every booking is indistinguishable from an outage, so
+    // the refusal has to be diagnosable from the logs.
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ msg: expect.stringContaining('unrecognized shape') }),
+    )
+  })
+
+  it('fails closed for an array containing an unusable entry', async () => {
+    const { findByID, req } = makeReq({})
+    const permitted = await callerMayUseTenant({
+      config: config as never,
+      data: { tenant: ['tenant-b', { name: 'no id field' }] },
+      req,
+    })
+    expect(permitted).toBe(false)
+    expect(findByID).not.toHaveBeenCalled()
+  })
+
+  it('treats an EMPTY array as nothing to authorize', async () => {
+    // `tenant: []` writes no tenant, so there is nothing to check — the same
+    // outcome as an absent value, not an unrecognized shape.
+    const { findByID, req, warn } = makeReq({})
+    const permitted = await callerMayUseTenant({
+      config: config as never,
+      data: { tenant: [] },
+      req,
+    })
+    expect(permitted).toBe(true)
+    expect(findByID).not.toHaveBeenCalled()
+    expect(warn).not.toHaveBeenCalled()
   })
 
   it('fails closed when the probe finds no matching tenant (not a member)', async () => {
