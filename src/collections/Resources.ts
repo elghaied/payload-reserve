@@ -162,6 +162,17 @@ export function createResourcesCollection(
         options: buildSelectOptions(config.resourceTypes),
       },
       ...(ownerFieldDef ? [ownerFieldDef] : []),
+      {
+        // Serialization point for concurrent bookings. Every booking write
+        // touches this field on each resource it claims, inside the booking's
+        // transaction — which turns "two transactions insert different
+        // reservation documents" (which no database serializes) into "two
+        // transactions write the SAME document" (which every database does).
+        // The value is never read; only the write matters.
+        name: 'bookingLock',
+        type: 'text',
+        admin: { hidden: true },
+      },
     ],
     labels: {
       plural: ({ t }) => (t as PluginT)('reservation:collectionResources'),

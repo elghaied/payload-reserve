@@ -8,6 +8,7 @@ import type {
 import type { PluginT } from '../translations/index.js'
 import type { ReservationPluginHooks, ResolvedReservationPluginConfig } from '../types.js'
 
+import { acquireBookingLock } from '../hooks/reservations/acquireBookingLock.js'
 import { calculateEndTime } from '../hooks/reservations/calculateEndTime.js'
 import { checkIdempotency } from '../hooks/reservations/checkIdempotency.js'
 import { enforceCustomerOwnership } from '../hooks/reservations/enforceCustomerOwnership.js'
@@ -275,6 +276,9 @@ export function createReservationsCollection(
         // checked too; before validateConflicts so rejection is cheap.
         validateActive(config),
         calculateEndTime(config),
+        // Must precede validateConflicts: it manufactures the write contention
+        // that makes the conflict check meaningful under concurrency.
+        acquireBookingLock(config),
         validateConflicts(config),
         // validateCancellation runs BEFORE validateStatusTransition so a cancel
         // rejected by the notice period never fires the beforeBookingCancel
