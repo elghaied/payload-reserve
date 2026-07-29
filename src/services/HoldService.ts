@@ -1,27 +1,33 @@
 import type { PayloadRequest } from 'payload'
 
+import { ValidationError } from 'payload'
+
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { isTransientWriteConflict } from '../utilities/retryOnWriteConflict.js'
 import { computeEndTime } from './AvailabilityService.js'
 
 /**
- * Why a hold was refused. A conflict surfaces as a ValidationError from
- * validateHoldSlot; a lost lock race surfaces as a transient write conflict,
- * which for a hold means the same thing to the caller — the slot went to
- * someone else.
+ * Why a hold was refused — a CLOSED set, deliberately.
+ *
+ * `/reserve/hold` is reachable without authentication, so the refusal reason is
+ * attacker-visible output. An earlier version echoed `error.message` from any
+ * failed write, which leaked internal detail (DB errors, `Forbidden`, genuine
+ * bugs) and reported all of it as `409 slot_taken` — a status that tells a
+ * well-behaved client the slot is gone and it should stop, for conditions that
+ * are nothing of the sort. Everything not enumerated here now propagates as a
+ * thrown error, so it surfaces as a 500 the operator can see rather than a
+ * plausible-looking 409 the caller cannot act on.
  */
-function reasonFor(error: unknown): string {
-  if (isTransientWriteConflict(error)) {
-    return 'slot_taken'
-  }
-  const message = (error as { message?: unknown })?.message
-  return typeof message === 'string' && message ? message : 'unavailable'
-}
+export type HoldRefusalReason =
+  | 'resource_not_found'
+  | 'service_inactive'
+  | 'service_not_found'
+  | 'slot_taken'
 
 export type TakeHoldResult =
   | { hold: { expiresAt: string; id: number | string; token: string }; ok: true }
-  | { ok: false; reason: string }
+  | { ok: false; reason: HoldRefusalReason }
 
 /**
  * Claim a slot for `config.slotHolds.ttlMinutes` while the caller completes an
@@ -45,14 +51,22 @@ export async function takeHold(params: {
   const { config, guestCount = 1, req, resourceId, serviceId, startTime } = params
   const { payload } = req
 
+  // `disableErrors` is what makes the `!service` guard below reachable at all:
+  // without it `findByID` THROWS `NotFound`, and this call sits outside the
+  // try/catch, so a bad service id escaped as a raw 404 while a bad resource id
+  // came back as a 409 with an internal message. The trailing `.catch` covers
+  // the adapter's own cast error for a malformed id (the same treatment
+  // `/reserve/availability` and `/reserve/slots` already give it) — to a caller
+  // both mean exactly "no such service".
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = await (payload.findByID as any)({
     id: serviceId,
     collection: config.slugs.services,
     depth: 0,
+    disableErrors: true,
     joins: false,
     req,
-  })
+  }).catch(() => null)
 
   if (!service) {
     return { ok: false, reason: 'service_not_found' }
@@ -60,6 +74,23 @@ export async function takeHold(params: {
 
   if (config.enforceActive && service.active === false) {
     return { ok: false, reason: 'service_inactive' }
+  }
+
+  // Same treatment for the resource. `validateHoldSlot` writes the resource's
+  // booking lock through `payload.db.updateOne`, which for an unknown or
+  // malformed id throws an adapter-level error — previously echoed verbatim as
+  // a 409. Resolving it here turns it into a clean 404.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resource = await (payload.findByID as any)({
+    id: resourceId,
+    collection: config.slugs.resources,
+    depth: 0,
+    disableErrors: true,
+    req,
+  }).catch(() => null)
+
+  if (!resource) {
+    return { ok: false, reason: 'resource_not_found' }
   }
 
   const { endTime } = computeEndTime({
@@ -106,7 +137,22 @@ export async function takeHold(params: {
       req,
     })
   } catch (error) {
-    return { ok: false, reason: reasonFor(error) }
+    // A lost lock race must REJECT, not resolve: `retryOnWriteConflict` (which
+    // wraps every caller of this function) only retries a rejected promise, so
+    // returning here made the whole retry wrapper inert and collapsed a
+    // `quantity: 3` resource to one hold under a burst.
+    if (isTransientWriteConflict(error)) {
+      throw error
+    }
+    // validateHoldSlot signals genuine unavailability — the slot is booked,
+    // held, out of capacity, or the service went inactive — as a
+    // ValidationError. That is the only refusal this catch recognises.
+    if (error instanceof ValidationError) {
+      return { ok: false, reason: 'slot_taken' }
+    }
+    // Anything else is a real failure, not a refusal. Propagate it rather than
+    // dressing it up as a 409 carrying its own message.
+    throw error
   }
 
   return { hold: { id: created.id, expiresAt, token }, ok: true }

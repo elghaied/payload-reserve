@@ -1,16 +1,35 @@
 import type { Endpoint } from 'payload'
 
+import type { HoldRefusalReason } from '../services/HoldService.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { takeHold } from '../services/HoldService.js'
-import { retryOnWriteConflict } from '../utilities/retryOnWriteConflict.js'
+import {
+  isTransientWriteConflict,
+  retryOnWriteConflict,
+} from '../utilities/retryOnWriteConflict.js'
+
+/**
+ * HTTP status per refusal reason. Exhaustive over the closed
+ * {@link HoldRefusalReason} union on purpose — a new reason cannot be added
+ * without deciding its status, which is how every failure used to collapse into
+ * a single 409 carrying an internal message.
+ */
+const REFUSAL_STATUS: Record<HoldRefusalReason, number> = {
+  resource_not_found: 404,
+  service_inactive: 409,
+  service_not_found: 404,
+  slot_taken: 409,
+}
 
 /**
  * Claim a slot while the caller completes checkout.
  *
  * Retried for the same reason a booking is: taking a hold writes the resource's
  * bookingLock, so two simultaneous callers contend on one document and MongoDB
- * aborts the loser rather than making it wait.
+ * aborts the loser rather than making it wait. `takeHold` therefore RETHROWS a
+ * transient conflict instead of returning it — the wrapper below only retries a
+ * rejected promise.
  */
 export function createHoldSlotEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
@@ -33,21 +52,39 @@ export function createHoldSlotEndpoint(config: ResolvedReservationPluginConfig):
         return Response.json({ error: 'startTime is not a valid date' }, { status: 400 })
       }
 
-      const result = await retryOnWriteConflict(() =>
-        takeHold({
-          config,
-          endTime: body.endTime ? new Date(body.endTime as string) : undefined,
-          guestCount: (body.guestCount as number) ?? 1,
-          req,
-          resourceId: resource,
-          serviceId: service,
-          startTime: parsedStart,
-        }),
-      )
+      let result: Awaited<ReturnType<typeof takeHold>>
+      try {
+        result = await retryOnWriteConflict(
+          () =>
+            takeHold({
+              config,
+              endTime: body.endTime ? new Date(body.endTime as string) : undefined,
+              guestCount: (body.guestCount as number) ?? 1,
+              req,
+              resourceId: resource,
+              serviceId: service,
+              startTime: parsedStart,
+            }),
+          { req },
+        )
+      } catch (err) {
+        // A conflict that survived every attempt is contention, not a verdict on
+        // the slot — mirrors /reserve/book's mapping so a client can distinguish
+        // "try again" from "gone".
+        if (isTransientWriteConflict(err)) {
+          return Response.json(
+            {
+              error: 'That slot is being claimed by someone else. Please try again.',
+              retryable: true,
+            },
+            { status: 409 },
+          )
+        }
+        throw err
+      }
 
       if (!result.ok) {
-        // The slot is unavailable, not the request malformed.
-        return Response.json({ error: result.reason }, { status: 409 })
+        return Response.json({ error: result.reason }, { status: REFUSAL_STATUS[result.reason] })
       }
 
       return Response.json(
