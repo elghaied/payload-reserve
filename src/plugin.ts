@@ -343,8 +343,19 @@ export const payloadReserve =
               userCollection && collectionHasTenantField(userCollection, tenantField)
 
             if (userCollection && !scopedByArray && !scopedByField) {
+              // The remedy is NOT "add it to multi-tenant's collections option" —
+              // confirmed against @payloadcms/plugin-multi-tenant's own source
+              // (index.ts): it resolves ONE "admin users" collection (config.admin.user,
+              // else the first auth-enabled collection) and pushes the tenants ARRAY
+              // onto that one automatically; listing THAT SAME collection in
+              // `collections` is actively rejected — multi-tenant logs its own
+              // console.warn and skips tenant-field processing for it entirely. Only a
+              // SEPARATE auth collection from the admin one can be scoped via
+              // `collections` (it gets an ordinary flat tenant field there). This
+              // plugin cannot tell which case applies from here, so the message
+              // explains both rather than asserting the wrong one.
               payload.logger.warn(
-                `payload-reserve: the "${resolved.slugs.customers}" collection backs userCollection mode and holds the customer PII that /api/reservation-customer-search reads, but it carries neither a "${tenantField}" field nor a "${MT_TENANTS_ARRAY_FIELD}" membership array. Detection is a heuristic, so disregard this if you are not using multi-tenancy, or if you renamed the tenants array field, or set "tenantsArrayField.includeDefaultField: false" — both are supported multi-tenant configurations this check cannot see. Otherwise add it to the multi-tenant plugin's "collections" option, or customer records stay readable across tenants.`,
+                `payload-reserve: the "${resolved.slugs.customers}" collection backs userCollection mode and holds the customer PII that /api/reservation-customer-search reads, but it carries neither a "${tenantField}" field nor a "${MT_TENANTS_ARRAY_FIELD}" membership array. Detection is a heuristic, so disregard this if you are not using multi-tenancy, or if you renamed the tenants array field, or set "tenantsArrayField.includeDefaultField: false" — both are supported multi-tenant configurations this check cannot see. Otherwise: multi-tenant does NOT scope an auth collection by listing it in its "collections" option — it rejects that with its own warning and skips the collection entirely. If this is the collection multi-tenant treats as its admin/tenant-owning collection ("admin.user" in your Payload config, or your only auth-enabled collection), it needs the "${MT_TENANTS_ARRAY_FIELD}" array instead, which multi-tenant adds automatically unless disabled. Only a SEPARATE auth collection from that one belongs in the "collections" option, where it gets an ordinary "${tenantField}" field.`,
               )
             }
           }

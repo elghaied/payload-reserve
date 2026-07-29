@@ -29,10 +29,13 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Collection Overrides** — Customize any generated collection (add fields like a `join`, tweak admin options, attach your own hooks) via `collectionOverrides` without forking — the plugin's hooks and access are merged, not clobbered (supersedes the deprecated `extraReservationFields`)
 - **Services ↔ Resources Join** — Services show a read-only `resources` field (a `join` over `Resources.services`) listing which resources currently perform them; assignment still happens on the Resource
 - **Active Enforcement** — `active: false` on a Service or Resource — including one referenced by a multi-resource `items[]` entry — blocks new bookings against it, blocks rescheduling or re-pointing an existing booking onto it, and excludes it from availability; non-scheduling edits such as confirm and cancel always remain allowed, and `enforceActive: false` opts out entirely
+- **Concurrency-Safe Booking** — A transactional `bookingLock` on Resources serializes simultaneous bookers for the same slot; automatic retry recovers lost capacity on MongoDB, and a surviving conflict maps to a clean HTTP 409 rather than a raw 500 — see [Concurrent booking: database adapter support](#concurrent-booking-database-adapter-support)
+- **Slot Holds** — Opt-in short-lived claims on a slot while a customer completes checkout, so it can't be booked out from under them; convert to a real booking or release, both idempotent-safe
+- **Delete Guard** — Deleting a Service or Resource still referenced by a reservation (or, for a Resource, a schedule) fails with an actionable message instead of an inconsistent database or a silent dangling reference; `active: false` is the supported way to retire one
 - **Cancellation Policy** — Configurable minimum notice period enforcement
-- **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems
+- **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems — all fire inside the write's own database transaction, never after
 - **Availability Service** — Pure functions and DB helpers for slot generation (15-min step) and conflict checking with guest-count-aware filtering
-- **Public REST API** — Six pre-built endpoints for availability, slot listing, resource availability, booking (incl. guest bookings), cancellation, and customer search — with ownership enforcement and input validation
+- **Public REST API** — Seven pre-built endpoints for availability, slot listing, resource availability, booking (incl. guest bookings), cancellation, and customer search, plus two more for slot holds when enabled — with ownership enforcement and input validation
 - **Calendar View** — Month/week/day/lanes/pending calendar replacing the default reservations list view, with per-resource availability shading and click-a-free-slot-to-book; plus an availability-aware slot picker on the reservation form
 - **Dashboard Widget** — Server component showing today's booking stats
 - **Availability Overview** — Weekly grid of resource availability vs. booked slots
@@ -415,18 +418,23 @@ Four endpoints now gate the request through Payload's normal access-control pipe
 | Endpoint | What delegates to access control | What stays privileged | Why |
 |---|---|---|---|
 | `/api/reservation-customer-search` | the customer query itself | — | The whole endpoint is the read; nothing is derived from it. |
-| `/api/reserve/resource-availability` | a `findByID` probe of the requested resource (404 on denial) | the four reads that build the grid (schedules, reservations, services, resources) | The probe decides *whether you may see this resource*. The grid must then show every conflicting booking, including other tenants' and other owners' — a busy slot you can't see is a double-booking. |
+| `/api/reserve/resource-availability` | a `findByID` probe of the requested resource (404 on denial) | the four reads that build the grid (the resource itself, its schedules, its busy reservations, and — when its services name a `requiredResources` pool — that pool's own resource read; two of the four are Resources reads, and there is no separate services read) | The probe decides *whether you may see this resource*. The grid must then show every conflicting booking, including other tenants' and other owners' — a busy slot you can't see is a double-booking. |
 | `/api/reserve/cancel` | the update, **only** on the privileged-non-owner path | the reservation read, and the update on the owner and guest-token paths | For a guest the cancellation token *is* the authorization. For an owner, `resourceOwnerMode`'s `update: adminOnly` would otherwise block a customer cancelling their own booking. Ownership and token matching are checked in the endpoint before either path is taken. |
 | `/api/reserve/effective-timezone` | the tenant-document read (falls back to the global zone on denial) | — | Prevents a forged tenant cookie resolving a zone you have no membership in. |
 
 - **Plain installs** (no `resourceOwnerMode`, no `multiTenant`, and no custom `access` overrides) are unaffected: Payload's own built-in default is `read: ({ req: { user } }) => Boolean(user)`, so any authenticated user still passes.
 - **A `userCollection` with a restrictive `read` rule now narrows customer search accordingly.** If the existing auth collection you pointed `userCollection` at defines its own `access.read` — for example, one that scopes a user to their own record or to a department — `/api/reservation-customer-search` now respects it, because the endpoint no longer out-permissions the collection it reads from. If staff stop seeing customers they used to see, the fix is in that collection's own `access.read`, not in the plugin.
 
-#### `/api/reserve/book` is intentionally **not** access-checked
+#### `/api/reserve/book`: two independent gates, not one
 
-`POST /api/reserve/book` still calls `payload.create` privileged, by design: anonymous guest bookings have no `req.user` to authorize, and under `resourceOwnerMode` a `create: adminOnly` rule would block an authenticated customer booking for themselves. It needs the same per-path treatment `/api/reserve/cancel` got, which is its own piece of work.
+`POST /api/reserve/book` does **not** follow the single "gate with one access-checked call" pattern the table above uses — it needs two independent gates, because a plain `overrideAccess: false` flip is not sufficient here and would also break ordinary self-service booking.
 
-> **Known limitation.** Because the create is privileged, under `multiTenant` an authenticated caller belonging to tenant A can `POST` an explicit `tenant: <tenant-B-id>` in the request body and have the reservation land in tenant B. The multi-tenant plugin's tenant-field `validate` only checks that a value is present, and its membership-checked `defaultValue` applies only when no value was supplied. If you expose this endpoint to untrusted authenticated users in a multi-tenant install, strip or pin `tenant` in a `beforeBookingCreate` hook until this is fixed.
+1. **`overrideAccess` (who may write at all).** An anonymous guest booking (no `req.user` to authorize) or an authenticated customer booking for **themselves** — already forced onto their own id by the `enforceCustomerOwnership` collection hook — stays privileged. Delegating on that path would trip `resourceOwnerMode`'s admin-only reservation `create` access for no security benefit, since the caller can only ever end up booking themselves anyway. Any other authenticated call (staff/admin booking on someone else's behalf) delegates (`overrideAccess: false`).
+2. **`callerMayUseTenant` (which tenant they may write into).** For every authenticated caller — including the privileged self-booking path above — an access-checked (`overrideAccess: false`) probe read (`src/utilities/tenantTimezone.ts`) checks any explicit `tenant` in the request body against the tenants collection. This is required because `overrideAccess` alone cannot close a cross-tenant write: Payload's `create` access check (`executeAccess`) only checks the *truthiness* of what an access function returns, and — unlike read/update/delete — never applies the returned `Where` to filter anything, since there's no existing document yet to filter. So multi-tenant's own tenant-scoped `create` access passes for *any* authenticated member of *any* tenant, regardless of gate 1. This is what **closes** the formerly-open hole where an authenticated tenant-A caller could `POST` an explicit `tenant: <tenant-B-id>` and land the reservation there — a denial from the probe returns a clean 403 before `payload.create` is ever called.
+
+**Precondition worth knowing:** the probe is a genuine membership check only when the caller authenticates against the *same* collection multi-tenant wraps as its admin/tenant-owning collection — true whenever `userCollection` points at that collection. In **standalone mode** (no `userCollection`), customers authenticate against the plugin's own `slugs.customers`, a collection multi-tenant never wraps, so the probe passes for any tenant id supplied by a logged-in customer. The plugin warns about this at boot whenever standalone mode + multi-tenant is detected; the fix is `userCollection` pointing at multi-tenant's admin auth collection, or your own tenant check in front of the endpoint.
+
+**`resourceOwnerMode` trade-off, by design, not an oversight:** because a self-booking customer stays on the privileged path (gate 1, above), a consumer's own `access.reservations.create` — and any field-level `create` access added via `collectionOverrides.reservations` — is **not** applied on that path. Nothing about this is exploitable today (the caller can still only ever book themselves), but if you add field-level create access via `collectionOverrides` expecting it to run for every booking, it silently won't run for this one.
 
 The reservations collection's own REST API (`POST /api/reservations`) is unaffected — it goes through Payload's access control as normal.
 
@@ -476,9 +484,25 @@ payload-reserve: these collections are NOT tenant-scoped: reservations, resource
 
 Detection is a **heuristic** — the multi-tenant plugin exposes nothing at init to check directly — so the warning arms on either of two independent signals: some collection in your config carries a top-level tenant field, or an auth collection carries multi-tenant's `tenants` membership array. Each covers the other's blind spot (scoping *only* these collections and forgetting them all leaves nothing else carrying the field; `tenantsArrayField.includeDefaultField: false` removes the array). Neither is exact, so the warning can fire on a config that merely looks tenant-shaped — it is only ever a warning and never blocks boot.
 
+Two more diagnostics fire under the same "multi-tenant detected" condition. In **standalone mode**, `/api/reserve/book`'s tenant-membership probe (above) is a real membership check only when the caller authenticates against the same collection multi-tenant wraps — standalone customers never do, so the plugin warns that the probe cannot actually verify a logged-in customer's membership there; point `userCollection` at multi-tenant's own admin auth collection to close it. In **`userCollection` mode**, if your auth collection carries *neither* a flat tenant field *nor* multi-tenant's `tenants` membership array, it is genuinely unscoped and the plugin warns naming it — the remedy depends on which collection multi-tenant treats as its own admin/tenant-owning collection: if it's this one, it needs the `tenants` array (which multi-tenant adds automatically unless disabled), not a listing in `collections`, which multi-tenant itself rejects for that collection; only a genuinely separate auth collection belongs in `collections`.
+
+### Hook timing: every plugin hook fires before commit, never after
+
+`afterBookingCreate`, `afterBookingConfirm`, `afterBookingCancel`, and `afterStatusChange` all fire **inside** the write's database transaction, not after it commits. Payload runs collection `afterChange` hooks and then commits in the same operation: verified directly against the installed package, `node_modules/payload/dist/collections/operations/create.js` invokes the collection's `afterChange` hooks at line 291 and calls `commitTransaction(req)` at line 324 — the only things that run in between are Payload's own `afterOperation` hook (which this plugin does not use) and `unlinkTempFiles`. The update path (where a status-change hook typically fires) is structurally identical.
+
+Payload exposes **no** post-commit hook point — `afterOperation` is pre-commit too — so this is a documented constraint, not something a future version can quietly fix. In practice the failure window is narrow: the only way a plugin hook fires for a write that never actually lands is the commit itself failing *after* every hook already ran successfully — a database partition, not a routine validation failure (those throw earlier, from a `beforeChange` hook, before any `afterChange` hook or the commit is ever reached). **If your integration must not act on an uncommitted booking** (e.g. charging a card from `afterBookingConfirm`), make the side effect idempotent and reconcile afterward — upsert by reservation id, or verify the booking still exists before treating a webhook as authoritative — rather than relying on hook-vs-commit ordering to protect you.
+
 ### Concurrent booking: database adapter support
 
-Two simultaneous bookers for the same slot are only kept from double-booking each other because a `beforeChange` hook writes each claimed resource's hidden `bookingLock` field inside the booking's own transaction — the database, not the plugin, is what forces the losers to wait or abort. That means correctness depends on the adapter actually giving Payload a transaction. Measured directly (burst of 8 concurrent creates against a `quantity: 3` resource; `dev/concurrency.int.spec.ts`, `dev/holds.int.spec.ts`):
+Two simultaneous bookers for the same slot are only kept from double-booking each other because a `beforeChange` hook (`acquireBookingLock`) writes each claimed resource's hidden `bookingLock` field inside the booking's own transaction — the database, not the plugin, is what forces the losers to wait or abort. **Before this existed, nothing prevented a double-booking at all:** measured on MongoDB, 10 simultaneous creates for one `quantity: 1` slot produced 10 confirmed reservations, and 8 simultaneous creates against a `quantity: 3` resource produced 8.
+
+Because the lock only works *inside* a transaction, **a database that gives Payload no transaction gives no protection, silently.** A standalone (non-replica-set) MongoDB skips transactions entirely; SQLite needs `transactionOptions` set on the adapter (see below) or it never gets one either. The plugin's boot diagnostic (`supportsTransactions`) probes this at startup and warns if it fails:
+
+```
+payload-reserve: this database does not support transactions, so concurrent bookings for the same slot can double-book. MongoDB needs a replica set (even single-node) for transaction support. Postgres supports transactions by default. SQLite requires transactionOptions to be set on the adapter, or it silently runs without them.
+```
+
+**Retry is required on MongoDB and does nothing on Postgres.** `retryOnWriteConflict` re-runs the whole write on a fresh transaction when the failure is a recognized transient conflict (structured signals only — MongoDB's `errorLabels`/code, Postgres's SQLSTATE, SQLite's `code` prefix — never message text). MongoDB's loser aborts immediately rather than waiting, so without retry a `quantity: 3` resource recovers only 1 of 3 under a burst. Postgres's loser *blocks* until the winner commits and then proceeds through the normal conflict check on the merits, so retry never fires there at all — measured 3 of 3 recovered with no retry needed. `/api/reserve/book`, `/api/reserve/cancel`, and `/api/reserve/hold` all wrap their write in `retryOnWriteConflict`; a conflict that survives every attempt maps to a clean HTTP **409**, not a raw 500. Measured directly (burst of 8 concurrent creates against a `quantity: 3` resource; `dev/concurrency.int.spec.ts`, `dev/holds.int.spec.ts`):
 
 | Adapter | Serializes? | Loser behavior | Capacity with no retry (of 3) | Retry recovers full capacity? |
 |---|---|---|---|---|
@@ -492,7 +516,53 @@ Two simultaneous bookers for the same slot are only kept from double-booking eac
 
 **Retry-based capacity recovery does not work for SQLite, and this is a limitation the plugin cannot fix.** `src/utilities/retryOnWriteConflict.ts` now recognizes the `SQLITE_BUSY`/`SQLITE_LOCKED*` code family (structured `code`-prefix match, same as the brief's constraint requires) — but in practice this detection never fires for SQLite's actual failure shape. Confirmed by direct inspection: the original `LibsqlError` (with `code: 'SQLITE_LOCKED_SHAREDCACHE'`) is caught **inside** `@payloadcms/drizzle`'s own `beginTransaction.js` (a Payload-core dependency, not this plugin) and re-thrown as a bare `new Error('Error: cannot begin transaction: ...')` — a plain object with a message string and nothing else (`Object.keys(error)` is empty; no `code`, no `cause`, `name` is the generic `'Error'`). By the time the error reaches this plugin's retry logic, the structured signal is already gone. Raising the retry budget from the default (5 attempts) to 30 makes no difference — confirmed each of the losing attempts fails exactly once, meaning retry is never even entered, since `isTransientWriteConflict` correctly returns `false` for an error with no matchable field. The only way to detect this failure would be matching on the error's message text, which this project's structured-signal-only constraint explicitly forbids. **Net effect: on SQLite, a `quantity: 1` resource is fully safe under concurrency (no double-booking, ever); a `quantity: N > 1` resource under a simultaneous burst will safely reject the excess rather than over-book, but will not recover to its full legitimate capacity the way Mongo and Postgres do** — some legitimately bookable slots may be lost under contention. This is a `@payloadcms/db-sqlite`/`@payloadcms/drizzle` limitation external to this plugin, not something addressed here.
 
-**The same gap means `POST /api/reserve/book` returns a raw HTTP 500 under SQLite contention, not the clean `409` Task 2 built for Mongo and Postgres.** `createBooking.ts` maps a surviving conflict to `409 { retryable: true }` by checking `isTransientWriteConflict` on whatever `retryOnWriteConflict` ultimately throws — the same check that cannot recognize SQLite's stripped `beginTransaction` error above. Measured directly: 6 simultaneous `POST /api/reserve/book` calls for the same slot correctly booked exactly one (no over-booking), but 5 of the 6 losers came back as `500`, not `409`. **Practically, this means a public booking widget backed by SQLite will show its generic error-handling UI, not a "someone just booked this, try again" message, whenever two customers click "Book" for the same slot at close to the same time** — the request still fails safely (nothing is double-booked), but the caller gets an opaque server error instead of an actionable one. This is the same external, unfixable-without-message-matching limitation described above, reaching a second call site.
+**The same gap means `POST /api/reserve/book` returns a raw HTTP 500 under SQLite contention, not the clean `409` this plugin's retry/409 mapping (above) gives Mongo and Postgres.** `createBooking.ts` maps a surviving conflict to `409 { retryable: true }` by checking `isTransientWriteConflict` on whatever `retryOnWriteConflict` ultimately throws — the same check that cannot recognize SQLite's stripped `beginTransaction` error above. Measured directly: 6 simultaneous `POST /api/reserve/book` calls for the same slot correctly booked exactly one (no over-booking), but 5 of the 6 losers came back as `500`, not `409`. **Practically, this means a public booking widget backed by SQLite will show its generic error-handling UI, not a "someone just booked this, try again" message, whenever two customers click "Book" for the same slot at close to the same time** — the request still fails safely (nothing is double-booked), but the caller gets an opaque server error instead of an actionable one. This is the same external, unfixable-without-message-matching limitation described above, reaching a second call site.
+
+#### Running the test suite against every adapter
+
+The integration suite defaults to an in-memory MongoDB replica set. Run it against Postgres or SQLite with an env var — no code changes needed:
+
+```bash
+# Postgres — point PG_URL at a real, empty database
+PG_URL="postgres://user:password@localhost:5432/reserve_test" CI=true pnpm test:int
+
+# SQLite — in-memory by default
+SQLITE=1 CI=true pnpm test:int
+```
+
+Both are opt-in dev/CI conveniences, not something a consumer's app needs to configure — they exist so this plugin's own suite can be verified against every adapter it claims to support. **Neither run is expected to be fully green by construction, and this is known, not a regression to chase:** under SQLite, 2 concurrency/lock-contention tests fail for the accepted upstream reason documented above (never "fix" this by matching on message text). Under both SQL adapters, 1 test (`bufferFor error trace`) is cleanly skipped — it manufactures a dangling reference via `context.skipReservationHooks` to exercise a code path that the delete guard below makes structurally unreachable on a schema-enforced SQL database.
+
+### Slot holds (opt-in)
+
+Short-lived claims on a slot, taken while a customer completes an external step (typically payment) before the booking itself exists. Enable with the `slotHolds` plugin option:
+
+```typescript
+payloadReserve({
+  slotHolds: {
+    enabled: true,
+    ttlMinutes: 10, // default; how long an unconverted hold blocks its slot
+  },
+})
+```
+
+Disabled by default — when absent, no `reservation-holds` collection is created, neither endpoint below is registered, and availability behaviour is byte-identical to a plugin build without this feature at all. A hold occupies its resource exactly like a blocking reservation (folded into the same availability/conflict calculations); it carries no status, buffer, or `items[]` — one resource, one window, one clock. Expired holds are never trusted and are swept opportunistically, so no background job is required.
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/api/reserve/hold` | `{ resource, service, startTime, endTime?, guestCount? }` | `201 { token, expiresAt }`, or `409 { error }` if the slot is already taken or held |
+| POST | `/api/reserve/hold/release` | `{ token }` | `200 { released: 0 \| 1 }` — always `200`, even for an already-released or expired token (idempotent) |
+
+Pass the token straight through to `POST /api/reserve/book` as `holdToken` to convert a hold into a real booking — the hold is excluded from that request's own conflict check (so it doesn't block the very booking it was protecting) and the hold row is deleted on success, best-effort, so a delete failure never fails the booking itself.
+
+### Deleting a referenced Service or Resource is blocked
+
+Deleting a Service or Resource that a reservation still references (or, for a Resource, that a Schedule still references) now fails with an actionable `400`:
+
+```
+Cannot delete this resource: 2 reservations and 1 schedule still reference it. Uncheck "active" to retire it instead — that stops new bookings while keeping existing ones intact.
+```
+
+**This is a real behavioural change on MongoDB**, where the same delete previously succeeded silently, leaving the referencing reservation or schedule pointing at a document that no longer exists. On Postgres/SQLite the delete was never silent — it always failed — but with a raw, un-actionable database error (`23502`/`SQLITE_CONSTRAINT_NOTNULL`) rather than this message, because `service`/`resource` are required fields (`NOT NULL` in SQL) while the underlying adapter emits `ON DELETE SET NULL` for the same relationship, a self-contradictory schema only application code can resolve cleanly. The guard checks `items[]` references too, not just the top-level `service`/`resource` field, and covers multi-resource bookings the same way. Set `active: false` instead of deleting to retire a Service or Resource while keeping its booking (or schedule) history intact — this is what the error message points you at.
 
 ---
 
