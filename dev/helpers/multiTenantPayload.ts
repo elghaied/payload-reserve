@@ -64,7 +64,24 @@ export async function buildMultiTenantPayload(): Promise<{
       },
     ],
     db: process.env.PG_URL
-      ? postgresAdapter({ pool: { connectionString: process.env.PG_URL }, push: true })
+      ? postgresAdapter({
+          pool: { connectionString: process.env.PG_URL },
+          push: true,
+          // Isolates this fixture's tables from the main suite's, which by the time
+          // this file runs has already populated the SAME `PG_URL` database with
+          // ~35 other files' worth of collections under the default `public` schema.
+          // Without this, `push: true` schema-diffs an overlapping-but-different
+          // shape (a different users/media collection, a new tenants collection,
+          // multi-tenant-wrapped reservations/resources/schedules/services) onto
+          // those already-populated tables and can take 60+ seconds — measured
+          // hanging past vitest's hookTimeout entirely. A dedicated Postgres schema
+          // gives this fixture its own empty namespace every time regardless of
+          // what else has run in the same database; `push: true` creates it
+          // automatically. Confirmed empirically: schema push against an
+          // already-populated database dropped from 60s+ (timeout) to <1s with
+          // this option set.
+          schemaName: 'reserve_multi_tenant_test',
+        })
       : process.env.SQLITE
         ? sqliteAdapter({
             client: { url: process.env.SQLITE_URL || 'file::memory:?cache=shared' },

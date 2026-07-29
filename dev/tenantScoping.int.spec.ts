@@ -59,12 +59,20 @@ beforeAll(async () => {
   })
 
   // depth: 0 so `.tenants[0].tenant` comes back as a raw id, not a populated doc.
+  //
+  // Pass `a.id` (the RAW id), not the stringified `tenantA`, here specifically.
+  // Confirmed empirically: a numeric-id adapter's relationship-field validation
+  // coerces a stringified numeric id fine at the TOP level (e.g. resources.tenant,
+  // above) but rejects it inside an ARRAY-nested relationship field
+  // (`ValidationError: The following field is invalid: Tenants 1 > Tenant`) —
+  // this is the one write in this file that must stay adapter-agnostic by using
+  // whatever shape `payload.create` itself just returned.
   tenantAUser = (await payload.create({
     collection: 'users',
     data: {
       email: 'tenant-a-user@test.com',
       password: 'testpass123',
-      tenants: [{ tenant: tenantA }],
+      tenants: [{ tenant: a.id }],
     } as Record<string, unknown>,
     depth: 0,
   })) as unknown as {
