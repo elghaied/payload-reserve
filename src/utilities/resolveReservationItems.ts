@@ -22,12 +22,19 @@ export type ResolvedItem = {
  *   conflict-checked even when items[] never names it.
  *   Items missing startTime or resource throw a ValidationError.
  *   Duplicate (resource, startTime) pairs throw a ValidationError.
+ *   An inverted top-level (parent) window throws a ValidationError too — UNLESS
+ *   `options.lenient` is set, in which case parent synthesis is silently
+ *   skipped instead (see the lenient-mode note below).
  * - If items[] is empty/absent -> return single item from top-level fields
  *
  * Every downstream function (conflict check, endTime calc, availability)
  * works with ResolvedItem[], never with raw reservation data.
  */
-export function resolveReservationItems(data: Record<string, unknown>): ResolvedItem[] {
+export function resolveReservationItems(
+  data: Record<string, unknown>,
+  options?: { lenient?: boolean },
+): ResolvedItem[] {
+  const lenient = options?.lenient ?? false
   const items = data.items as Array<Record<string, unknown>> | undefined
 
   if (items && items.length > 0) {
@@ -113,7 +120,20 @@ export function resolveReservationItems(data: Record<string, unknown>): Resolved
     // below would always say "not covered" and synthesise a phantom item that
     // conflicts with nothing. Reject it at the source instead — it is malformed
     // input, not a case to paper over.
+    //
+    // Lenient mode (reservationOccupancies only — see AvailabilityService.ts)
+    // resolves ALREADY-STORED documents, which can carry an inverted window
+    // from a context.skipReservationHooks write or data predating this check.
+    // A read must never crash over one malformed row, and — critically — it
+    // must not lose the real items[] occupancies already resolved above by
+    // throwing out of this function entirely. So lenient mode just skips
+    // parent synthesis here instead of throwing: precisely the pre-check
+    // behavior minus the (harmless but pointless) phantom item. The write
+    // path never passes `lenient`, so it keeps the hard rejection.
     if (parentStart && parentEnd && new Date(parentEnd) <= new Date(parentStart)) {
+      if (lenient) {
+        return resolved
+      }
       throw new ValidationError({
         errors: [{ message: 'endTime must be after startTime', path: 'endTime' }],
       })

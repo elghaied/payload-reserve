@@ -114,4 +114,32 @@ describe('resolveReservationItems — parent synthesis (B1)', () => {
       }),
     ).toThrow(/endTime/i)
   })
+
+  it('lenient mode skips parent synthesis instead of throwing, preserving real items[]', () => {
+    // reservationOccupancies (the read side, resolving already-stored
+    // documents) uses lenient mode so a malformed stored row never crashes
+    // an availability read AND never loses the real items[] occupancy on
+    // that same row — critical, since a broad catch around the whole
+    // function would silently discard it too (see AvailabilityService.ts).
+    const items = resolveReservationItems(
+      {
+        endTime: '2027-01-01T09:00:00.000Z', // inverted: before startTime below
+        items: [
+          {
+            endTime: '2027-01-01T08:30:00.000Z',
+            resource: 'r1',
+            startTime: '2027-01-01T08:00:00.000Z',
+          },
+        ],
+        resource: 'r1',
+        startTime: '2027-01-01T10:00:00.000Z',
+      },
+      { lenient: true },
+    )
+
+    expect(items).toHaveLength(1)
+    expect(items[0].resource).toBe('r1')
+    expect(items[0].startTime).toBe('2027-01-01T08:00:00.000Z')
+    expect(items.some((i) => i.fromParent)).toBe(false)
+  })
 })

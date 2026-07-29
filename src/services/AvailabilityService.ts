@@ -154,7 +154,16 @@ export async function itemsToOccupancies(params: {
   return occupancies
 }
 
-/** Occupancy a single fetched reservation imposes on `resourceId`. */
+/**
+ * Occupancy a single fetched reservation imposes on `resourceId`.
+ *
+ * Resolves `reservation` LENIENTLY: this is a stored document, which — unlike
+ * a write in progress — can carry an inverted top-level window from a
+ * `context.skipReservationHooks` write or data predating that check. Lenient
+ * mode skips parent synthesis instead of throwing, so a malformed top-level
+ * window never discards the real `items[]` occupancies also present on the
+ * same row (see the lenient-mode note in resolveReservationItems.ts).
+ */
 export async function reservationOccupancies(params: {
   bufferFor: (serviceId: number | string | undefined) => Promise<{ after: number; before: number }>
   capacityMode: CapacityMode
@@ -165,7 +174,7 @@ export async function reservationOccupancies(params: {
   return itemsToOccupancies({
     bufferFor,
     capacityMode,
-    items: resolveReservationItems(reservation),
+    items: resolveReservationItems(reservation, { lenient: true }),
     resourceId,
   })
 }
@@ -333,27 +342,15 @@ export async function checkAvailability(params: {
     return result
   }
 
+  // reservationOccupancies resolves each doc LENIENTLY (see its own doc
+  // comment) — an inverted top-level window on a stored row skips parent
+  // synthesis rather than throwing, so this never needs a try/catch: every
+  // real items[] occupancy on the row still comes back.
   const fetchedOccupancies = (
     await Promise.all(
-      (docs as Array<Record<string, unknown>>).map(async (doc) => {
-        try {
-          return await reservationOccupancies({
-            bufferFor,
-            capacityMode,
-            reservation: doc,
-            resourceId,
-          })
-        } catch (err) {
-          // resolveReservationItems now rejects an inverted top-level window,
-          // but this loop resolves already-STORED documents — a row shaped
-          // like that can only exist via context.skipReservationHooks or data
-          // written before the check existed. Reading availability must stay
-          // up even if one stored row is malformed: skip its occupancy
-          // instead of failing the whole request.
-          trace.dbg('error', { docId: doc.id, err, where: 'reservationOccupancies' })
-          return []
-        }
-      }),
+      (docs as Array<Record<string, unknown>>).map((doc) =>
+        reservationOccupancies({ bufferFor, capacityMode, reservation: doc, resourceId }),
+      ),
     )
   ).flat()
 

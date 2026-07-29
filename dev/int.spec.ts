@@ -1445,11 +1445,11 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
   it('does not crash conflict-checking on a stored row with an inverted top-level window', async () => {
     // resolveReservationItems now rejects an inverted top-level window on the
     // write path, but reservationOccupancies (the READ side used by every
-    // conflict check) resolves already-stored documents. A row shaped like
-    // this can only exist via skipReservationHooks or legacy data predating
-    // the check. checkAvailability must stay up for everything else even if
-    // one stored row is malformed — see AvailabilityService's try/catch
-    // around reservationOccupancies.
+    // conflict check) resolves already-stored documents LENIENTLY — a row
+    // shaped like this can only exist via skipReservationHooks or legacy data
+    // predating the check. checkAvailability must stay up for everything else
+    // even if one stored row is malformed (lenient mode skips parent
+    // synthesis instead of throwing — see resolveReservationItems.ts).
     await payload.create({
       collection: col('reservations'),
       context: { skipReservationHooks: true },
@@ -1486,6 +1486,49 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
       },
     })
     expect(res.id).toBeDefined()
+  })
+
+  it('still rejects a genuinely conflicting booking against a stored row with an inverted top-level window', async () => {
+    // The dangerous case: lenient mode must not just avoid crashing, it must
+    // preserve the real items[] occupancy on the malformed row. If it were
+    // dropped (e.g. a catch that returns [] for the whole row instead of
+    // skipping only parent synthesis), this booking — which genuinely
+    // overlaps the malformed row's real item window — would wrongly succeed
+    // and double-book the resource.
+    await payload.create({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        customer: customerId,
+        endTime: '2025-01-09T09:00:00.000Z', // inverted: before startTime below
+        items: [
+          {
+            endTime: '2025-01-09T08:30:00.000Z',
+            resource: resourceId,
+            startTime: '2025-01-09T08:00:00.000Z',
+          },
+        ],
+        resource: resourceId,
+        service: serviceId,
+        startTime: '2025-01-09T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    // Overlaps the malformed row's real item window (08:00-08:30) directly.
+    await expect(
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          customer: customerId,
+          endTime: '2025-01-09T08:45:00.000Z',
+          resource: resourceId,
+          service: serviceId,
+          startTime: '2025-01-09T08:15:00.000Z',
+          status: 'pending',
+        },
+      }),
+    ).rejects.toThrow()
   })
 })
 

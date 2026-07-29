@@ -344,7 +344,7 @@ export const payloadReserve =
 
             if (userCollection && !scopedByArray && !scopedByField) {
               payload.logger.warn(
-                `payload-reserve: the "${resolved.slugs.customers}" collection backs userCollection mode and holds the customer PII that /api/reservation-customer-search reads, but it carries neither a "${tenantField}" field nor a "${MT_TENANTS_ARRAY_FIELD}" membership array. Detection is a heuristic, so disregard this if you are not using multi-tenancy. Otherwise add it to the multi-tenant plugin's "collections" option, or customer records stay readable across tenants.`,
+                `payload-reserve: the "${resolved.slugs.customers}" collection backs userCollection mode and holds the customer PII that /api/reservation-customer-search reads, but it carries neither a "${tenantField}" field nor a "${MT_TENANTS_ARRAY_FIELD}" membership array. Detection is a heuristic, so disregard this if you are not using multi-tenancy, or if you renamed the tenants array field, or set "tenantsArrayField.includeDefaultField: false" — both are supported multi-tenant configurations this check cannot see. Otherwise add it to the multi-tenant plugin's "collections" option, or customer records stay readable across tenants.`,
               )
             }
           }
