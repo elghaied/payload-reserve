@@ -13,8 +13,9 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server'
 let replSet: MongoMemoryReplSet | undefined
 
 export async function setup(): Promise<() => Promise<void>> {
-  // The Postgres harness supplies its own database; do not start Mongo at all.
-  if (process.env.PG_URL) {
+  // The Postgres and SQLite harnesses supply their own database; do not start
+  // Mongo at all.
+  if (process.env.PG_URL || process.env.SQLITE) {
     return async () => {}
   }
 

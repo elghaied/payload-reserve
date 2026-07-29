@@ -4,6 +4,7 @@ import { smsPlugin } from '@elghaied/payload-plugin-sms'
 import { mockAdapter } from '@elghaied/payload-plugin-sms/mock'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
@@ -35,6 +36,16 @@ const buildConfigWithMemoryDB = async () => {
   // correctness depends on that behaviour. Unset, nothing here changes.
   if (process.env.PG_URL) {
     process.env.DATABASE_URL = process.env.PG_URL
+  }
+  // Opt-in SQLite harness: `SQLITE=1 pnpm test:int` runs the same suite against
+  // sqliteAdapter (below) instead of Mongo. It needs no DATABASE_URL, and —
+  // like the Postgres branch above — must not fall into the Mongo
+  // memory-replica-set path below: globalSetup.ts skips starting Mongo for
+  // SQLITE too, so MEMORY_DB_URI is never set and that path would otherwise
+  // spin up a private 3-node replica set per test file for a database this
+  // run never connects to.
+  else if (process.env.SQLITE) {
+    // no-op — sqliteAdapter reads process.env.SQLITE_URL directly, below.
   }
   // Otherwise spin up the in-memory replica set, but only under Vitest. Gating
   // on NODE_ENV alone is too broad: CLI tooling that inherits NODE_ENV=test
@@ -248,10 +259,15 @@ const buildConfigWithMemoryDB = async () => {
           pool: { connectionString: process.env.PG_URL },
           push: true,
         })
-      : mongooseAdapter({
-          ensureIndexes: true,
-          url: process.env.DATABASE_URL || '',
-        }),
+      : process.env.SQLITE
+        ? sqliteAdapter({
+            client: { url: process.env.SQLITE_URL || 'file::memory:?cache=shared' },
+            push: true,
+          })
+        : mongooseAdapter({
+            ensureIndexes: true,
+            url: process.env.DATABASE_URL || '',
+          }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
     endpoints: guestCancelOtpEndpoints,

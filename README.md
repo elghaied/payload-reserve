@@ -474,6 +474,20 @@ payload-reserve: these collections are NOT tenant-scoped: reservations, resource
 
 Detection is a **heuristic** — the multi-tenant plugin exposes nothing at init to check directly — so the warning arms on either of two independent signals: some collection in your config carries a top-level tenant field, or an auth collection carries multi-tenant's `tenants` membership array. Each covers the other's blind spot (scoping *only* these collections and forgetting them all leaves nothing else carrying the field; `tenantsArrayField.includeDefaultField: false` removes the array). Neither is exact, so the warning can fire on a config that merely looks tenant-shaped — it is only ever a warning and never blocks boot.
 
+### Concurrent booking: database adapter support
+
+Two simultaneous bookers for the same slot are only kept from double-booking each other because a `beforeChange` hook writes each claimed resource's hidden `bookingLock` field inside the booking's own transaction — the database, not the plugin, is what forces the losers to wait or abort. That means correctness depends on the adapter actually giving Payload a transaction. Measured directly (burst of 8 concurrent creates against a `quantity: 3` resource; `dev/concurrency.int.spec.ts`, `dev/holds.int.spec.ts`):
+
+| Adapter | Serializes? | Loser behavior | Capacity with no retry (of 3) | Retry required? |
+|---|---|---|---|---|
+| MongoDB (replica set) | Yes | Aborts (`WriteConflict`, code 112, `errorLabels: ['TransientTransactionError']`) | 1 of 3 | Yes — `retryOnWriteConflict` recovers the other 2 |
+| Postgres 18.4 | Yes | Blocks, then proceeds; rejected bookings surface as a clean `ValidationError` (400) | 3 of 3 | No — retry never fires |
+| SQLite (`@payloadcms/db-sqlite`, default config) | **No** | N/A — no transaction is ever opened | 8 of 3 (full over-book) | N/A — nothing to retry |
+
+**SQLite is unsupported for concurrent booking with the adapter's default configuration**, and the failure is silent — no error, no rejected request, just extra rows. Every concurrency-sensitive assertion measured a complete loss of serialization: 10 of 10 concurrent bookings for one slot persisted (expected 1), a `quantity: 3` resource accepted all 8 of a burst of 8, and 8 of 8 concurrent slot-hold attempts were all granted the same slot (expected 1). The root cause is `@payloadcms/db-sqlite` itself, not this plugin: it wires up a real `beginTransaction` only when the adapter is given a truthy `transactionOptions`; without it, `beginTransaction` is a no-op that always resolves `null`, so the plugin's own boot diagnostic (`supportsTransactions`, added for exactly this class of problem) correctly detects and warns about it at startup — Postgres enables transactions by default and only needs `transactionOptions: false` to turn them *off*, so this default is inverted between the two SQL adapters.
+
+For completeness, the same suites were also run against `sqliteAdapter({ ..., transactionOptions: {} })` as a diagnostic (not the shipped harness — Step 1 keeps the adapter config exactly as a typical consumer would first write it). With a real transaction engaged, SQLite **aborts the loser immediately at `beginTransaction`** — even before entering the transaction body — with a `LibsqlError` carrying `code: 'SQLITE_LOCKED_SHAREDCACHE'` (`rawCode: 262`), landing on the same "1 of 3 with no retry" capacity Mongo measures. `isTransientWriteConflict` does not currently recognize that code, so retry does not yet recover the other 2 in that configuration (measured: 1 of 3, not 3 of 3). This is reported as a finding, not fixed here — extending detection and/or changing the shipped harness default is a candidate follow-up, out of scope for this task.
+
 ---
 
 ## Internationalization
