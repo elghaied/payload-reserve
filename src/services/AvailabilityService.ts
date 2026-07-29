@@ -346,13 +346,23 @@ export async function checkAvailability(params: {
   // comment) — an inverted top-level window on a stored row skips parent
   // synthesis rather than throwing, so this never needs a try/catch: every
   // real items[] occupancy on the row still comes back.
-  const fetchedOccupancies = (
-    await Promise.all(
-      (docs as Array<Record<string, unknown>>).map((doc) =>
-        reservationOccupancies({ bufferFor, capacityMode, reservation: doc, resourceId }),
-      ),
+  //
+  // SEQUENTIAL, not Promise.all, and that is load-bearing. Each iteration can
+  // reach `bufferFor` -> `payload.findByID` on the shared `req`, and this whole
+  // function runs inside the booking's own transaction on the write path. A
+  // MongoDB ClientSession cannot carry concurrent operations inside a
+  // transaction: when two do collide, the loser's `count`/`findByID` calls
+  // `killTransaction` from its own catch, which rolls back and clears the
+  // transaction the enclosing create/delete owns, and the survivor then reports
+  // `NoSuchTransaction` ("transaction number N does not match any in-progress
+  // transactions"). Buffers are per-service and cached, so the loop is at most
+  // one read per DISTINCT neighbouring service either way.
+  const fetchedOccupancies: Occupancy[] = []
+  for (const doc of docs as Array<Record<string, unknown>>) {
+    fetchedOccupancies.push(
+      ...(await reservationOccupancies({ bufferFor, capacityMode, reservation: doc, resourceId })),
     )
-  ).flat()
+  }
 
   // Sibling items from the same booking (review A5) — expanded with the same
   // per-service buffers and capacity mode.
@@ -390,7 +400,7 @@ export async function checkAvailability(params: {
   // behaviour is identical on Mongo, Postgres and SQLite. `excludeHoldToken`
   // is the bearer converting their OWN hold into a booking — without it the
   // hold would block the very booking it was taken to protect.
-  let holdOccupancies: Occupancy[] = []
+  const holdOccupancies: Occupancy[] = []
   if (holdsSlug) {
     const holdWhere: Where = {
       and: [
@@ -411,26 +421,25 @@ export async function checkAvailability(params: {
       where: holdWhere,
     })
 
-    holdOccupancies = await Promise.all(
-      (holdDocs as Array<Record<string, unknown>>).map(async (hold) => {
-        // Expand by the held service's own buffers, so a hold reserves the same
-        // real-world window the resulting booking will.
-        const { after, before } = await bufferFor(
-          hold.service as number | string | undefined,
-        )
-        const { effectiveEnd, effectiveStart } = computeBlockedWindow(
-          new Date(hold.startTime as string),
-          new Date(hold.endTime as string),
-          before,
-          after,
-        )
-        return {
-          blockedEnd: effectiveEnd,
-          blockedStart: effectiveStart,
-          units: capacityMode === 'per-guest' ? ((hold.guestCount as number) ?? 1) : 1,
-        }
-      }),
-    )
+    // Sequential for the same reason the reservation loop above is: `bufferFor`
+    // reads through the shared `req`, and concurrent operations on one MongoDB
+    // session inside a transaction abort it.
+    for (const hold of holdDocs as Array<Record<string, unknown>>) {
+      // Expand by the held service's own buffers, so a hold reserves the same
+      // real-world window the resulting booking will.
+      const { after, before } = await bufferFor(hold.service as number | string | undefined)
+      const { effectiveEnd, effectiveStart } = computeBlockedWindow(
+        new Date(hold.startTime as string),
+        new Date(hold.endTime as string),
+        before,
+        after,
+      )
+      holdOccupancies.push({
+        blockedEnd: effectiveEnd,
+        blockedStart: effectiveStart,
+        units: capacityMode === 'per-guest' ? ((hold.guestCount as number) ?? 1) : 1,
+      })
+    }
 
     trace.dbg('check_holds', { activeHolds: holdOccupancies.length, resourceId })
   }
@@ -510,6 +519,16 @@ export async function getAvailableSlots(params: {
   /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
   getExternalBusy?: GetExternalBusy
   guestCount?: number
+  /**
+   * Slug of the slot-holds collection; omit to ignore holds entirely.
+   *
+   * Load-bearing, not optional polish: without it every read-path caller
+   * (`/reserve/availability`, `/reserve/slots`, the reservation form's slot
+   * picker) advertises a held slot as FREE, and the customer who clicks it is
+   * rejected by the write path — which DOES count holds — as a 409. Pass it
+   * whenever `slotHolds.enabled`.
+   */
+  holdsSlug?: string
   payload: Payload
   req: PayloadRequest
   reservationSlug: string
@@ -528,6 +547,7 @@ export async function getAvailableSlots(params: {
     enforceActive,
     getExternalBusy,
     guestCount,
+    holdsSlug,
     payload,
     req,
     reservationSlug,
@@ -723,6 +743,7 @@ export async function getAvailableSlots(params: {
         endTime: end,
         getExternalBusy,
         guestCount: guestCount ?? 1,
+        holdsSlug,
         payload,
         req,
         reservationSlug,

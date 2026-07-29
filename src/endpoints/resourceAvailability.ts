@@ -49,12 +49,23 @@ async function busyFor(args: {
   blockingStatuses: string[]
   capacityMode: 'per-guest' | 'per-reservation'
   end: Date
+  /** Slot-holds slug; omit to ignore holds (i.e. when `slotHolds` is off). */
+  holdsSlug?: string
   payload: Payload
   reservationSlug: string
   resourceId: number | string
   start: Date
 }): Promise<Busy> {
-  const { blockingStatuses, capacityMode, end, payload, reservationSlug, resourceId, start } = args
+  const {
+    blockingStatuses,
+    capacityMode,
+    end,
+    holdsSlug,
+    payload,
+    reservationSlug,
+    resourceId,
+    start,
+  } = args
   const where: Where = {
     and: [
       { status: { in: blockingStatuses } },
@@ -72,13 +83,46 @@ async function busyFor(args: {
     limit: 0,
     where,
   })
-  return (docs as Array<Record<string, unknown>>)
+  const busy: Busy = (docs as Array<Record<string, unknown>>)
     .filter((r) => r.startTime && r.endTime)
     .map((r) => ({
       end: new Date(r.endTime as string).toISOString(),
       start: new Date(r.startTime as string).toISOString(),
       units: capacityMode === 'per-guest' ? ((r.guestCount as number) ?? 1) : 1,
     }))
+
+  // An unexpired hold occupies the resource exactly as a blocking reservation
+  // does — the write path counts it — so the grid must show it busy. Expiry is a
+  // read-time predicate here for the same reason it is in `checkAvailability`:
+  // TTL indexes are MongoDB-only.
+  if (holdsSlug) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { docs: holdDocs } = await (payload.find as any)({
+      collection: holdsSlug,
+      depth: 0,
+      limit: 0,
+      where: {
+        and: [
+          { resource: { equals: resourceId } },
+          { expiresAt: { greater_than: new Date().toISOString() } },
+          { startTime: { less_than: end.toISOString() } },
+          { endTime: { greater_than: start.toISOString() } },
+        ],
+      } as Where,
+    })
+    for (const hold of holdDocs as Array<Record<string, unknown>>) {
+      if (!hold.startTime || !hold.endTime) {
+        continue
+      }
+      busy.push({
+        end: new Date(hold.endTime as string).toISOString(),
+        start: new Date(hold.startTime as string).toISOString(),
+        units: capacityMode === 'per-guest' ? ((hold.guestCount as number) ?? 1) : 1,
+      })
+    }
+  }
+
+  return busy
 }
 
 export async function buildResourceAvailability(params: {
@@ -86,6 +130,8 @@ export async function buildResourceAvailability(params: {
   debug?: ReserveDebug
   end: Date
   getExternalBusy?: GetExternalBusy
+  /** Slot-holds slug; omit to ignore holds (i.e. when `slotHolds` is off). */
+  holdsSlug?: string
   payload: Payload
   req?: PayloadRequest
   reservationSlug: string
@@ -100,6 +146,7 @@ export async function buildResourceAvailability(params: {
     debug,
     end,
     getExternalBusy,
+    holdsSlug,
     payload,
     req,
     reservationSlug,
@@ -196,6 +243,7 @@ export async function buildResourceAvailability(params: {
     blockingStatuses,
     capacityMode,
     end,
+    holdsSlug,
     payload,
     reservationSlug,
     resourceId,
@@ -237,6 +285,7 @@ export async function buildResourceAvailability(params: {
         blockingStatuses,
         capacityMode: poolCapacityMode,
         end,
+        holdsSlug,
         payload,
         reservationSlug,
         resourceId: poolId,
@@ -347,6 +396,7 @@ export function createResourceAvailabilityEndpoint(
         debug: dbg,
         end: endDate,
         getExternalBusy: config.getExternalBusy,
+        holdsSlug: config.slotHolds.enabled ? config.slugs.holds : undefined,
         payload: req.payload,
         req,
         reservationSlug: config.slugs.reservations,

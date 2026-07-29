@@ -105,6 +105,9 @@ export function createCheckAvailabilityEndpoint(
         enforceActive: config.enforceActive,
         getExternalBusy: config.getExternalBusy,
         guestCount,
+        // Held slots are busy. Omitting this advertises a slot the write path
+        // will reject with a 409.
+        holdsSlug: config.slotHolds.enabled ? config.slugs.holds : undefined,
         payload: req.payload,
         req,
         reservationSlug: config.slugs.reservations,
