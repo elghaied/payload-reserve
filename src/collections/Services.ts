@@ -3,6 +3,7 @@ import type { CollectionConfig, CollectionSlug, Field } from 'payload'
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { preventDeleteWhenReferenced } from '../hooks/shared/preventDeleteWhenReferenced.js'
 import { composeAccess, makeServiceOwnerAccess } from '../utilities/ownerAccess.js'
 
 export function createServicesCollection(config: ResolvedReservationPluginConfig): CollectionConfig {
@@ -204,6 +205,9 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
       },
       ...(ownerFieldDef ? [ownerFieldDef] : []),
     ],
+    hooks: {
+      beforeDelete: [preventDeleteWhenReferenced({ config, field: 'service', label: 'service' })],
+    },
     labels: {
       plural: ({ t }) => (t as PluginT)('reservation:collectionServices'),
       singular: ({ t }) => (t as PluginT)('reservation:collectionServices'),

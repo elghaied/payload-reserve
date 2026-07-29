@@ -4797,7 +4797,14 @@ describe('Reservation plugin - checkAvailability bufferFor error trace', () => {
 
     // Delete the service the reservation still references. bufferFor's
     // payload.findByID(service.id) now throws NotFound and must fail open.
-    await payload.delete({ id: service.id, collection: col('services') })
+    await payload.delete({
+      id: service.id,
+      collection: col('services'),
+      // Deleting a referenced service is now blocked by design.
+      // This test needs the dangling reference as a FIXTURE to prove
+      // bufferFor degrades to defaults when its service is gone.
+      context: { skipReservationHooks: true },
+    })
   })
 
   it('logs a bufferFor error under err and still fails open', async () => {

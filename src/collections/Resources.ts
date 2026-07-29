@@ -3,6 +3,7 @@ import type { CollectionConfig, CollectionSlug, Field } from 'payload'
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { preventDeleteWhenReferenced } from '../hooks/shared/preventDeleteWhenReferenced.js'
 import { composeAccess, makeResourceOwnerAccess } from '../utilities/ownerAccess.js'
 import { buildSelectOptions } from '../utilities/selectOptions.js'
 
@@ -174,6 +175,11 @@ export function createResourcesCollection(
         admin: { hidden: true },
       },
     ],
+    hooks: {
+      beforeDelete: [
+        preventDeleteWhenReferenced({ config, field: 'resource', label: 'resource' }),
+      ],
+    },
     labels: {
       plural: ({ t }) => (t as PluginT)('reservation:collectionResources'),
       singular: ({ t }) => (t as PluginT)('reservation:collectionResources'),
