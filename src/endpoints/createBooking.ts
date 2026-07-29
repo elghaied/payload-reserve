@@ -6,6 +6,8 @@ import {
   isTransientWriteConflict,
   retryOnWriteConflict,
 } from '../utilities/retryOnWriteConflict.js'
+import { collectionHasTenantField } from '../utilities/tenantFilter.js'
+import { tenantCollectionSlug } from '../utilities/tenantTimezone.js'
 import { isPrivilegedUser } from '../utilities/userRoles.js'
 
 export function createBookingEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
@@ -37,6 +39,53 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
         }
       }
 
+      // Per-path, exactly as cancelBooking does. An anonymous guest booking has
+      // no user to authorize, so it must stay privileged — collection access
+      // would reject it outright. An AUTHENTICATED caller delegates, which is
+      // what makes multi-tenant isolation apply: MT's tenant-field validate only
+      // checks presence, and its membership-checked defaultValue applies only
+      // when no tenant was supplied, so an explicit foreign tenant otherwise
+      // sails through.
+      const delegateAccess = Boolean(req.user)
+
+      // The delegation above is necessary but not sufficient for `tenant`
+      // specifically: Payload's create operation only checks the TRUTHINESS of
+      // a collection access result (executeAccess), never applies it as a
+      // filter — that only happens for read/update/delete, which operate on a
+      // real document. MT's own tenant-scoped create access therefore can't
+      // reject an explicit foreign tenant either; empirically (see
+      // dev/tenantScoping.int.spec.ts) the `overrideAccess: false` above does
+      // NOT by itself stop a tenant-A caller from writing `tenant: <tenantB>`.
+      // Close it the same way `getEffectiveTenantTimezone` closes the same gap
+      // for a client-supplied tenant cookie: an access-checked probe read on
+      // the tenants collection, which MT DOES filter by membership for reads.
+      if (delegateAccess && typeof data.tenant === 'string') {
+        const reservationsCollection = req.payload.config.collections?.find(
+          (c) => c.slug === config.slugs.reservations,
+        ) as { fields?: unknown[] } | undefined
+        const tenantSlug = collectionHasTenantField(
+          reservationsCollection,
+          config.multiTenant.tenantField,
+        )
+          ? tenantCollectionSlug(reservationsCollection, config.multiTenant.tenantField)
+          : null
+        if (tenantSlug) {
+          const permittedTenant = await (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            req.payload.findByID as any
+          )({
+            id: data.tenant,
+            collection: tenantSlug,
+            depth: 0,
+            overrideAccess: false,
+            req,
+          }).catch(() => null)
+          if (!permittedTenant) {
+            return Response.json({ error: 'Not permitted to create this booking' }, { status: 403 })
+          }
+        }
+      }
+
       // Create via Payload Local API — collection hooks handle conflict detection,
       // endTime calculation, status transitions, AND the beforeBookingCreate
       // plugin hooks (running them here too made them fire twice per booking).
@@ -54,6 +103,7 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
               collection: config.slugs.reservations,
               context: holdToken ? { holdToken } : undefined,
               data,
+              overrideAccess: !delegateAccess,
               req,
             }) as Promise<Record<string, unknown>>,
         )
@@ -68,6 +118,10 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
             },
             { status: 409 },
           )
+        }
+        // A denied delegate write is an authorization failure, not a 500.
+        if ((err as { status?: number })?.status === 403) {
+          return Response.json({ error: 'Not permitted to create this booking' }, { status: 403 })
         }
         throw err
       }
