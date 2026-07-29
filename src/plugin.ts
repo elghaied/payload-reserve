@@ -303,6 +303,13 @@ export const payloadReserve =
           if (!resolved.userCollection) {
             candidates.push(resolved.slugs.customers)
           }
+          // Only exists when slot holds are opted in. A hold row carries a
+          // bearer `token`: unscoped, a tenant-A staff account with Local-API
+          // reach (or any consumer code that reads holds) sees tenant B's
+          // tokens, and a token is enough to release B's hold or book its slot.
+          if (resolved.slotHolds.enabled) {
+            candidates.push(resolved.slugs.holds)
+          }
           const unscoped = candidates.filter((slug) => {
             const collection = all.find((c) => c.slug === slug)
             return collection && !collectionHasTenantField(collection, tenantField)
@@ -326,7 +333,7 @@ export const payloadReserve =
           // which is not observable from here), so warn about it.
           if (!resolved.userCollection) {
             payload.logger.warn(
-              `payload-reserve: in standalone mode (no "userCollection"), /reserve/book's tenant-membership check does not actually verify a logged-in customer's membership — customers authenticate against "${resolved.slugs.customers}", a collection multi-tenant never wraps, so its probe read passes for any tenant id. A malicious customer could still supply an explicit foreign tenant. Set "userCollection" to point at multi-tenant's own admin auth collection, or add your own tenant-membership check in front of /reserve/book.`,
+              `payload-reserve: in standalone mode (no "userCollection"), /reserve/book's tenant-membership check may not actually verify a logged-in customer's membership — customers authenticate against "${resolved.slugs.customers}", a collection multi-tenant never wraps, so its probe read passes for any tenant id. Detection is the same heuristic as the warning above (a top-level "${tenantField}" field is matched by NAME, not by type or relationship target, and the check cannot see whether "${resolved.slugs.customers}" is itself multi-tenant's admin/tenant-owning collection), so disregard this if you are not using multi-tenancy. Otherwise a malicious customer could supply an explicit foreign tenant: set "userCollection" to point at multi-tenant's own admin auth collection, or add your own tenant-membership check in front of /reserve/book.`,
             )
           }
 

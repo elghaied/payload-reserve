@@ -23,11 +23,18 @@ export function createHoldsCollection(config: ResolvedReservationPluginConfig): 
   return {
     slug: config.slugs.holds,
     access: {
-      // Holds are created and released through the plugin's endpoints, which
-      // apply their own rules. Nothing reaches them through the REST API.
+      // Every operation is closed, `read` included. `admin.hidden` only hides
+      // the nav link — Payload still mounts `GET /api/<slug>` — and `token`
+      // below is a BEARER SECRET with no field-level read rule of its own, so
+      // any reader can release someone else's hold or book their slot with it.
+      // There is no legitimate REST reader: the plugin's own endpoints, hooks
+      // and services all reach this collection through the Local API with
+      // `overrideAccess` at its default (`true`), which bypasses these rules —
+      // `checkAvailability`'s find, `takeHold`'s create and expiry sweep,
+      // `releaseHold`'s delete, and `createBooking`'s hold consumption.
       create: () => false,
       delete: () => false,
-      read: ({ req }) => Boolean(req.user),
+      read: () => false,
       update: () => false,
     },
     admin: {
