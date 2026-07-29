@@ -95,14 +95,42 @@ export function isTransientWriteConflict(error: unknown): boolean {
  *
  * Backoff is exponential with full jitter, so a burst of losers does not
  * synchronise into a second stampede on the same document.
+ *
+ * Pass `req` whenever the operation writes through the Payload Local API. Every
+ * attempt re-invokes a closure over the SAME `req`, and Payload's
+ * `initTransaction` JOINS an existing `req.transactionID` rather than opening a
+ * fresh transaction — so a transaction id left behind by a failed attempt would
+ * make the next attempt re-enter a transaction the database already discarded.
+ * Payload's own operations normally clean up after themselves (`killTransaction`
+ * deletes the id from their catch), with one gap they cannot close: when
+ * `beginTransaction` ITSELF rejects, `initTransaction` has already stored the
+ * rejected promise on the req and `killTransaction`'s guard skips promises, so
+ * the req stays permanently poisoned and every later attempt re-throws the first
+ * error without touching the database. That is the measured
+ * "raising the retry budget changes nothing" behaviour on SQLite, where
+ * contention surfaces at BEGIN. Clearing a leftover here closes it. See
+ * dev/retryTransaction.spec.ts.
  */
 export async function retryOnWriteConflict<T>(
   operation: () => Promise<T>,
-  { attempts = 5, baseDelayMs = 10 }: { attempts?: number; baseDelayMs?: number } = {},
+  {
+    attempts = 5,
+    baseDelayMs = 10,
+    req,
+  }: { attempts?: number; baseDelayMs?: number; req?: { transactionID?: unknown } } = {},
 ): Promise<T> {
   let lastError: unknown
 
+  // Only leftovers from a failed attempt are ours to clear. A req that arrives
+  // already inside a transaction belongs to an enclosing caller: dropping that
+  // id would silently detach the retried write from their unit of work.
+  const callerOwnsTransaction = req ? req.transactionID !== undefined : false
+
   for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0 && req && !callerOwnsTransaction && req.transactionID !== undefined) {
+      delete req.transactionID
+    }
+
     try {
       return await operation()
     } catch (error) {

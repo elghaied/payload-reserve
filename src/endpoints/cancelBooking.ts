@@ -73,6 +73,7 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
               overrideAccess: !delegateAccess,
               req,
             }) as Promise<Record<string, unknown>>,
+          { req },
         )
       } catch (err) {
         if (isTransientWriteConflict(err)) {
