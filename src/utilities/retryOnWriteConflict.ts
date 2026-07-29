@@ -105,11 +105,19 @@ export function isTransientWriteConflict(error: unknown): boolean {
  * deletes the id from their catch), with one gap they cannot close: when
  * `beginTransaction` ITSELF rejects, `initTransaction` has already stored the
  * rejected promise on the req and `killTransaction`'s guard skips promises, so
- * the req stays permanently poisoned and every later attempt re-throws the first
- * error without touching the database. That is the measured
- * "raising the retry budget changes nothing" behaviour on SQLite, where
- * contention surfaces at BEGIN. Clearing a leftover here closes it. See
- * dev/retryTransaction.spec.ts.
+ * the req stays poisoned — every later `initTransaction` short-circuits on
+ * `instanceof Promise` and re-throws the first error without touching the
+ * database. Clearing a leftover here closes it. See dev/retryTransaction.spec.ts.
+ *
+ * Do NOT attribute SQLite's "raising the retry budget changes nothing"
+ * measurement to this. That has a different, independent cause: `@payloadcms/
+ * drizzle` rethrows the driver's error as a bare `Error`, so
+ * `isTransientWriteConflict` returns FALSE and this loop throws on attempt 1 —
+ * attempts 2..N never happen, and poisoning never gets a chance to matter. See
+ * README's "Concurrent booking: database adapter support". The shape this
+ * clearing actually protects is any caller that swallows a
+ * begin-transaction failure and then keeps using the same req (see the expiry
+ * sweep in HoldService.takeHold).
  */
 export async function retryOnWriteConflict<T>(
   operation: () => Promise<T>,

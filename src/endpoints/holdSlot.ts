@@ -52,14 +52,47 @@ export function createHoldSlotEndpoint(config: ResolvedReservationPluginConfig):
         return Response.json({ error: 'startTime is not a valid date' }, { status: 400 })
       }
 
+      // `endTime` reaches `computeEndTime` unchanged for a `flexible`-duration
+      // service, so an unparseable one became an Invalid Date whose
+      // `.toISOString()` threw a RangeError deep inside `takeHold` — neither a
+      // transient conflict nor a ValidationError, so it correctly propagated as
+      // a 500 from an endpoint reachable without authentication. Bad input is a
+      // 400, and it is cheaper to say so here.
+      let parsedEnd: Date | undefined
+      if (body.endTime !== undefined && body.endTime !== null) {
+        parsedEnd = new Date(body.endTime as string)
+        if (isNaN(parsedEnd.getTime())) {
+          return Response.json({ error: 'endTime is not a valid date' }, { status: 400 })
+        }
+      }
+
+      // `guestCount` is `min: 1` on the collection, and the field-level failure
+      // it raises is a Payload ValidationError — indistinguishable inside
+      // `takeHold` from the ValidationError `validateHoldSlot` raises for genuine
+      // unavailability, so `{ guestCount: 0 }` answered `409 slot_taken`: a
+      // well-behaved client is told the slot is gone and to stop retrying,
+      // for a malformed request. Rejecting it here keeps that 409 meaning only
+      // what it says.
+      let guestCount = 1
+      if (body.guestCount !== undefined && body.guestCount !== null) {
+        const raw = body.guestCount
+        if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) {
+          return Response.json(
+            { error: 'guestCount must be an integer of 1 or more' },
+            { status: 400 },
+          )
+        }
+        guestCount = raw
+      }
+
       let result: Awaited<ReturnType<typeof takeHold>>
       try {
         result = await retryOnWriteConflict(
           () =>
             takeHold({
               config,
-              endTime: body.endTime ? new Date(body.endTime as string) : undefined,
-              guestCount: (body.guestCount as number) ?? 1,
+              endTime: parsedEnd,
+              guestCount,
               req,
               resourceId: resource,
               serviceId: service,

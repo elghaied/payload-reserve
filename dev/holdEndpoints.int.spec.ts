@@ -146,6 +146,46 @@ describe('slot-hold endpoints', () => {
     expect((await second.json()) as { released: number }).toEqual({ released: 0 })
   })
 
+  test('malformed input is 400, never a 409 that says the slot is taken', async () => {
+    // `409 slot_taken` tells a well-behaved client the slot is gone and to stop
+    // retrying. Two malformed requests used to earn exactly that verdict — or
+    // worse — for reasons that have nothing to do with availability:
+    //
+    //   guestCount: 0    -> tripped the collection's `min: 1` field validation,
+    //                       which raises a Payload ValidationError that takeHold
+    //                       cannot tell apart from validateHoldSlot's own
+    //                       unavailability ValidationError -> 409 slot_taken.
+    //   endTime: garbage -> reaches computeEndTime unchanged for a flexible
+    //                       service, so `.toISOString()` threw a RangeError:
+    //                       a 500 out of an unauthenticated endpoint.
+    const { resource, service } = await seed('badinput')
+    const startTime = '2027-06-05T10:00:00.000Z'
+    const base = { resource: resource.id, service: service.id, startTime }
+
+    const zeroGuests = await call(createHoldSlotEndpoint(resolved), { ...base, guestCount: 0 })
+    expect(zeroGuests.status).toBe(400)
+    expect(((await zeroGuests.json()) as { error: string }).error).toMatch(/guestCount/)
+
+    const fractionalGuests = await call(createHoldSlotEndpoint(resolved), {
+      ...base,
+      guestCount: 1.5,
+    })
+    expect(fractionalGuests.status).toBe(400)
+
+    const badEnd = await call(createHoldSlotEndpoint(resolved), { ...base, endTime: 'not-a-date' })
+    expect(badEnd.status).toBe(400)
+    expect(((await badEnd.json()) as { error: string }).error).toMatch(/endTime/)
+
+    // The control: the same body with both fields valid still succeeds, so the
+    // guards above reject the input rather than the request shape.
+    const ok = await call(createHoldSlotEndpoint(resolved), {
+      ...base,
+      endTime: '2027-06-05T11:00:00.000Z',
+      guestCount: 1,
+    })
+    expect(ok.status).toBe(201)
+  })
+
   test('a hold request for an already-booked slot is refused', async () => {
     const { customer, resource, service } = await seed('taken')
     const startTime = '2027-06-04T10:00:00.000Z'

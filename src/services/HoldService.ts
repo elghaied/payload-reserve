@@ -111,6 +111,23 @@ export async function takeHold(params: {
     })
   } catch {
     // Ignored by design: expiry is enforced at read time, not by this sweep.
+    //
+    // But swallowing the error is not enough to keep that promise. If this
+    // delete's `beginTransaction` REJECTED, `initTransaction` already stored the
+    // rejected promise on `req.transactionID` and `killTransaction`'s guard
+    // skips promises — so the `create` below would short-circuit inside
+    // `initTransaction` and rethrow THE SWEEP'S error, failing the hold on
+    // behalf of a step documented as never able to. `retryOnWriteConflict`'s
+    // between-attempts clearing cannot reach this: the poisoning happens
+    // mid-attempt. Clearing it here restores the invariant.
+    //
+    // This cannot drop a live transaction. A sweep that COMMITTED cleared the id
+    // itself; a sweep that failed any other way had `killTransaction` clear it
+    // (Payload does that unconditionally, even for an id it only joined). The
+    // poisoned promise is the one shape that can still be sitting here.
+    if (req.transactionID !== undefined) {
+      delete req.transactionID
+    }
   }
 
   const token = crypto.randomUUID()

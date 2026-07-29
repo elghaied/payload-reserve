@@ -418,7 +418,7 @@ Four endpoints now gate the request through Payload's normal access-control pipe
 | Endpoint | What delegates to access control | What stays privileged | Why |
 |---|---|---|---|
 | `/api/reservation-customer-search` | the customer query itself | — | The whole endpoint is the read; nothing is derived from it. |
-| `/api/reserve/resource-availability` | a `findByID` probe of the requested resource (404 on denial) | the four reads that build the grid (the resource itself, its schedules, its busy reservations, and — when its services name a `requiredResources` pool — that pool's own resource read; two of the four are Resources reads, and there is no separate services read) | The probe decides *whether you may see this resource*. The grid must then show every conflicting booking, including other tenants' and other owners' — a busy slot you can't see is a double-booking. |
+| `/api/reserve/resource-availability` | a `findByID` probe of the requested resource (404 on denial) | every read that builds the grid: the resource itself, its schedules, its busy reservations, and — only when `slotHolds` is enabled — its unexpired slot holds. So **four** reads for a plain resource with `slotHolds` on, three with it off. Each `requiredResources` pool its services name adds three more (the pool's own resource read, its busy reservations, its holds), or two with `slotHolds` off. Two are Resources reads, and there is no separate services read | The probe decides *whether you may see this resource*. The grid must then show every conflicting booking, including other tenants' and other owners' — a busy slot you can't see is a double-booking. |
 | `/api/reserve/cancel` | the update, **only** on the privileged-non-owner path | the reservation read, and the update on the owner and guest-token paths | For a guest the cancellation token *is* the authorization. For an owner, `resourceOwnerMode`'s `update: adminOnly` would otherwise block a customer cancelling their own booking. Ownership and token matching are checked in the endpoint before either path is taken. |
 | `/api/reserve/effective-timezone` | the tenant-document read (falls back to the global zone on denial) | — | Prevents a forged tenant cookie resolving a zone you have no membership in. |
 
@@ -532,13 +532,13 @@ PG_URL="postgres://user:password@localhost:5432/reserve_test" CI=true pnpm test:
 SQLITE=1 CI=true pnpm test:int
 ```
 
-Both are opt-in dev/CI conveniences, not something a consumer's app needs to configure — they exist so this plugin's own suite can be verified against every adapter it claims to support. **Neither run is expected to be fully green by construction, and this is known, not a regression to chase.** Last measured (38 files, 537 tests):
+Both are opt-in dev/CI conveniences, not something a consumer's app needs to configure — they exist so this plugin's own suite can be verified against every adapter it claims to support. **Neither run is expected to be fully green by construction, and this is known, not a regression to chase.** Last measured (38 files, 539 tests):
 
 | Run | Result | The gaps |
 |---|---|---|
-| MongoDB (default) | 38 files, 537 passed, 0 skipped | none |
-| `PG_URL=…` | 38 files, 536 passed, 1 skipped | the `bufferFor error trace` skip below |
-| `SQLITE=1` | 35 of 38 files, 533 passed, 3 failed, 1 skipped | the same `bufferFor` skip, plus **3 failures that are all one accepted upstream limitation**: `dev/concurrency.int.spec.ts`'s `quantity: 3` capacity recovery, `dev/holds.int.spec.ts`'s `quantity: 3` capacity recovery, and `dev/bookingRetry.int.spec.ts`'s no-500 assertion. All three trace to `@payloadcms/drizzle` discarding the driver's structured error code at `beginTransaction` (see the section above) — never "fix" any of them by matching on message text. |
+| MongoDB (default) | 38 files, 539 passed, 0 skipped | none |
+| `PG_URL=…` | 38 files, 538 passed, 1 skipped | the `bufferFor error trace` skip below |
+| `SQLITE=1` | 35 of 38 files, 535 passed, 3 failed, 1 skipped | the same `bufferFor` skip, plus **3 failures that are all one accepted upstream limitation**: `dev/concurrency.int.spec.ts`'s `quantity: 3` capacity recovery, `dev/holds.int.spec.ts`'s `quantity: 3` capacity recovery, and `dev/bookingRetry.int.spec.ts`'s no-500 assertion. All three trace to `@payloadcms/drizzle` discarding the driver's structured error code at `beginTransaction` (see the section above) — never "fix" any of them by matching on message text. |
 
 The `bufferFor error trace` skip manufactures a dangling reference via `context.skipReservationHooks` to exercise a code path that the delete guard below makes structurally unreachable on a schema-enforced SQL database, so the scenario is MongoDB-only by construction.
 
@@ -566,7 +566,9 @@ Pass the token straight through to `POST /api/reserve/book` as `holdToken` to co
 
 **The hold token is a bearer secret, and the collection is closed to the REST API entirely** — `create`, `read`, `update` and `delete` all return `false`, so `GET /api/reservation-holds` is denied for every caller including admins. Anyone who can read a live token can release someone else's hold or book their slot with it, and `admin: { hidden: true }` hides only the nav link, not the route. The plugin's own reads and writes reach the collection through the Local API privileged, so nothing internal depends on those rules. **Under `multiTenant`, list the holds slug in the multi-tenant plugin's own `collections` option** alongside the scheduling collections — the boot diagnostic warns if you don't.
 
-**Held slots are excluded from availability, not just from bookings.** `/api/reserve/availability`, `/api/reserve/slots`, `/api/reserve/resource-availability`, the reservation form's slot picker, and the admin calendar/availability grids all treat an unexpired hold as busy — so a customer is never shown a slot the booking endpoint will refuse with a `409`. Nothing in that path changes when `slotHolds` is off.
+**Held slots are excluded from availability, not just from bookings.** `/api/reserve/availability`, `/api/reserve/slots` and `/api/reserve/resource-availability` all treat an unexpired hold as busy, so every customer-facing path agrees with the write path — a customer is never shown a slot the booking endpoint will then refuse with a `409`. That covers the reservation form's slot picker (`AvailabilityTimeField`, which fetches `/reserve/slots`) and the admin **Calendar** view (which fetches `/reserve/resource-availability`). Nothing in that path changes when `slotHolds` is off.
+
+**Known limitation — the admin Availability grid does not show holds.** `AvailabilityOverview` (the weekly grid at `/reservation-availability`) does not use `/reserve/resource-availability`; it queries the `resources`, `schedules` and `reservations` REST endpoints directly and computes the grid in the browser, so an unexpired hold is invisible there and its slot reads as free. This is **display-only and admin-only**: it cannot cause a wrong write, because every write still goes through `checkAvailability`, which does count holds — an admin who books over a held slot from that grid is refused exactly as any other caller would be. Cross-check the Calendar view, or `/reserve/availability`, when holds matter.
 
 ### Deleting a referenced Service or Resource is blocked
 

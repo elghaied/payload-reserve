@@ -178,3 +178,76 @@ describe('retryOnWriteConflict — transaction hygiene across attempts', () => {
     expect({ calls, result }).toEqual({ calls: 3, result: 'ok' })
   })
 })
+
+/**
+ * The poisoning can also happen MID-attempt, where `retryOnWriteConflict`'s
+ * between-attempts clearing cannot reach it.
+ *
+ * `takeHold`'s expired-row sweep is a `payload.delete` on the shared `req` with
+ * an empty catch, documented as unable to fail the hold. If that delete's
+ * `beginTransaction` rejects, `initTransaction` has already parked the rejected
+ * promise on `req.transactionID`; the empty catch swallows the error, and the
+ * `create` that follows short-circuits inside `initTransaction` and rethrows THE
+ * SWEEP'S error — so the sweep fails the hold after all.
+ */
+describe('takeHold — a failed expiry sweep cannot poison the hold that follows', () => {
+  test('the create still opens its own transaction after the sweep fails at BEGIN', async () => {
+    const beginFailure = Object.assign(new Error('cannot begin transaction'), { code: 'SQLITE_X' })
+    // Counted, not flagged: the sweep's OWN begin attempt must be the failing
+    // one, so the discriminator has to be "which begin call is this", never a
+    // flag the sweep sets before it calls begin.
+    let beginCalls = 0
+    let seenByCreate: unknown = 'not-called'
+
+    // Only the sweep's BEGIN fails; the create's would succeed. Faithful to the
+    // real shape: `payload.delete`/`payload.create` both call the real
+    // `initTransaction` first, exactly as Payload's operations do.
+    const req: FakeReq = {
+      payload: {
+        create: async () => {
+          await initTransaction(req as never)
+          seenByCreate = req.transactionID
+          return { id: 'hold-1' }
+        },
+        db: {
+          beginTransaction: () => {
+            beginCalls++
+            return beginCalls === 1 ? Promise.reject(beginFailure) : Promise.resolve('txn-create')
+          },
+
+          commitTransaction: async () => {},
+
+          rollbackTransaction: async () => {},
+        },
+        delete: async () => {
+          await initTransaction(req as never)
+          return { docs: [], errors: [] }
+        },
+        // Service, then resource — both resolved before the write.
+        // eslint-disable-next-line @typescript-eslint/require-await
+        findByID: async () => ({ active: true, duration: 60, durationType: 'fixed' }),
+        logger: { warn: () => {} },
+      },
+      user: null,
+    } as FakeReq
+
+    const { takeHold } = await import('../src/services/HoldService.js')
+    const { resolveConfig } = await import('../src/defaults.js')
+
+    const result = await takeHold({
+      config: resolveConfig({ slotHolds: { enabled: true, ttlMinutes: 10 } }),
+      req: req as never,
+      resourceId: 'r1',
+      serviceId: 's1',
+      startTime: new Date('2027-03-01T10:00:00.000Z'),
+    })
+
+    // Both the sweep's failed begin AND the create's own successful one.
+    // Without the clearing in the sweep's catch, the create short-circuits inside
+    // `initTransaction` on the leftover rejected promise, never calls begin a
+    // second time, and `takeHold` rejects with the SWEEP's error.
+    expect(beginCalls).toBe(2)
+    expect(result.ok).toBe(true)
+    expect(seenByCreate).toBe('txn-create')
+  })
+})
