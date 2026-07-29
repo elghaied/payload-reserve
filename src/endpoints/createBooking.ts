@@ -17,6 +17,12 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
       // from the request body.
       delete data.cancellationToken
 
+      // A hold token is a bearer secret, not booking data: it must reach the
+      // conflict check via context (so the hold does not block the booking it
+      // was taken to protect) and must never be persisted on the reservation.
+      const holdToken = typeof data.holdToken === 'string' ? data.holdToken : undefined
+      delete data.holdToken
+
       // Who may book for whom: staff/admin for anyone (walk-ins); an
       // authenticated customer only for themselves; anonymous callers never
       // for an existing customer record (the guest flow covers them).
@@ -46,6 +52,7 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (req.payload.create as any)({
               collection: config.slugs.reservations,
+              context: holdToken ? { holdToken } : undefined,
               data,
               req,
             }) as Promise<Record<string, unknown>>,
@@ -63,6 +70,24 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
           )
         }
         throw err
+      }
+
+      // Consume the hold now that the booking exists. Failure here must not fail
+      // the booking — the hold expires on its own, and a stale hold only ever
+      // blocks the slot for its remaining TTL.
+      if (holdToken) {
+        try {
+          await req.payload.delete({
+            collection: config.slugs.holds,
+            req,
+            where: { token: { equals: holdToken } },
+          })
+        } catch (err) {
+          req.payload.logger.warn({
+            err,
+            msg: 'payload-reserve: booking created but its hold could not be released',
+          })
+        }
       }
 
       // Never expose the cancellation token in the HTTP response — it is delivered

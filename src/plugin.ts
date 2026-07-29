@@ -18,6 +18,8 @@ import { createBookingEndpoint } from './endpoints/createBooking.js'
 import { createCustomerSearchEndpoint } from './endpoints/customerSearch.js'
 import { createEffectiveTimezoneEndpoint } from './endpoints/effectiveTimezone.js'
 import { createGetSlotsEndpoint } from './endpoints/getSlots.js'
+import { createHoldSlotEndpoint } from './endpoints/holdSlot.js'
+import { createReleaseSlotEndpoint } from './endpoints/releaseSlot.js'
 import { createResourceAvailabilityEndpoint } from './endpoints/resourceAvailability.js'
 import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
 import { type PluginT, translations } from './translations/index.js'
@@ -337,6 +339,11 @@ export const payloadReserve =
       createEffectiveTimezoneEndpoint(resolved),
       createGetSlotsEndpoint(resolved),
       createResourceAvailabilityEndpoint(resolved),
+      // Only when slot holds are enabled — an install that never opts in gets
+      // no new routes.
+      ...(resolved.slotHolds.enabled
+        ? [createHoldSlotEndpoint(resolved), createReleaseSlotEndpoint(resolved)]
+        : []),
     )
 
     // Wire staff auto-provisioning onto the staff user collection
