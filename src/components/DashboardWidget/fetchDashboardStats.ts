@@ -26,6 +26,12 @@ export type DashboardStats = {
  * code. With the flag, `count`/`find` short-circuit to `{ totalDocs: 0 }` /
  * `{ docs: [] }` and the widget renders zeros — which is the honest answer for a
  * caller allowed to see nothing.
+ *
+ * `disableErrors` also widens any OTHER falsy access result (not just boolean
+ * `false`) to "no constraint". Payload's `AccessResult` type forbids returning
+ * one, and multi-tenant still layers its own constraint underneath, so this is
+ * theoretical — but do not remove the flag to close it. Removing it trades a
+ * theoretical widening for the real Forbidden-throw crash above.
  */
 export async function fetchDashboardStats(args: {
   blockingStatuses: string[]

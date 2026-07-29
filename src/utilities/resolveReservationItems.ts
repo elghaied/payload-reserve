@@ -109,6 +109,16 @@ export function resolveReservationItems(data: Record<string, unknown>): Resolved
     const parentStart = data.startTime as string
     const parentEnd = data.endTime as string | undefined
 
+    // An inverted parent window can never overlap anything, so the coverage test
+    // below would always say "not covered" and synthesise a phantom item that
+    // conflicts with nothing. Reject it at the source instead — it is malformed
+    // input, not a case to paper over.
+    if (parentStart && parentEnd && new Date(parentEnd) <= new Date(parentStart)) {
+      throw new ValidationError({
+        errors: [{ message: 'endTime must be after startTime', path: 'endTime' }],
+      })
+    }
+
     if (parentResource !== undefined && parentResource !== '' && parentStart) {
       const parentAlreadyItemized = resolved.some((item) => {
         // String-compare ids: a raw id (string for Mongo, number for Postgres)

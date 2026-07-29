@@ -61,6 +61,13 @@ const usersWithTenantsArray = {
   ],
 }
 
+/** A userCollection auth collection carrying neither signal multi-tenant uses. */
+const usersWithNoTenantSignal = {
+  slug: 'users',
+  auth: true,
+  fields: [{ name: 'email', type: 'email' }],
+}
+
 const scopeAllBut = (
   generated: Array<Record<string, unknown>>,
   exceptSlug: null | string,
@@ -196,5 +203,49 @@ describe('tenant-membership-probe precondition diagnostic (D3)', () => {
     const { messages, payload } = fakePayload([...generated, scopedPosts])
     await config.onInit?.(payload)
     expect(messages.join('\n')).not.toMatch(/tenant-membership check/i)
+  })
+})
+
+describe('userCollection auth-collection blind-spot diagnostic (D4)', () => {
+  // The D2 unscoped-collections check deliberately excludes `customers` from its
+  // candidates in userCollection mode — that slug is the host's own auth
+  // collection, scoped via multi-tenant's `tenants` ARRAY rather than a flat
+  // field, so a flat-field check would always false-positive on it. That leaves
+  // a real blind spot: an auth collection with NEITHER the array NOR the flat
+  // field is genuinely unscoped and got no signal at all before this diagnostic.
+  it('warns when the userCollection auth collection has neither the tenants array nor a flat tenant field', async () => {
+    const config = payloadReserve({ userCollection: 'users' })({
+      collections: [usersWithNoTenantSignal],
+      endpoints: [],
+    } as unknown as Config)
+    const generated = (config.collections ?? []) as Array<Record<string, unknown>>
+    // Scope every OTHER generated collection so multi-tenant is detected (D2's
+    // gate) — 'users' is deliberately left without a tenant field or array.
+    for (const c of generated) {
+      if (c.slug !== 'users') {
+        ;(c.fields as Array<Record<string, unknown>>).push({ ...tenantField })
+      }
+    }
+    const { messages, payload } = fakePayload(generated)
+    await config.onInit?.(payload)
+    const joined = messages.join('\n')
+    expect(joined).toMatch(/neither/i)
+    expect(joined).toMatch(/users/)
+  })
+
+  it('stays silent when the userCollection auth collection carries the tenants array', async () => {
+    const config = payloadReserve({ userCollection: 'users' })({
+      collections: [usersWithTenantsArray],
+      endpoints: [],
+    } as unknown as Config)
+    const generated = (config.collections ?? []) as Array<Record<string, unknown>>
+    for (const c of generated) {
+      if (c.slug !== 'users') {
+        ;(c.fields as Array<Record<string, unknown>>).push({ ...tenantField })
+      }
+    }
+    const { messages, payload } = fakePayload(generated)
+    await config.onInit?.(payload)
+    expect(messages.join('\n')).not.toMatch(/neither/i)
   })
 })

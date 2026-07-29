@@ -335,9 +335,25 @@ export async function checkAvailability(params: {
 
   const fetchedOccupancies = (
     await Promise.all(
-      (docs as Array<Record<string, unknown>>).map((doc) =>
-        reservationOccupancies({ bufferFor, capacityMode, reservation: doc, resourceId }),
-      ),
+      (docs as Array<Record<string, unknown>>).map(async (doc) => {
+        try {
+          return await reservationOccupancies({
+            bufferFor,
+            capacityMode,
+            reservation: doc,
+            resourceId,
+          })
+        } catch (err) {
+          // resolveReservationItems now rejects an inverted top-level window,
+          // but this loop resolves already-STORED documents — a row shaped
+          // like that can only exist via context.skipReservationHooks or data
+          // written before the check existed. Reading availability must stay
+          // up even if one stored row is malformed: skip its occupancy
+          // instead of failing the whole request.
+          trace.dbg('error', { docId: doc.id, err, where: 'reservationOccupancies' })
+          return []
+        }
+      }),
     )
   ).flat()
 

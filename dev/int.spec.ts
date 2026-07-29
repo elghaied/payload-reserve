@@ -1441,6 +1441,52 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
     })
     expect(res2.id).toBeDefined()
   })
+
+  it('does not crash conflict-checking on a stored row with an inverted top-level window', async () => {
+    // resolveReservationItems now rejects an inverted top-level window on the
+    // write path, but reservationOccupancies (the READ side used by every
+    // conflict check) resolves already-stored documents. A row shaped like
+    // this can only exist via skipReservationHooks or legacy data predating
+    // the check. checkAvailability must stay up for everything else even if
+    // one stored row is malformed — see AvailabilityService's try/catch
+    // around reservationOccupancies.
+    await payload.create({
+      collection: col('reservations'),
+      context: { skipReservationHooks: true },
+      data: {
+        customer: customerId,
+        endTime: '2025-01-08T09:00:00.000Z', // inverted: before startTime below
+        items: [
+          {
+            endTime: '2025-01-08T08:30:00.000Z',
+            resource: resourceId,
+            startTime: '2025-01-08T08:00:00.000Z',
+          },
+        ],
+        resource: resourceId,
+        service: serviceId,
+        startTime: '2025-01-08T10:00:00.000Z',
+        status: 'pending',
+      },
+    })
+
+    // A normal booking on the same resource, far enough from the malformed
+    // row's own item window to not conflict with it, but still within the
+    // coarse query's 24h margin of the malformed row's top-level span — so
+    // checkAvailability must fetch and attempt to resolve the malformed row.
+    const res = await payload.create({
+      collection: col('reservations'),
+      data: {
+        customer: customerId,
+        endTime: '2025-01-08T14:30:00.000Z',
+        resource: resourceId,
+        service: serviceId,
+        startTime: '2025-01-08T14:00:00.000Z',
+        status: 'pending',
+      },
+    })
+    expect(res.id).toBeDefined()
+  })
 })
 
 // ---------------------------------------------------------------------------

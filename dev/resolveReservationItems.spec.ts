@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, test } from 'vitest'
 
 import { resolveReservationItems } from '../src/utilities/resolveReservationItems.js'
 
@@ -96,5 +96,22 @@ describe('resolveReservationItems — parent synthesis (B1)', () => {
 
     expect(items).toHaveLength(2)
     expect(items.some((i) => i.fromParent)).toBe(false)
+  })
+
+  test('rejects an inverted parent window instead of silently synthesising it', () => {
+    expect(() =>
+      resolveReservationItems({
+        endTime: '2027-01-01T09:00:00.000Z',
+        items: [
+          {
+            endTime: '2027-01-01T12:00:00.000Z',
+            resource: 'r1',
+            startTime: '2027-01-01T11:00:00.000Z',
+          },
+        ],
+        resource: 'r1',
+        startTime: '2027-01-01T10:00:00.000Z',
+      }),
+    ).toThrow(/endTime/i)
   })
 })
