@@ -312,6 +312,23 @@ export const payloadReserve =
               `payload-reserve: these collections are NOT tenant-scoped: ${unscoped.join(', ')}. This config looks like it enables multi-tenancy (another collection carries a "${tenantField}" field, or an auth collection carries a "${MT_TENANTS_ARRAY_FIELD}" membership array) — detection is a heuristic, so disregard this if you are not using multi-tenancy. Otherwise add these slugs to the multi-tenant plugin's "collections" option, or their documents stay readable across tenants.`,
             )
           }
+
+          // createBooking's tenant-membership probe (callerMayUseTenant, in
+          // src/utilities/tenantTimezone.ts) is a real membership check only
+          // when the caller authenticates against the SAME collection
+          // multi-tenant wraps as its admin/tenant-owning collection —
+          // `withTenantAccess` only applies its membership constraint under
+          // that condition. In standalone mode a customer authenticates
+          // against `slugs.customers`, a collection multi-tenant never wraps,
+          // so the probe's tenants-collection read passes for ANY tenant id
+          // for a logged-in customer: this is detectable (unlike a host
+          // setting multi-tenant's own `useTenantsCollectionAccess: false`,
+          // which is not observable from here), so warn about it.
+          if (!resolved.userCollection) {
+            payload.logger.warn(
+              `payload-reserve: in standalone mode (no "userCollection"), /reserve/book's tenant-membership check does not actually verify a logged-in customer's membership — customers authenticate against "${resolved.slugs.customers}", a collection multi-tenant never wraps, so its probe read passes for any tenant id. A malicious customer could still supply an explicit foreign tenant. Set "userCollection" to point at multi-tenant's own admin auth collection, or add your own tenant-membership check in front of /reserve/book.`,
+            )
+          }
         }
 
         // The booking lock only serializes anything inside a transaction. On a

@@ -106,13 +106,14 @@ describe('tenant scoping with the real multi-tenant plugin', () => {
 })
 
 describe('cross-tenant create via /reserve/book', () => {
-  it('an authenticated tenant-A caller cannot create a booking in tenant B', async () => {
-    // slugs.customers must mirror the userCollection wiring plugin.ts does at
-    // boot (resolveConfig alone does not apply it) — otherwise `user.collection
-    // ('users') !== slugs.customers ('customers')` misclassifies our ordinary
-    // authenticated user as privileged staff, which changes which code path the
-    // endpoint takes before the tenant check is even reached.
-    const resolved = resolveConfig({ slugs: { customers: 'users' }, userCollection: 'users' })
+  // slugs.customers must mirror the userCollection wiring plugin.ts does at
+  // boot (resolveConfig alone does not apply it) — otherwise `user.collection
+  // ('users') !== slugs.customers ('customers')` misclassifies our ordinary
+  // authenticated user as privileged staff, which changes which code path the
+  // endpoint takes before the tenant check is even reached.
+  const resolved = resolveConfig({ slugs: { customers: 'users' }, userCollection: 'users' })
+
+  it('an authenticated tenant-A caller cannot create a booking in tenant B (string id)', async () => {
     const endpoint = createBookingEndpoint(resolved)
 
     // resource/service both genuinely belong to tenant B (MT auto-injects
@@ -135,26 +136,50 @@ describe('cross-tenant create via /reserve/book', () => {
       user: { ...tenantAUser, collection: 'users' },
     } as never)
 
-    // Either the write is refused outright, or the tenant is forced back to the
-    // caller's own. What must NOT happen is a 201 carrying tenant B.
-    if (res.status === 201) {
-      const created = (await res.json()) as { tenant?: unknown }
-      const tenantId =
-        typeof created.tenant === 'object' && created.tenant
-          ? (created.tenant as { id: unknown }).id
-          : created.tenant
-      expect(String(tenantId)).toBe(String(tenantAUser.tenants[0].tenant))
-    } else {
-      expect(res.status).toBeGreaterThanOrEqual(400)
-    }
+    // Assert the exact refusal, not merely "some 4xx" — an unrelated 400 (a
+    // wrong-reason failure, the same trap the RED test for this fix tripped
+    // twice) would satisfy a looser `>= 400` assertion just as well as the
+    // genuine 403 the tenant probe returns.
+    expect(res.status).toBe(403)
+    const { totalDocs } = await payload.count({
+      collection: 'reservations',
+      where: { tenant: { equals: tenantB } },
+    })
+    expect(totalDocs).toBe(0)
   })
 
-  // Positive control: the tenant-membership probe that rejects the case above
+  it('an authenticated tenant-A caller cannot create a booking in tenant B (object-shaped id)', async () => {
+    const endpoint = createBookingEndpoint(resolved)
+
+    // A populated relationship — `{ "tenant": { "id": "<tenantB>" } }` — is a
+    // shape Payload itself normalizes internally (beforeValidate) and a real
+    // client can send. A guard that only recognizes a bare string id would
+    // skip the probe entirely for this shape and let the write through.
+    const res = await endpoint.handler({
+      json: () =>
+        Promise.resolve({
+          resource: tenantBResource.id,
+          service: tenantBService.id,
+          startTime: '2027-07-01T11:00:00.000Z',
+          tenant: { id: tenantB },
+        }),
+      payload,
+      user: { ...tenantAUser, collection: 'users' },
+    } as never)
+
+    expect(res.status).toBe(403)
+    const { totalDocs } = await payload.count({
+      collection: 'reservations',
+      where: { tenant: { equals: tenantB } },
+    })
+    expect(totalDocs).toBe(0)
+  })
+
+  // Positive control: the tenant-membership probe that rejects the cases above
   // must not also reject a legitimate same-tenant booking — otherwise the fix
   // would trade one bug (cross-tenant writes) for another (booking broken for
   // everyone under multiTenant).
   it('an authenticated tenant-A caller can still create a booking in their own tenant', async () => {
-    const resolved = resolveConfig({ slugs: { customers: 'users' }, userCollection: 'users' })
     const endpoint = createBookingEndpoint(resolved)
 
     const res = await endpoint.handler({

@@ -1,6 +1,8 @@
 import type { Payload } from 'payload'
 
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { postgresAdapter } from '@payloadcms/db-postgres'
+import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
@@ -19,7 +21,17 @@ export async function buildMultiTenantPayload(): Promise<{
   payload: Payload
   stop: () => Promise<void>
 }> {
-  const db = await testDbUri('mtmemory')
+  // Opt-in SQL harnesses, mirroring dev/payload.config.ts: `PG_URL=...` or
+  // `SQLITE=1` runs this same multi-tenant fixture against a real SQL adapter
+  // instead of the in-memory Mongo replica set. This exists to verify
+  // callerMayUseTenant's tenant-membership probe (src/utilities/tenantTimezone.ts)
+  // against NUMBER-shaped ids — the shape Postgres/SQLite use for a relationship,
+  // which Mongo's ObjectId-string ids never produce. Skip testDbUri entirely in
+  // that case: dev/globalSetup.ts does not start Mongo under either env var, so
+  // calling it would spin up an unwanted private Mongo replica set instead of
+  // reading MEMORY_DB_URI.
+  const usingSqlAdapter = Boolean(process.env.PG_URL || process.env.SQLITE)
+  const db = usingSqlAdapter ? null : await testDbUri('mtmemory')
 
   const config = await buildConfig({
     admin: { importMap: { baseDir: path.resolve(dirname, '..') } },
@@ -51,7 +63,17 @@ export async function buildMultiTenantPayload(): Promise<{
         upload: { staticDir: path.resolve(dirname, '..', 'media') },
       },
     ],
-    db: mongooseAdapter({ ensureIndexes: true, url: db.uri }),
+    db: process.env.PG_URL
+      ? postgresAdapter({ pool: { connectionString: process.env.PG_URL }, push: true })
+      : process.env.SQLITE
+        ? sqliteAdapter({
+            client: { url: process.env.SQLITE_URL || 'file::memory:?cache=shared' },
+            push: true,
+            // See dev/payload.config.ts's identical option for why this is
+            // required: without it db-sqlite's beginTransaction is a no-op.
+            transactionOptions: {},
+          })
+        : mongooseAdapter({ ensureIndexes: true, url: db!.uri }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
     // payloadReserve MUST run before multiTenantPlugin so the reservations/resources
@@ -77,7 +99,7 @@ export async function buildMultiTenantPayload(): Promise<{
     payload,
     stop: async () => {
       await payload.destroy()
-      await db.stop()
+      await db?.stop()
     },
   }
 }

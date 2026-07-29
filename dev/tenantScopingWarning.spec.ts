@@ -84,7 +84,7 @@ describe('tenant-scoping diagnostic (D2)', () => {
     expect(messages).toEqual([])
   })
 
-  it('stays silent when the plugin collections ARE tenant-scoped', async () => {
+  it('stays silent on the unscoped-collections check when the plugin collections ARE tenant-scoped', async () => {
     const config = payloadReserve({})(baseConfig())
     const generated = (config.collections ?? []) as Array<Record<string, unknown>>
     // Simulate multi-tenant having injected the tenant field into reservations.
@@ -97,7 +97,10 @@ describe('tenant-scoping diagnostic (D2)', () => {
     }
     const { messages, payload } = fakePayload([...generated, scopedPosts])
     await config.onInit?.(payload)
-    expect(messages).toEqual([])
+    // Scoping every collection fixes THIS check, but not the separate
+    // standalone-mode probe-precondition warning below (D3) — this is still
+    // standalone mode (`payloadReserve({})`), so that one still fires.
+    expect(messages.join('\n')).not.toMatch(/not tenant-scoped/i)
   })
 
   it('does not break boot when the host logger throws', async () => {
@@ -148,12 +151,50 @@ describe('tenant-scoping diagnostic (D2)', () => {
     expect(messages.join('\n')).toMatch(/reservations/)
   })
 
-  it('stays silent when the users tenants array is present but everything is scoped', async () => {
+  it('stays silent on the unscoped-collections check when the users tenants array is present but everything is scoped', async () => {
     const config = payloadReserve({})(baseConfig())
     const generated = (config.collections ?? []) as Array<Record<string, unknown>>
     scopeAllBut(generated, null)
     const { messages, payload } = fakePayload([...generated, usersWithTenantsArray])
     await config.onInit?.(payload)
-    expect(messages).toEqual([])
+    // Same distinction as above: this is still standalone mode, so D3 fires
+    // even though nothing is left unscoped.
+    expect(messages.join('\n')).not.toMatch(/not tenant-scoped/i)
+  })
+})
+
+describe('tenant-membership-probe precondition diagnostic (D3)', () => {
+  // createBooking's tenant-membership probe (callerMayUseTenant) is only a
+  // real membership check when the caller authenticates against the SAME
+  // collection multi-tenant wraps. In standalone mode that's never true for a
+  // customer (they authenticate against the plugin's own `customers`
+  // collection) — this warns about exactly that configuration, independent of
+  // whether any particular collection happens to be scoped.
+  it('warns in standalone mode once multi-tenant is detected', async () => {
+    const messages = await runInit([scopedPosts])
+    const joined = messages.join('\n')
+    expect(joined).toMatch(/tenant-membership check/i)
+    expect(joined).toMatch(/standalone mode/i)
+  })
+
+  it('stays silent when multi-tenant is not detected at all', async () => {
+    const messages = await runInit([{ slug: 'posts', fields: [{ name: 'title', type: 'text' }] }])
+    expect(messages.join('\n')).not.toMatch(/tenant-membership check/i)
+  })
+
+  it('does not fire in userCollection mode', async () => {
+    const config = payloadReserve({ userCollection: 'users' })({
+      collections: [usersWithTenantsArray],
+      endpoints: [],
+    } as unknown as Config)
+    const generated = (config.collections ?? []) as Array<Record<string, unknown>>
+    for (const c of generated) {
+      if (c.slug !== 'users') {
+        ;(c.fields as Array<Record<string, unknown>>).push({ ...tenantField })
+      }
+    }
+    const { messages, payload } = fakePayload([...generated, scopedPosts])
+    await config.onInit?.(payload)
+    expect(messages.join('\n')).not.toMatch(/tenant-membership check/i)
   })
 })
