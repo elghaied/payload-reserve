@@ -2,6 +2,10 @@ import type { Endpoint } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import {
+  isTransientWriteConflict,
+  retryOnWriteConflict,
+} from '../utilities/retryOnWriteConflict.js'
 import { isPrivilegedUser } from '../utilities/userRoles.js'
 
 export function createCancelBookingEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
@@ -56,18 +60,27 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
 
       let reservation: Record<string, unknown>
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        reservation = await (req.payload.update as any)({
-          id: reservationId,
-          collection: config.slugs.reservations,
-          data: {
-            cancellationReason: reason,
-            status: config.statusMachine.cancelStatus,
-          },
-          overrideAccess: !delegateAccess,
-          req,
-        })
+        reservation = await retryOnWriteConflict(
+          () =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (req.payload.update as any)({
+              id: reservationId,
+              collection: config.slugs.reservations,
+              data: {
+                cancellationReason: reason,
+                status: config.statusMachine.cancelStatus,
+              },
+              overrideAccess: !delegateAccess,
+              req,
+            }) as Promise<Record<string, unknown>>,
+        )
       } catch (err) {
+        if (isTransientWriteConflict(err)) {
+          return Response.json(
+            { error: 'That booking is being modified. Please try again.', retryable: true },
+            { status: 409 },
+          )
+        }
         // A denied delegate write is an authorization failure, not a 500.
         if ((err as { status?: number })?.status === 403) {
           return Response.json({ message: 'Forbidden' }, { status: 403 })
