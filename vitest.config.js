@@ -18,16 +18,16 @@ export default defineConfig(() => {
     ],
     test: {
       environment: 'node',
-      // Run spec files sequentially. Several integration specs each boot their
-      // own MongoMemoryReplSet; running files in parallel made multiple replsets
-      // elect/tear down concurrently, intermittently throwing
-      // `InterruptedDueToReplStateChange` ("operation was interrupted") and
-      // failing the release pipeline. Serial execution keeps one Mongo instance
-      // alive at a time.
-      fileParallelism: false,
-      hookTimeout: 30_000,
-      testTimeout: 30_000,
       exclude: ['dev/e2e.spec.ts', 'node_modules/**'],
+      // One replica set for the whole run — see dev/globalSetup.ts. Before this,
+      // nine files each created their own cluster and the start/stop churn
+      // intermittently failed a beforeAll with a connect error.
+      globalSetup: ['./dev/globalSetup.ts'],
+      hookTimeout: 30_000,
+      // Kept even with a shared cluster: several suites seed overlapping fixture
+      // data and assert on collection-wide counts.
+      fileParallelism: false,
+      testTimeout: 30_000,
     },
   }
 })

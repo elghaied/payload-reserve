@@ -43,14 +43,29 @@ const buildConfigWithMemoryDB = async () => {
   // mongods then pile up and pin the CPU. `VITEST` is only set inside Vitest
   // workers, which own the replica-set lifecycle via getPayload/payload.destroy().
   else if (process.env.NODE_ENV === 'test' && process.env.VITEST) {
-    const memoryDB = await MongoMemoryReplSet.create({
-      replSet: {
-        count: 3,
-        dbName: 'payloadmemory',
-      },
-    })
+    // Prefer the run-wide replica set from dev/globalSetup.ts. Falling back to a
+    // private cluster keeps this file usable outside Vitest (and if globalSetup
+    // is ever removed), at the cost this file used to always pay.
+    if (process.env.MEMORY_DB_URI) {
+      // MEMORY_DB_URI is getUri() with no db argument: `mongodb://host/?replicaSet=name`
+      // — empty path, query already present. Concatenating the db name onto the end
+      // of that string lands it inside the replicaSet query value instead of the
+      // path, producing a replica set name that doesn't exist and failing server
+      // selection. The URL API inserts it in the right place instead.
+      const url = new URL(process.env.MEMORY_DB_URI)
+      url.pathname = '/payloadmemory'
+      url.searchParams.set('retryWrites', 'true')
+      process.env.DATABASE_URL = url.toString()
+    } else {
+      const memoryDB = await MongoMemoryReplSet.create({
+        replSet: {
+          count: 3,
+          dbName: 'payloadmemory',
+        },
+      })
 
-    process.env.DATABASE_URL = `${memoryDB.getUri()}&retryWrites=true`
+      process.env.DATABASE_URL = `${memoryDB.getUri()}&retryWrites=true`
+    }
   }
 
   // Build the collections array; conditionally extend it when MT is enabled.
