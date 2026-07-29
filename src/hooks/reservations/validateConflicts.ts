@@ -94,9 +94,12 @@ export const validateConflicts =
         bufferBefore,
         debug: dbg,
         endTime: new Date(item.endTime),
+        excludeHoldToken:
+          typeof context?.holdToken === 'string' ? context.holdToken : undefined,
         excludeReservationId: isUpdate ? originalDoc?.id : undefined,
         getExternalBusy: config.getExternalBusy,
         guestCount: item.guestCount,
+        holdsSlug: config.slotHolds.enabled ? config.slugs.holds : undefined,
         payload: req.payload,
         req,
         reservationSlug: config.slugs.reservations,

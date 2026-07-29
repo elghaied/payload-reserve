@@ -96,6 +96,7 @@ function resolveStaffProvisioning(
 
 export const DEFAULT_SLUGS = {
   customers: 'customers',
+  holds: 'reservation-holds',
   media: 'media',
   reservations: 'reservations',
   resources: 'resources',
@@ -103,6 +104,7 @@ export const DEFAULT_SLUGS = {
   services: 'services',
 } as const
 
+export const DEFAULT_HOLD_TTL_MINUTES = 10
 export const DEFAULT_ADMIN_GROUP = 'Reservations'
 export const DEFAULT_ALLOW_GUEST_BOOKING = false
 export const DEFAULT_BUFFER_TIME = 0
@@ -164,8 +166,13 @@ export function resolveConfig(
         }
       : undefined,
     resourceTypes,
+    slotHolds: {
+      enabled: !disabled && (pluginOptions.slotHolds?.enabled ?? false),
+      ttlMinutes: pluginOptions.slotHolds?.ttlMinutes ?? DEFAULT_HOLD_TTL_MINUTES,
+    },
     slugs: {
       customers: pluginOptions.slugs?.customers ?? DEFAULT_SLUGS.customers,
+      holds: pluginOptions.slugs?.holds ?? DEFAULT_SLUGS.holds,
       media: pluginOptions.slugs?.media ?? DEFAULT_SLUGS.media,
       reservations: pluginOptions.slugs?.reservations ?? DEFAULT_SLUGS.reservations,
       resources: pluginOptions.slugs?.resources ?? DEFAULT_SLUGS.resources,

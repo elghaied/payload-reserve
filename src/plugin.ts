@@ -6,6 +6,7 @@ import { deepMergeSimple } from 'payload/shared'
 import type { ReservationPluginConfig } from './types.js'
 
 import { createCustomersCollection } from './collections/Customers.js'
+import { createHoldsCollection } from './collections/Holds.js'
 import { createReservationsCollection } from './collections/Reservations.js'
 import { createResourcesCollection } from './collections/Resources.js'
 import { createSchedulesCollection } from './collections/Schedules.js'
@@ -218,6 +219,9 @@ export const payloadReserve =
       ...(resolved.userCollection
         ? []
         : [applyCollectionOverride(createCustomersCollection(resolved), ov.customers)]),
+      // Only when slot holds are enabled — an install that never opts in gets no
+      // extra collection and no schema change.
+      ...(resolved.slotHolds.enabled ? [createHoldsCollection(resolved)] : []),
     )
 
     // C3: collections are registered (above) even when disabled so the DB schema

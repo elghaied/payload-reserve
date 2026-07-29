@@ -240,9 +240,23 @@ export type ReservationPluginConfig = {
   resourceOwnerMode?: ResourceOwnerModeConfig
   /** Configurable resourceType vocabulary (default: staff/equipment/room) */
   resourceTypes?: string[]
+  /**
+   * Short-lived slot claims taken while a customer completes checkout.
+   *
+   * Opt-in: when absent, no holds collection is created and availability
+   * behaviour is byte-identical to before. Enabling it makes unexpired holds
+   * occupy their resource in every availability check.
+   */
+  slotHolds?: {
+    enabled?: boolean
+    /** Minutes a hold survives before it stops occupying its slot. Default 10. */
+    ttlMinutes?: number
+  }
   /** Override collection slugs */
   slugs?: {
     customers?: string
+    /** Slug for the slot-holds collection (only created when `slotHolds.enabled`). */
+    holds?: string
     media?: string
     reservations?: string
     resources?: string
@@ -298,8 +312,13 @@ export type ResolvedReservationPluginConfig = {
   }
   resourceOwnerMode: ResolvedResourceOwnerModeConfig | undefined
   resourceTypes: string[]
+  slotHolds: {
+    enabled: boolean
+    ttlMinutes: number
+  }
   slugs: {
     customers: string
+    holds: string
     media: string
     reservations: string
     resources: string

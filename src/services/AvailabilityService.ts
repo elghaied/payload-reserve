@@ -204,10 +204,14 @@ export async function checkAvailability(params: {
   /** Optional tracer — emits check/check_result/error lines when enabled. */
   debug?: ReserveDebug
   endTime: Date
+  /** Token of the hold being converted into this booking — never self-blocks. */
+  excludeHoldToken?: string
   excludeReservationId?: number | string
   /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
   getExternalBusy?: GetExternalBusy
   guestCount: number
+  /** Slug of the slot-holds collection; omit to ignore holds entirely. */
+  holdsSlug?: string
   payload: Payload
   req: PayloadRequest
   reservationSlug: string
@@ -229,9 +233,11 @@ export async function checkAvailability(params: {
     bufferBefore,
     debug,
     endTime,
+    excludeHoldToken,
     excludeReservationId,
     getExternalBusy,
     guestCount,
+    holdsSlug,
     payload,
     req,
     reservationSlug,
@@ -366,7 +372,62 @@ export async function checkAvailability(params: {
     }
   }
 
-  const occupancies = [...fetchedOccupancies, ...siblingOccupancies, ...externalOccupancies]
+  // Unexpired slot holds occupy the resource exactly as a blocking reservation
+  // does. Expiry is a read-time predicate rather than a TTL index so the
+  // behaviour is identical on Mongo, Postgres and SQLite. `excludeHoldToken`
+  // is the bearer converting their OWN hold into a booking — without it the
+  // hold would block the very booking it was taken to protect.
+  let holdOccupancies: Occupancy[] = []
+  if (holdsSlug) {
+    const holdWhere: Where = {
+      and: [
+        { resource: { equals: resourceId } },
+        { expiresAt: { greater_than: new Date().toISOString() } },
+        { startTime: { less_than: candidateEnd.toISOString() } },
+        { endTime: { greater_than: candidateStart.toISOString() } },
+        ...(excludeHoldToken ? [{ token: { not_equals: excludeHoldToken } }] : []),
+      ],
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { docs: holdDocs } = await (payload.find as any)({
+      collection: holdsSlug,
+      depth: 0,
+      limit: 0,
+      req,
+      where: holdWhere,
+    })
+
+    holdOccupancies = await Promise.all(
+      (holdDocs as Array<Record<string, unknown>>).map(async (hold) => {
+        // Expand by the held service's own buffers, so a hold reserves the same
+        // real-world window the resulting booking will.
+        const { after, before } = await bufferFor(
+          hold.service as number | string | undefined,
+        )
+        const { effectiveEnd, effectiveStart } = computeBlockedWindow(
+          new Date(hold.startTime as string),
+          new Date(hold.endTime as string),
+          before,
+          after,
+        )
+        return {
+          blockedEnd: effectiveEnd,
+          blockedStart: effectiveStart,
+          units: capacityMode === 'per-guest' ? ((hold.guestCount as number) ?? 1) : 1,
+        }
+      }),
+    )
+
+    trace.dbg('check_holds', { activeHolds: holdOccupancies.length, resourceId })
+  }
+
+  const occupancies = [
+    ...fetchedOccupancies,
+    ...siblingOccupancies,
+    ...externalOccupancies,
+    ...holdOccupancies,
+  ]
 
   // Sum the units of every occupancy whose buffered window overlaps the candidate
   const currentUnits = occupancies.reduce(

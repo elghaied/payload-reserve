@@ -3,6 +3,7 @@ import type { CollectionSlug, Field, Plugin } from 'payload'
 import { smsPlugin } from '@elghaied/payload-plugin-sms'
 import { mockAdapter } from '@elghaied/payload-plugin-sms/mock'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { postgresAdapter } from '@payloadcms/db-postgres'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
@@ -27,13 +28,21 @@ if (!process.env.ROOT_DIR) {
 const MT = Boolean(process.env.MT)
 
 const buildConfigWithMemoryDB = async () => {
-  // Only spin up the in-memory replica set when actually running under Vitest.
-  // Gating on NODE_ENV alone is too broad: CLI tooling that inherits NODE_ENV=test
-  // (e.g. `payload generate:types`) would otherwise spawn an untracked 3-node mongod
-  // cluster at config-import time that nothing ever tears down — orphaned mongods then
-  // pile up and pin the CPU. `VITEST` is only set inside Vitest workers, which own the
-  // replica-set lifecycle via getPayload/payload.destroy() in int.spec.ts.
-  if (process.env.NODE_ENV === 'test' && process.env.VITEST) {
+  // Opt-in Postgres harness: `PG_URL=... pnpm test:int` runs the same suite
+  // against a real Postgres instead of the in-memory Mongo replica set. It
+  // exists because transaction semantics differ between the two — Mongo aborts
+  // a write-conflict loser, Postgres blocks it — and the booking lock's
+  // correctness depends on that behaviour. Unset, nothing here changes.
+  if (process.env.PG_URL) {
+    process.env.DATABASE_URL = process.env.PG_URL
+  }
+  // Otherwise spin up the in-memory replica set, but only under Vitest. Gating
+  // on NODE_ENV alone is too broad: CLI tooling that inherits NODE_ENV=test
+  // (e.g. `payload generate:types`) would otherwise spawn an untracked 3-node
+  // mongod cluster at config-import time that nothing ever tears down — orphaned
+  // mongods then pile up and pin the CPU. `VITEST` is only set inside Vitest
+  // workers, which own the replica-set lifecycle via getPayload/payload.destroy().
+  else if (process.env.NODE_ENV === 'test' && process.env.VITEST) {
     const memoryDB = await MongoMemoryReplSet.create({
       replSet: {
         count: 3,
@@ -178,6 +187,7 @@ const buildConfigWithMemoryDB = async () => {
           },
         ],
       },
+      slotHolds: { enabled: true, ttlMinutes: 10 },
       // statusMachine: {
       //   statuses: ['pending', 'waitlisted', 'confirmed', 'completed', 'cancelled', 'no-show'],
       //   transitions: {
@@ -218,10 +228,15 @@ const buildConfigWithMemoryDB = async () => {
       },
     },
     collections,
-    db: mongooseAdapter({
-      ensureIndexes: true,
-      url: process.env.DATABASE_URL || '',
-    }),
+    db: process.env.PG_URL
+      ? postgresAdapter({
+          pool: { connectionString: process.env.PG_URL },
+          push: true,
+        })
+      : mongooseAdapter({
+          ensureIndexes: true,
+          url: process.env.DATABASE_URL || '',
+        }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
     endpoints: guestCancelOtpEndpoints,
