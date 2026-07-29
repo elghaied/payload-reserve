@@ -21,6 +21,8 @@ export async function buildEnforceActiveOffPayload(): Promise<{
   payload: Payload
   stop: () => Promise<void>
 }> {
+  const db = await testDbUri('enforceactiveoffmemory')
+
   const config = await buildConfig({
     admin: { importMap: { baseDir: path.resolve(dirname, '..') } },
     collections: [
@@ -35,10 +37,7 @@ export async function buildEnforceActiveOffPayload(): Promise<{
         upload: { staticDir: path.resolve(dirname, '..', 'media') },
       },
     ],
-    db: mongooseAdapter({
-      ensureIndexes: true,
-      url: await testDbUri('enforceactiveoffmemory'),
-    }),
+    db: mongooseAdapter({ ensureIndexes: true, url: db.uri }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
     plugins: [payloadReserve({ enforceActive: false })],
@@ -55,6 +54,7 @@ export async function buildEnforceActiveOffPayload(): Promise<{
     payload,
     stop: async () => {
       await payload.destroy()
+      await db.stop()
     },
   }
 }

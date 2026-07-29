@@ -19,6 +19,8 @@ export async function buildMultiTenantPayload(): Promise<{
   payload: Payload
   stop: () => Promise<void>
 }> {
+  const db = await testDbUri('mtmemory')
+
   const config = await buildConfig({
     admin: { importMap: { baseDir: path.resolve(dirname, '..') } },
     collections: [
@@ -49,7 +51,7 @@ export async function buildMultiTenantPayload(): Promise<{
         upload: { staticDir: path.resolve(dirname, '..', 'media') },
       },
     ],
-    db: mongooseAdapter({ ensureIndexes: true, url: await testDbUri('mtmemory') }),
+    db: mongooseAdapter({ ensureIndexes: true, url: db.uri }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
     // payloadReserve MUST run before multiTenantPlugin so the reservations/resources
@@ -75,6 +77,7 @@ export async function buildMultiTenantPayload(): Promise<{
     payload,
     stop: async () => {
       await payload.destroy()
+      await db.stop()
     },
   }
 }

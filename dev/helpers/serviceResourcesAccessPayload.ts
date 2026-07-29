@@ -23,6 +23,8 @@ export async function buildServiceResourcesAccessPayload(): Promise<{
   payload: Payload
   stop: () => Promise<void>
 }> {
+  const db = await testDbUri('sraccessmemory')
+
   const config = await buildConfig({
     admin: { importMap: { baseDir: path.resolve(dirname, '..') } },
     collections: [
@@ -37,7 +39,7 @@ export async function buildServiceResourcesAccessPayload(): Promise<{
         upload: { staticDir: path.resolve(dirname, '..', 'media') },
       },
     ],
-    db: mongooseAdapter({ ensureIndexes: true, url: await testDbUri('sraccessmemory') }),
+    db: mongooseAdapter({ ensureIndexes: true, url: db.uri }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
     plugins: [
@@ -58,6 +60,7 @@ export async function buildServiceResourcesAccessPayload(): Promise<{
     payload,
     stop: async () => {
       await payload.destroy()
+      await db.stop()
     },
   }
 }

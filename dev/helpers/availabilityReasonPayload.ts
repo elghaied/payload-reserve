@@ -21,6 +21,8 @@ export async function buildAvailabilityReasonPayload(): Promise<{
   payload: Payload
   stop: () => Promise<void>
 }> {
+  const db = await testDbUri('availabilityreasonmemory')
+
   const config = await buildConfig({
     admin: { importMap: { baseDir: path.resolve(dirname, '..') } },
     collections: [
@@ -35,10 +37,7 @@ export async function buildAvailabilityReasonPayload(): Promise<{
         upload: { staticDir: path.resolve(dirname, '..', 'media') },
       },
     ],
-    db: mongooseAdapter({
-      ensureIndexes: true,
-      url: await testDbUri('availabilityreasonmemory'),
-    }),
+    db: mongooseAdapter({ ensureIndexes: true, url: db.uri }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
     plugins: [payloadReserve({})],
@@ -55,6 +54,7 @@ export async function buildAvailabilityReasonPayload(): Promise<{
     payload,
     stop: async () => {
       await payload.destroy()
+      await db.stop()
     },
   }
 }

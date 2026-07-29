@@ -23,6 +23,8 @@ export async function buildCustomerScopedPayload(): Promise<{
   payload: Payload
   stop: () => Promise<void>
 }> {
+  const db = await testDbUri('csmemory')
+
   const config = await buildConfig({
     admin: { importMap: { baseDir: path.resolve(dirname, '..') }, user: 'users' },
     collections: [
@@ -53,7 +55,7 @@ export async function buildCustomerScopedPayload(): Promise<{
         upload: { staticDir: path.resolve(dirname, '..', 'media') },
       },
     ],
-    db: mongooseAdapter({ ensureIndexes: true, url: await testDbUri('csmemory') }),
+    db: mongooseAdapter({ ensureIndexes: true, url: db.uri }),
     editor: lexicalEditor(),
     email: testEmailAdapter,
     // payloadReserve MUST run before multiTenantPlugin so `customers` exists
@@ -84,6 +86,7 @@ export async function buildCustomerScopedPayload(): Promise<{
     payload,
     stop: async () => {
       await payload.destroy()
+      await db.stop()
     },
   }
 }
