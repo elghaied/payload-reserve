@@ -8,11 +8,13 @@ import { buildServiceResourcesAccessPayload } from './helpers/serviceResourcesAc
 
 // Maintainer ruling verification: under resourceOwnerMode, reservation `create`
 // access is admin-only (makeReservationOwnerAccess, src/utilities/ownerAccess.ts)
-// — a plain, non-admin customer trips it. If createBooking delegated collection
-// access for a customer booking THEMSELVES, self-service booking would break
-// under resourceOwnerMode entirely. The ruling keeps that path privileged
-// (protected instead by the tenant probe + the pre-existing force-onto-own-id
-// guard), specifically so this keeps working.
+// — a plain, non-admin CUSTOMER trips it, and so does a non-admin STAFF/owner
+// account. The ruling is that the access-checked tenant probe, not
+// `overrideAccess`, is /reserve/book's security boundary; applied consistently,
+// that means the create stays privileged for EVERY caller and the probe runs for
+// every authenticated one. These cases pin both halves of that: self-service
+// booking and non-admin staff walk-in booking both keep working, while the
+// force-onto-own-id guard still confines a customer to themselves.
 let payload: Payload
 let stop: () => Promise<void>
 let owner: { id: number | string }
@@ -137,7 +139,61 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
     expect(String(customerId)).toBe(String(customerA.id))
   })
 
-  it('a genuine admin may still book on behalf of any customer (delegated, not privileged-bypassed)', async () => {
+  it('a NON-ADMIN staff/owner may book a walk-in for another customer', async () => {
+    // The gap the "genuine admin" case below cannot see. `isPrivilegedUser`
+    // returns true for ANY user outside `slugs.customers`, so a plain staff or
+    // resource-owner account (no `admin` role) took the same branch an admin
+    // does. While that branch delegated collection access, this caller hit
+    // makeReservationOwnerAccess's admin-only reservation `create` rule and got
+    // a flat 403 — for a walk-in booking that worked in every release before
+    // resourceOwnerMode-aware overrideAccess was introduced. The write is now
+    // privileged for every caller and the tenant probe is the boundary, so this
+    // must succeed.
+    const service = await payload.create({
+      collection: 'services',
+      data: { name: 'ROM Cut Staff', duration: 30, durationType: 'fixed' },
+    })
+    const resource = await payload.create({
+      collection: 'resources',
+      data: { name: 'ROM Chair Staff', quantity: 1, services: [service.id] },
+      user: owner,
+    })
+    const customer = await payload.create({
+      collection: 'customers',
+      data: {
+        email: 'rom-staff-walkin@test.com',
+        firstName: 'ROM',
+        lastName: 'StaffWalkin',
+        password: 'testpass123',
+      },
+    })
+
+    // `owner` is a users-collection account with NO role — staff, not admin.
+    const endpoint = createBookingEndpoint(resolved)
+    const res = await endpoint.handler({
+      json: () =>
+        Promise.resolve({
+          customer: customer.id,
+          resource: resource.id,
+          service: service.id,
+          startTime: '2027-08-02T09:00:00.000Z',
+        }),
+      payload,
+      user: { ...owner, collection: 'users' },
+    } as never)
+
+    const body = (await res.clone().json()) as Record<string, unknown>
+    expect(res.status, JSON.stringify(body)).toBe(201)
+    const customerId =
+      typeof body.customer === 'object' && body.customer
+        ? (body.customer as { id: unknown }).id
+        : body.customer
+    // The walk-in stayed the walk-in — a privileged caller is not forced onto
+    // their own id.
+    expect(String(customerId)).toBe(String(customer.id))
+  })
+
+  it('a genuine admin may still book on behalf of any customer', async () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'ROM Cut 3', duration: 30, durationType: 'fixed' },

@@ -40,27 +40,30 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
         }
       }
 
-      // `overrideAccess` and the tenant-membership probe below are two
-      // INDEPENDENT gates, not one derived from the other (maintainer ruling):
+      // The write stays PRIVILEGED for every caller, and the tenant-membership
+      // probe below is the security boundary (maintainer ruling). Applying that
+      // ruling consistently is what makes this endpoint's behaviour identical to
+      // pre-`slotHolds` releases for collection access — it never passed
+      // `overrideAccess`, so the Local API default (`true`) applied to
+      // everyone — while still closing the cross-tenant write.
       //
-      //   anonymous guest       -> privileged (no user to authorize)
-      //   customer books SELF   -> privileged + tenant probe
-      //   any other authed call -> delegates  + tenant probe
-      //
-      // A self-booking customer is forced onto their own id just above, so
-      // delegating collection access there protects against nothing — it only
-      // costs correctness, tripping resourceOwnerMode's reservation `create`
-      // access (admin-only) and breaking ordinary self-service booking.
-      // Staying privileged for that path is safe precisely BECAUSE the tenant
-      // probe (not overrideAccess) is what actually closes the cross-tenant
-      // hole, so it runs on every authenticated path below regardless of which
-      // way this flag goes.
-      const delegateAccess = privileged
+      // Delegating for any subset of callers is not a security improvement and
+      // is a real regression: `isPrivilegedUser` is true for ANY user outside
+      // `slugs.customers`, so delegating on that branch made a non-admin staff
+      // or resource-owner account hit `resourceOwnerMode`'s admin-only
+      // reservation `create` access (`makeReservationOwnerAccess` in
+      // src/utilities/ownerAccess.ts) and get a flat 403 for a walk-in booking
+      // they could take before. And it buys nothing, because Payload's `create`
+      // access check only tests the TRUTHINESS of an access function's result —
+      // a returned `Where` (how multi-tenant scopes access) is discarded, so
+      // `overrideAccess: false` cannot constrain WHICH tenant is written to.
+      // Only the probe can. See README, "/api/reserve/book: two independent
+      // gates".
 
       // See callerMayUseTenant's doc comment (src/utilities/tenantTimezone.ts)
-      // for the full mechanism and its precondition. Runs for every
-      // authenticated caller — including the privileged self-booking path
-      // above — since it is independent of overrideAccess.
+      // for the full mechanism and its precondition. Unconditional on
+      // `req.user`: it is what authorizes an explicit `tenant` in the body, and
+      // it is independent of the privileged write above.
       if (req.user) {
         const permitted = await callerMayUseTenant({ config, data, req })
         if (!permitted) {
@@ -85,9 +88,10 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
               collection: config.slugs.reservations,
               context: holdToken ? { holdToken } : undefined,
               data,
-              overrideAccess: !delegateAccess,
+              overrideAccess: true,
               req,
             }) as Promise<Record<string, unknown>>,
+          { req },
         )
       } catch (err) {
         // A conflict that survived every attempt is contention, not a bad request:
@@ -101,7 +105,8 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
             { status: 409 },
           )
         }
-        // A denied delegate write is an authorization failure, not a 500.
+        // An access denial raised anywhere under the create (a consumer hook,
+        // a field-level rule) is an authorization failure, not a 500.
         if ((err as { status?: number })?.status === 403) {
           return Response.json({ error: 'Not permitted to create this booking' }, { status: 403 })
         }
