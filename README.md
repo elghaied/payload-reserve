@@ -10,6 +10,8 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 
 📦 **npm:** https://www.npmjs.com/package/payload-reserve
 
+**[Website](https://payloadreserve.com)** · **[Documentation](https://docs.payloadreserve.com)** · **[Live demos](#live-demos)** · **[Demo source code](https://github.com/elghaied/payloadreserve-demos)**
+
 ---
 
 ## Features
@@ -75,6 +77,25 @@ export default buildConfig({
 ```
 
 > **Using SQLite?** It requires one extra adapter setting to avoid silent double-booking under concurrent load — see [Concurrent booking: database adapter support](#concurrent-booking-database-adapter-support).
+
+---
+
+## Live Demos
+
+Four standalone booking apps, each fully themed and running the **same plugin** with completely different business logic — the fastest way to see whether payload-reserve fits your use case before wiring anything up.
+
+| Demo | What it books | Plugin features it exercises |
+|------|---------------|------------------------------|
+| **[Salon](https://salon.payloadreserve.com)** — Lumiere Salon | Appointments with a specific stylist | 1:1 resource booking, per-resource schedules, 5 min buffer, abandoned-payment jobs |
+| **[Hotel](https://hotel.payloadreserve.com)** — Grand Hotel | Multi-night stays across 5 room types | Date-range booking, `flexible` duration, quantity pools (2–40 units), 4–6 h turnover buffer |
+| **[Restaurant](https://restaurant.payloadreserve.com)** — Le Jardin Doré | Tables by party size across 5 dining spaces | Custom reservation fields (`partySize`), per-guest capacity, 15 min turnover, 4 h cancellation notice |
+| **[Events](https://events.payloadreserve.com)** — Éclat Festival | Tickets for events across 5 venues (50–500 seats) | Ticket quantities, per-reservation capacity mode, resource–event restrictions |
+
+All four ship Stripe payments and EN/FR internationalization.
+
+**Source code:** [`elghaied/payloadreserve-demos`](https://github.com/elghaied/payloadreserve-demos) — a Turborepo containing all four apps plus shared seed, email-template, and types packages. This is the reference implementation for taking the plugin from Payload config to a shipped Next.js 15 / React 19 frontend.
+
+**Want your own instance?** [payloadreserve.com/demo](https://payloadreserve.com/demo) provisions a private, fully seeded copy of any demo — its own database, storage, and admin credentials, emailed to you. It self-destructs after 24 hours, so you can change anything without consequence.
 
 ---
 
@@ -606,10 +627,11 @@ This is separate from Payload **field localization** (localizing the *content* o
 
 ## Documentation
 
-> The docs below live in the [GitHub repository](https://github.com/elghaied/payload-reserve/tree/main/docs) and are not included in the published npm package.
+> The docs below live in the [GitHub repository](https://github.com/elghaied/payload-reserve/tree/main/docs) and are not included in the published npm package. They are also published, rendered, at **[docs.payloadreserve.com](https://docs.payloadreserve.com)**.
 
 | Topic | Contents |
 |-------|----------|
+| [Demo apps](https://github.com/elghaied/payloadreserve-demos) | Full source for the four [live demos](#live-demos) — salon, hotel, restaurant, events — as runnable Next.js apps |
 | [Getting Started](https://github.com/elghaied/payload-reserve/blob/main/docs/getting-started.md) | Installation, quick start, what gets created |
 | [Configuration](https://github.com/elghaied/payload-reserve/blob/main/docs/configuration.md) | All plugin options with types and defaults, including `resourceOwnerMode` and `getExternalBusy` |
 | [Collections](https://github.com/elghaied/payload-reserve/blob/main/docs/collections.md) | Services, Resources, Schedules, Customers, Reservations schemas |
