@@ -99,5 +99,24 @@ jobs:
       # OIDC trusted publishing needs a modern npm (>=11.5.1); the runner's
       # bundled npm is older. npm@latest requires Node>=22, which the jobs now use.
       - run: npm install -g npm@latest
+
+      # Pack and publish as two steps rather than `pnpm publish`, because pnpm
+      # forwards its ENTIRE argv to npm verbatim. Captured from pnpm 9.15.9 with
+      # a shim standing in for npm:
+      #
+      #   npm publish --ignore-scripts <tarball> --no-git-checks --provenance --access public
+      #
+      # `--no-git-checks` is a pnpm-only flag, and npm >=12 rejects unknown flags
+      # outright (`EUNKNOWNCONFIG: Unknown cli flag: --git-checks`) where npm 11
+      # merely ignored them. So adding the `npm@latest` step above is what broke
+      # publishing — it failed this way for v2.4.0 and again on the first v3.0.0
+      # tag. Splitting the steps drops the offending flag while keeping pnpm's own
+      # mechanism: `pnpm pack` is what applies `publishConfig` (remapping every
+      # `exports` entry from ./src/*.ts to ./dist/*.js — npm does NOT do this, so
+      # a plain `npm publish` here would ship a package resolving to files that
+      # aren't in the tarball). Packing also needs no git checks at all, so the
+      # flag is not merely moved to a config file, it stops being needed.
+      - name: Pack (applies publishConfig exports remapping)
+        run: pnpm pack
       - name: Publish to npm
-        run: pnpm publish --no-git-checks --provenance --access public
+        run: npm publish payload-reserve-*.tgz --provenance --access public
