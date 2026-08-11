@@ -54,8 +54,23 @@ export const validateConflicts =
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
+
+      // An item with no endTime has no window, which makes every check below a
+      // no-op: the coarse overlap query filters on endTime and itemsToOccupancies
+      // skips it. This used to `continue`, so a booking that could not be bounded
+      // was checked against nothing at all. calculateEndTime's chokepoint makes
+      // the state unreachable through the collection's own hook chain; a host
+      // that reorders or replaces hooks via `collectionOverrides.reservations`
+      // can still reach it, and refusing is the only safe answer.
       if (!item.endTime) {
-        continue
+        throw new ValidationError({
+          errors: [
+            {
+              message: 'endTime is required before a reservation can be conflict-checked',
+              path: items.length > 1 && !item.fromParent ? `items.${i}.endTime` : 'endTime',
+            },
+          ],
+        })
       }
 
       // Fetch buffer times from the item's own service (not just the primary)

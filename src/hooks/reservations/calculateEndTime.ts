@@ -113,7 +113,9 @@ export const calculateEndTime =
       // can see this reservation.
       let earliestStart: Date | undefined
       let latestEnd: Date | undefined
-      for (const item of data.items as Array<Record<string, unknown>>) {
+      const dataItems = data.items as Array<Record<string, unknown>>
+      for (let i = 0; i < dataItems.length; i++) {
+        const item = dataItems[i]
         if (!item.startTime) {
           continue
         }
@@ -141,11 +143,40 @@ export const calculateEndTime =
 
         const durationType = ((service.durationType as string) ?? 'fixed') as DurationType
 
-        if (durationType === 'flexible' && !item.endTime) {
-          continue
-        }
+        if (durationType === 'flexible') {
+          // Inherit the top-level endTime the way resolveReservationItems does,
+          // so a requiredResources pool expanded into items[] is bounded by the
+          // window the caller actually stated. Skipping instead (the old
+          // behaviour) left `latestEnd` underived, so the row was stored with a
+          // NULL top-level endTime that no downstream guard can see — while the
+          // single-resource branch refused the very same input. Both branches
+          // must refuse it alike; a booking's end is never guessed.
+          const inherited =
+            (item.endTime as string | undefined) ?? (merged.endTime as string | undefined)
 
-        if (durationType !== 'flexible') {
+          if (!inherited) {
+            throw new ValidationError({
+              errors: [
+                { message: 'endTime is required for flexible duration services', path: 'endTime' },
+              ],
+            })
+          }
+
+          // An inverted window is invisible to overlap queries — the single-
+          // resource branch has rejected one since the inverted-window fix, and
+          // an item inheriting a parent end can invert against its own start.
+          if (new Date(inherited) <= new Date(item.startTime as string)) {
+            throw new ValidationError({
+              errors: [
+                { message: 'endTime must be after startTime', path: `items.${i}.endTime` },
+              ],
+            })
+          }
+
+          // Materialise it: a stored item with no endTime contributes no
+          // occupancy of its own resource.
+          item.endTime = inherited
+        } else {
           const result = computeEndTime({
             durationType,
             serviceDuration: (service.duration as number) ?? 0,
@@ -175,6 +206,25 @@ export const calculateEndTime =
       if (latestEnd) {
         data.endTime = latestEnd.toISOString()
       }
+    }
+
+    // One chokepoint for both branches: an unbounded reservation is an
+    // UNCHECKED reservation. Conflict detection, occupancy and availability all
+    // skip a row with no endTime — buildCoarseOverlapQuery filters on
+    // `endTime greater_than`, so such a row is invisible to every other
+    // booking's check, and resolveReservationItems can only backfill an item's
+    // endTime from a top-level one that exists. Any `continue` above that
+    // leaves the span underived (an item with no startTime, an unresolvable
+    // service) lands here instead of silently storing a NULL.
+    const effectiveEnd =
+      (data.endTime as string | undefined) ?? (merged.endTime as string | undefined)
+
+    if (!effectiveEnd) {
+      throw new ValidationError({
+        errors: [
+          { message: 'endTime could not be determined for this reservation', path: 'endTime' },
+        ],
+      })
     }
 
     return data
