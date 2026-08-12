@@ -216,6 +216,18 @@ export const calculateEndTime =
     // endTime from a top-level one that exists. Any `continue` above that
     // leaves the span underived (an item with no startTime, an unresolvable
     // service) lands here instead of silently storing a NULL.
+    //
+    // Its scope, so it is not over-trusted: this catches every path that
+    // REACHES the end of this hook. It is NOT a guarantee that every stored
+    // reservation carries an endTime, because the early `return data`s above
+    // bypass it deliberately — an update touching no scheduling field, a doc
+    // with no startTime/service, a multi-resource update whose patch carries no
+    // items[], and (only if a consumer relaxes the required `duration` field
+    // via collectionOverrides) a service with no duration that is not
+    // full-day. The first of those is load-bearing: it is what keeps a row
+    // ALREADY stored with a NULL endTime editable and cancellable rather than
+    // trapping it, while any edit that actually reschedules one still lands
+    // here and must bound it.
     const effectiveEnd =
       (data.endTime as string | undefined) ?? (merged.endTime as string | undefined)
 

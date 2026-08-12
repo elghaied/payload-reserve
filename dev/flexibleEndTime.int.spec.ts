@@ -233,6 +233,49 @@ describe('flexible services must never store an unbounded window', () => {
     expect(await reservationsFor(customer.id)).toHaveLength(0)
   })
 
+  test('rejects an item whose own start falls after the window it inherits', async () => {
+    // The item-level guard in calculateEndTime's multi-resource branch is the
+    // ONLY thing checking this. resolveReservationItems rejects an inverted
+    // PARENT window (that is what the previous test actually exercises) but
+    // never compares an item's own startTime against the endTime it inherits.
+    // Here the parent window is perfectly valid; only the supplied item
+    // inverts against it, which an unbounded-window guard alone would miss.
+    const { customer, resource, service } = await seed('item-inverted', 'flexible')
+
+    const extra = await payload.create({
+      collection: col('resources'),
+      data: {
+        name: 'Resource item-inverted extra',
+        active: true,
+        quantity: 1,
+        services: [service.id],
+      },
+    })
+
+    const errors = await validationErrors(() =>
+      payload.create({
+        collection: col('reservations'),
+        data: {
+          customer: customer.id,
+          endTime: '2027-03-08T11:00:00.000Z',
+          items: [{ resource: extra.id, startTime: '2027-03-08T12:00:00.000Z' }],
+          resource: resource.id,
+          service: service.id,
+          startTime: '2027-03-08T10:00:00.000Z',
+          status: 'pending',
+        },
+      }),
+    )
+
+    // The PATH is what proves which guard fired: the parent-window check
+    // reports `endTime`, this one names the offending item.
+    expect(errors.find((e) => e.path === 'items.0.endTime')?.message).toBe(
+      'endTime must be after startTime',
+    )
+
+    expect(await reservationsFor(customer.id)).toHaveLength(0)
+  })
+
   test('accepts a flexible booking with an endTime and bounds every stored item', async () => {
     const { customer, pool, resource, service } = await seed('accept', 'flexible')
 
