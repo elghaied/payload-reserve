@@ -35,6 +35,64 @@ import { supportsTransactions } from './utilities/transactionSupport.js'
  */
 const MT_TENANTS_ARRAY_FIELD = 'tenants'
 
+/** Slug of the "Today's Reservations" dashboard widget. */
+const DASHBOARD_WIDGET_SLUG = 'reservation-todays-reservations'
+
+/**
+ * Width the widget occupies in the default layout. Must sit within the widget's
+ * own `minWidth`/`maxWidth` (medium..large), below.
+ */
+const DASHBOARD_WIDGET_WIDTH = 'large'
+
+/**
+ * Place the widget in the dashboard's default layout.
+ *
+ * `admin.dashboard.widgets` only REGISTERS a widget — Payload renders whatever
+ * `defaultLayout` lists, looking each entry up by slug
+ * (`@payloadcms/next` ModularDashboard -> `getItemsFromConfig`). A widget that is
+ * registered but never placed simply never appears, which is what this plugin's
+ * widget did for its whole life.
+ *
+ * This has to run at INIT, not at plugin time. Payload sanitizes the config
+ * AFTER plugins run (`payload/dist/config/build.js`), and sanitize both pushes
+ * its own `collections` widget and sets `defaultLayout ??= [{ collections }]`.
+ * Assigning `defaultLayout` at plugin time would therefore win over that `??=`
+ * and drop the Collections cards off every consumer's dashboard. By init the
+ * default is materialised and we can append to it. `ModularDashboard` reads
+ * `payload.config` per request, so mutating it here is picked up.
+ *
+ * Note a user's SAVED dashboard preferences take precedence over `defaultLayout`
+ * entirely, so anyone who already customised their dashboard keeps their layout
+ * and has to add the widget themselves — that is Payload's behaviour, not ours.
+ */
+function placeDashboardWidget(dashboard: {
+  defaultLayout?: unknown
+  widgets?: unknown
+}): void {
+  type Instance = { widgetSlug: string; width: string }
+  const entry: Instance = { widgetSlug: DASHBOARD_WIDGET_SLUG, width: DASHBOARD_WIDGET_WIDTH }
+  const alreadyPlaced = (layout: Instance[]) =>
+    layout.some((item) => item?.widgetSlug === DASHBOARD_WIDGET_SLUG)
+
+  const existing = dashboard.defaultLayout
+
+  // A consumer may supply `defaultLayout` as a function to vary the layout per
+  // request (e.g. by role). Wrap it rather than replace it.
+  if (typeof existing === 'function') {
+    const hostLayout = existing as (args: unknown) => Instance[] | Promise<Instance[]>
+    dashboard.defaultLayout = async (args: unknown) => {
+      const layout = (await hostLayout(args)) ?? []
+      return alreadyPlaced(layout) ? layout : [...layout, entry]
+    }
+    return
+  }
+
+  const layout = Array.isArray(existing) ? (existing as Instance[]) : []
+  if (!alreadyPlaced(layout)) {
+    dashboard.defaultLayout = [...layout, entry]
+  }
+}
+
 /** True if the collection has a top-level `array` field named `fieldName`. */
 function collectionHasArrayField(
   collection: { fields?: unknown[] } | null | undefined,
@@ -246,6 +304,18 @@ export const payloadReserve =
     const hostOnInit = config.onInit
     config.onInit = async (payload) => {
       await hostOnInit?.(payload)
+      // Own try/catch: placing the widget must never break boot, and must not
+      // short-circuit the diagnostics below if it somehow throws.
+      try {
+        if (payload.config.admin?.dashboard) {
+          placeDashboardWidget(payload.config.admin.dashboard)
+        }
+      } catch (err) {
+        payload.logger.warn({
+          err,
+          msg: 'payload-reserve: could not add the reservations widget to the dashboard layout.',
+        })
+      }
       try {
         // The Services `resources` join is omitted when a collectionOverrides.resources
         // override removed, renamed, or nested `services` inside a NAMED group/tab.
@@ -439,7 +509,7 @@ export const payloadReserve =
       config.admin.dashboard.widgets = []
     }
     config.admin.dashboard.widgets.push({
-      slug: 'reservation-todays-reservations',
+      slug: DASHBOARD_WIDGET_SLUG,
       Component: 'payload-reserve/rsc#DashboardWidgetServer',
       label: ({ t }) => (t as PluginT)('reservation:dashboardTitle'),
       maxWidth: 'large',
