@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.1.1] - 2026-08-13
+
+Two admin-panel fixes. Both are long-standing rather than regressions: one made
+the calendar silently ignore clicks, the other meant a dashboard widget this
+plugin ships had never rendered for anyone. No schema changes, no API changes,
+no migration.
+
+### Fixed
+
+- **The calendar silently swallowed any click that re-requested the document it was already holding — most visibly, "Create New" did nothing at all on a freshly loaded calendar.**
+
+  `CalendarView` opens its document drawer indirectly: a click sets `drawerDocId` state, and an effect calls `openDrawer()` on the resulting render. That indirection is necessary, because `useDocumentDrawer` bakes the document id into the modal slug — opening synchronously from the click handler would target the *previously* opened document. What it assumed was that a render would always follow.
+
+  When a click set `drawerDocId` and `initialData` to the values they already held, React bailed out of the re-render entirely. No render meant the effect never ran, and the click did nothing. Three consequences, all reproduced in a browser:
+  - **"Create New" was dead on a freshly loaded calendar.** On mount `drawerDocId` is already `null` and `initialData` already `undefined`, so the button set both to what they already were. It only began working after some other document had been opened and closed.
+  - **A reservation could not be reopened after closing its drawer** — from the month, week and day event blocks (mouse or keyboard) and from the pending tab's customer link. Clicking a *different* reservation still worked, which is why this read as intermittent rather than broken.
+  - **A drawer could open by itself.** The swallowed click left the open request armed, so the next unrelated re-render — changing month, a background refetch — consumed it and opened the drawer with no click at all.
+
+  The open request is now carried on a monotonic counter, which always produces a new value, so the render the effect depends on is guaranteed. All seven entry points route through a single `requestDrawer` helper. The three click-to-book handlers were never affected, but only by accident: they pass a fresh object literal to `setInitialData`, which is never equal to the previous value. Routing them through the same helper means memoizing that object can no longer reintroduce the bug.
+
+- **The "Today's Reservations" dashboard widget had never rendered, in any release that shipped it.**
+
+  `admin.dashboard.widgets` only *registers* a widget. Payload renders whatever `admin.dashboard.defaultLayout` lists, resolving each entry's component by slug. The plugin pushed its widget into `widgets` and never added it to `defaultLayout`, so the widget was registered, present in the import map, and never placed on the dashboard.
+
+  The placement now happens at init rather than at plugin time, and that ordering is load-bearing. Payload sanitizes the config *after* plugins run, and sanitize both appends its own `collections` widget and sets `defaultLayout ??= [{ widgetSlug: 'collections' }]`. Assigning `defaultLayout` from plugin code would win over that `??=` and drop the Collections cards off the dashboard — trading this bug for a worse one. By `onInit` the default is materialised and the widget can be appended to it.
+
+  A `defaultLayout` supplied as a function is wrapped rather than replaced, an existing entry for the widget is never duplicated, and the whole step is guarded so it can neither break boot nor suppress the plugin's other boot diagnostics.
+
+  **You may need to reset your dashboard layout to see it.** Payload gives a user's *saved* dashboard preferences precedence over `defaultLayout`, so anyone who has already customised their dashboard keeps the layout they saved and can add the widget themselves. That is Payload's own behaviour, not something this fix can override.
+
+### Internal
+
+- Repaired 14 end-to-end tests that could never pass, and added coverage for the drawer paths above, which had none. The failures were Playwright strict-mode violations (locators such as `{ name: 'Day' }` also matching "Today"), a loading-state check reading `document.querySelector('*').textContent` — which is `<html>`, and includes `<script>` contents, so a string inlined into Next.js's RSC payload made the condition permanently false — and one assertion expecting a bare weekday abbreviation where the grid renders "Sun 9". The suite goes from 15 failing / 10 passing to 28 passing. Note that end-to-end tests still do not run in the release pipeline, which is why a widget that never rendered went unnoticed.
+
 ## [3.1.0] - 2026-08-12
 
 Released as a **minor** rather than a patch: the fix below rejects input that
@@ -20,7 +54,6 @@ previously succeeded, so this is not a safe blind bump for anyone booking
   That mattered because `endTime` is what every safety check is built on. `buildCoarseOverlapQuery` filters on `endTime greater_than`, so a NULL-`endTime` row was never fetched for any other booking's conflict check; `itemsToOccupancies` skips an item without an end, so it contributed no occupancy; and `validateConflicts` skipped such an item too, so the offending booking was itself checked against nothing. The slot could then be booked repeatedly, with no error raised on any attempt.
 
   It did not require a multi-resource booking to reach. `expandRequiredResources` expands a service's `requiredResources` into `items[]`, so a service that is **both** `flexible` **and** carries any `requiredResources` took the multi-resource branch on an ordinary single-resource create — one caller, one resource, no multi-resource API involved.
-
   - `calculateEndTime` — a `flexible` item with no `endTime` of its own now inherits the top-level `endTime` (the same backfill `resolveReservationItems` performs) and is materialised onto the stored item. When no end can be inherited it raises the same `ValidationError`, with the same message and path, as the single-resource branch has always raised. An item whose window inverts against its own start is rejected, which the multi-resource branch never checked.
   - `calculateEndTime` — a single chokepoint before the hook returns now refuses any reservation whose window could not be bounded, covering both branches and any future skip. It catches every path that reaches the end of the hook; the early returns above it (most importantly an update touching no scheduling field) deliberately bypass it, which is what keeps a row already stored with a NULL `endTime` editable and cancellable rather than trapped.
   - `validateConflicts` — an item with no `endTime` is refused rather than skipped. A booking that cannot be bounded cannot be checked, and silently checking nothing was the worst available response. After the chokepoint above this is unreachable through the collection's own hook chain; it remains reachable for a host that reorders or replaces hooks via `collectionOverrides.reservations`.
