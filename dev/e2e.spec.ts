@@ -11,6 +11,20 @@ async function loginAsAdmin(page: Page) {
   await expect(page).toHaveTitle(/Dashboard/)
 }
 
+// Wait until the AvailabilityOverview grid has finished fetching.
+//
+// Deliberately reads `document.body.innerText`, NOT
+// `document.querySelector('*')?.textContent`. `querySelector('*')` returns
+// <html>, whose textContent includes <script> contents — Next.js inlines the RSC
+// payload into a script tag, and that payload contains the literal string
+// "Loading availability...". The condition could therefore never become true,
+// so every test using it timed out against a fully-rendered page.
+async function waitForAvailabilityLoaded(page: Page) {
+  await page.waitForFunction(() => !document.body.innerText.includes('Loading availability...'), {
+    timeout: 10_000,
+  })
+}
+
 // this is an example Playwright e2e test
 test('should render admin panel logo', async ({ page }) => {
   await page.goto('/admin')
@@ -36,12 +50,14 @@ test('DashboardWidget shows stat cards with numeric values', async ({ page }) =>
   // Verify the section heading is present.
   await expect(page.getByText("Today's Reservations")).toBeVisible({ timeout: 10_000 })
 
-  // Verify the four stat labels are rendered
-  await expect(page.getByText('Total')).toBeVisible()
-  await expect(page.getByText('Active')).toBeVisible()
-  await expect(page.getByText('Upcoming')).toBeVisible()
+  // Verify the four stat labels are rendered. `exact` matters: the widget also
+  // renders "No upcoming appointments today.", which a substring match on
+  // "Upcoming" would collide with (Playwright fails on multiple matches).
+  await expect(page.getByText('Total', { exact: true })).toBeVisible()
+  await expect(page.getByText('Active', { exact: true })).toBeVisible()
+  await expect(page.getByText('Upcoming', { exact: true })).toBeVisible()
   // "dashboardTerminal" translates to "Closed"
-  await expect(page.getByText('Closed')).toBeVisible()
+  await expect(page.getByText('Closed', { exact: true })).toBeVisible()
 })
 
 test('DashboardWidget stat values are numeric (not NaN or undefined)', async ({ page }) => {
@@ -101,21 +117,28 @@ test('CalendarView renders status legend with known status names', async ({ page
   // while fetching, then renders the calendar. Once legend items are visible, loading is done.
   await page.waitForSelector('text="Pending"', { timeout: 15_000 })
 
-  // The status legend renders all configured statuses as legend items
-  await expect(page.getByText('Pending')).toBeVisible()
-  await expect(page.getByText('Confirmed')).toBeVisible()
-  await expect(page.getByText('Completed')).toBeVisible()
-  await expect(page.getByText('Cancelled')).toBeVisible()
+  // The status legend renders all configured statuses as legend items. Scope to
+  // the legend: "Pending" is also the text of the view-toggle button, so an
+  // unscoped match resolves to two elements and Playwright fails on it.
+  const legend = page.locator('[class*="legendItem"]')
+  await expect(legend.getByText('Pending', { exact: true })).toBeVisible()
+  await expect(legend.getByText('Confirmed', { exact: true })).toBeVisible()
+  await expect(legend.getByText('Completed', { exact: true })).toBeVisible()
+  await expect(legend.getByText('Cancelled', { exact: true })).toBeVisible()
 })
 
 test('CalendarView shows month/week/day/pending view toggle buttons', async ({ page }) => {
   await loginAsAdmin(page)
   await page.goto('/admin/collections/reservations')
 
-  // The view toggle buttons are always rendered regardless of loading state
-  await expect(page.getByRole('button', { name: 'Month' })).toBeVisible({ timeout: 10_000 })
-  await expect(page.getByRole('button', { name: 'Week' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Day' })).toBeVisible()
+  // The view toggle buttons are always rendered regardless of loading state.
+  // `exact` matters for "Day": accessible-name matching is substring-based, so
+  // it would also match the "Today" navigation button.
+  await expect(page.getByRole('button', { name: 'Month', exact: true })).toBeVisible({
+    timeout: 10_000,
+  })
+  await expect(page.getByRole('button', { name: 'Week', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Day', exact: true })).toBeVisible()
   // Pending button text: "Pending" (may have a badge suffix)
   await expect(page.getByRole('button', { name: /^Pending/ })).toBeVisible()
 })
@@ -144,6 +167,10 @@ test('CalendarView renders event items with status-appropriate tooltips', async 
   // The tooltip format is: "Service\nHH:MM - HH:MM\nCustomer: name\nResource: name\nStatus: status"
   // We look for any element with a title that contains "Customer:" — this is present on all events.
   const eventItems = page.locator('[title*="Customer:"]')
+  // The legend renders while reservations are still being fetched, so waiting on
+  // it is not enough. `count()` is a one-shot read with no auto-retry and would
+  // see 0; assert visibility first so Playwright waits for the fetch to land.
+  await expect(eventItems.first()).toBeVisible({ timeout: 15_000 })
   const count = await eventItems.count()
   expect(count).toBeGreaterThan(0)
 })
@@ -172,10 +199,10 @@ test('CalendarView can switch to Week view', async ({ page }) => {
   await page.goto('/admin/collections/reservations')
   await page.waitForSelector('text="Month"', { timeout: 10_000 })
 
-  await page.getByRole('button', { name: 'Week' }).click()
+  await page.getByRole('button', { name: 'Week', exact: true }).click()
 
   // Week view shows time labels like "07:00", "08:00", etc.
-  await expect(page.getByText('07:00')).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByText('07:00', { exact: true })).toBeVisible({ timeout: 5_000 })
 })
 
 test('CalendarView can switch to Day view', async ({ page }) => {
@@ -183,10 +210,10 @@ test('CalendarView can switch to Day view', async ({ page }) => {
   await page.goto('/admin/collections/reservations')
   await page.waitForSelector('text="Month"', { timeout: 10_000 })
 
-  await page.getByRole('button', { name: 'Day' }).click()
+  await page.getByRole('button', { name: 'Day', exact: true }).click()
 
   // Day view also shows time labels; verify the view changed by checking 07:00 is visible
-  await expect(page.getByText('07:00')).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByText('07:00', { exact: true })).toBeVisible({ timeout: 5_000 })
 })
 
 test('CalendarView can switch to Pending view', async ({ page }) => {
@@ -235,7 +262,7 @@ test('CalendarView shows multi-resource reservation with multiple resource names
     // collapsed "+N more" state. This is a soft assertion — we verify the
     // seed data pattern exists by checking for the event via API.
     // Navigate to the day view which shows all events for today without collapsing.
-    await page.getByRole('button', { name: 'Day' }).click()
+    await page.getByRole('button', { name: 'Day', exact: true }).click()
     await page.waitForTimeout(2_000)
 
     const dayViewEvent = page.locator('[title*="Alice Johnson, Bob Smith"]')
@@ -271,7 +298,7 @@ test('CalendarView resource filter dropdown filters events by resource', async (
   expect(optionTexts).toContain('Bob Smith')
 
   // Switch to Day view for more reliable event visibility (month view may collapse events)
-  await page.getByRole('button', { name: 'Day' }).click()
+  await page.getByRole('button', { name: 'Day', exact: true }).click()
   await page.waitForTimeout(1_000)
 
   // 4. With "All Resources" selected, events from both Alice and Bob should be visible
@@ -369,10 +396,7 @@ test('AvailabilityOverview shows resource names in the grid', async ({ page }) =
   // The grid will show resource names once loaded
   await page.waitForSelector('text="Availability Overview"', { timeout: 15_000 })
   // Wait for loading state to clear (either grid or "no resources" message)
-  await page.waitForFunction(
-    () => !document.querySelector('*')?.textContent?.includes('Loading availability...'),
-    { timeout: 10_000 },
-  )
+  await waitForAvailabilityLoaded(page)
 
   // Seed data creates: Alice Johnson, Bob Smith, Massage Table, Yoga Class Room
   // We verify at least one expected resource name appears in the grid
@@ -387,10 +411,7 @@ test('AvailabilityOverview shows ×5 capacity indicator for Massage Table', asyn
   await loginAsAdmin(page)
   await page.goto('/admin/reservation-availability')
   await page.waitForSelector('text="Availability Overview"', { timeout: 15_000 })
-  await page.waitForFunction(
-    () => !document.querySelector('*')?.textContent?.includes('Loading availability...'),
-    { timeout: 10_000 },
-  )
+  await waitForAvailabilityLoaded(page)
 
   // The AvailabilityOverview renders `×5` (times-symbol + quantity) next to multi-unit resources.
   // The DOM renders: <span>×{quantity}</span> inside the resource name cell.
@@ -404,10 +425,7 @@ test('AvailabilityOverview shows X/Y booked format for multi-unit resource booki
   await loginAsAdmin(page)
   await page.goto('/admin/reservation-availability')
   await page.waitForSelector('text="Availability Overview"', { timeout: 15_000 })
-  await page.waitForFunction(
-    () => !document.querySelector('*')?.textContent?.includes('Loading availability...'),
-    { timeout: 10_000 },
-  )
+  await waitForAvailabilityLoaded(page)
 
   // Seed data creates a reservation for Yoga Class Room (quantity: 20) with guestCount: 4.
   // However, the AvailabilityOverview counts bookings per-reservation (by document count),
@@ -434,28 +452,25 @@ test('AvailabilityOverview shows day-of-week header columns', async ({ page }) =
   await loginAsAdmin(page)
   await page.goto('/admin/reservation-availability')
   await page.waitForSelector('text="Availability Overview"', { timeout: 15_000 })
-  await page.waitForFunction(
-    () => !document.querySelector('*')?.textContent?.includes('Loading availability...'),
-    { timeout: 10_000 },
-  )
+  await waitForAvailabilityLoaded(page)
 
   // The grid header row contains day abbreviations: Sun, Mon, Tue, Wed, Thu, Fri, Sat
   // and the "Resource" column header
   await expect(page.getByText('Resource', { exact: true })).toBeVisible()
-  // Day headers — at least one day abbreviation must be visible
-  const sunVisible = await page.getByText('Sun', { exact: true }).isVisible().catch(() => false)
-  const monVisible = await page.getByText('Mon', { exact: true }).isVisible().catch(() => false)
-  expect(sunVisible || monVisible).toBe(true)
+  // Day headers. Each header cell renders the abbreviation AND the date in one
+  // element ("Sun 9"), so an exact-text match on "Sun" never resolves. Assert on
+  // the header row and require all seven abbreviations, each followed by a date.
+  const headerCells = page.locator('[class*="headerCell"]')
+  for (const day of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']) {
+    await expect(headerCells.filter({ hasText: new RegExp(`^${day}\\s+\\d+$`) })).toHaveCount(1)
+  }
 })
 
 test('AvailabilityOverview shows schedule availability slots for resources', async ({ page }) => {
   await loginAsAdmin(page)
   await page.goto('/admin/reservation-availability')
   await page.waitForSelector('text="Availability Overview"', { timeout: 15_000 })
-  await page.waitForFunction(
-    () => !document.querySelector('*')?.textContent?.includes('Loading availability...'),
-    { timeout: 10_000 },
-  )
+  await waitForAvailabilityLoaded(page)
 
   // Schedule slots render as "HH:MM-HH:MM" strings (e.g. "09:00-17:00").
   // Alice's schedule: Mon–Thu 09:00–17:00, Fri 09:00–15:00
@@ -502,4 +517,72 @@ test('AvailabilityOverview can navigate back to this week', async ({ page }) => 
 
   // "This Week" should be visible and functional
   await expect(page.getByRole('button', { name: 'This Week' })).toBeVisible()
+})
+
+// ---------------------------------------------------------------------------
+// CalendarView document drawer
+//
+// The drawer is opened indirectly: a click sets `drawerDocId` state, and an
+// effect calls `openDrawer()` on the resulting render (the id is baked into the
+// modal slug, so opening synchronously would target the previous document).
+// If a click sets the state to what it already holds, React bails out of the
+// re-render and the effect never runs — the click is silently swallowed.
+// These tests pin the paths where that happens.
+// ---------------------------------------------------------------------------
+
+// Open the reservations calendar and wait until its fetches have settled, so a
+// later re-render can't mask a swallowed click.
+async function openSettledCalendar(page: Page) {
+  await loginAsAdmin(page)
+  await page.goto('/admin/collections/reservations')
+  await page.waitForSelector('text="Month"', { timeout: 15_000 })
+  await expect(page.locator('[title*="Customer:"]').first()).toBeVisible({ timeout: 15_000 })
+  await page.waitForTimeout(1_000)
+}
+
+test('CalendarView opens the create drawer from Create New on a freshly loaded calendar', async ({
+  page,
+}) => {
+  await openSettledCalendar(page)
+
+  await page.getByRole('button', { name: 'Create New' }).click()
+
+  await expect(page.locator('.doc-drawer')).toBeVisible({ timeout: 10_000 })
+})
+
+test('CalendarView reopens the same reservation after its drawer is closed', async ({ page }) => {
+  await openSettledCalendar(page)
+
+  const event = page.locator('[title*="Customer:"]').first()
+  const drawer = page.locator('.doc-drawer')
+
+  await event.click()
+  await expect(drawer).toBeVisible({ timeout: 10_000 })
+
+  await page.locator('.doc-drawer__header-close').click()
+  await expect(drawer).toBeHidden({ timeout: 10_000 })
+
+  await event.click()
+  await expect(drawer).toBeVisible({ timeout: 10_000 })
+})
+
+test('CalendarView reopens the same pending reservation after its drawer is closed', async ({
+  page,
+}) => {
+  await openSettledCalendar(page)
+
+  await page.getByRole('button', { name: /^Pending/ }).click()
+  await page.waitForTimeout(1_000)
+
+  const customerLink = page.locator('td [role="button"]').first()
+  const drawer = page.locator('.doc-drawer')
+
+  await customerLink.click()
+  await expect(drawer).toBeVisible({ timeout: 10_000 })
+
+  await page.locator('.doc-drawer__header-close').click()
+  await expect(drawer).toBeHidden({ timeout: 10_000 })
+
+  await customerLink.click()
+  await expect(drawer).toBeVisible({ timeout: 10_000 })
 })
