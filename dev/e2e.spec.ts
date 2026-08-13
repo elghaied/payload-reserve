@@ -503,3 +503,72 @@ test('AvailabilityOverview can navigate back to this week', async ({ page }) => 
   // "This Week" should be visible and functional
   await expect(page.getByRole('button', { name: 'This Week' })).toBeVisible()
 })
+
+
+// ---------------------------------------------------------------------------
+// CalendarView document drawer
+//
+// The drawer is opened indirectly: a click sets `drawerDocId` state, and an
+// effect calls `openDrawer()` on the resulting render (the id is baked into the
+// modal slug, so opening synchronously would target the previous document).
+// If a click sets the state to what it already holds, React bails out of the
+// re-render and the effect never runs — the click is silently swallowed.
+// These tests pin the paths where that happens.
+// ---------------------------------------------------------------------------
+
+// Open the reservations calendar and wait until its fetches have settled, so a
+// later re-render can't mask a swallowed click.
+async function openSettledCalendar(page: Page) {
+  await loginAsAdmin(page)
+  await page.goto('/admin/collections/reservations')
+  await page.waitForSelector('text="Month"', { timeout: 15_000 })
+  await expect(page.locator('[title*="Customer:"]').first()).toBeVisible({ timeout: 15_000 })
+  await page.waitForTimeout(1_000)
+}
+
+test('CalendarView opens the create drawer from Create New on a freshly loaded calendar', async ({
+  page,
+}) => {
+  await openSettledCalendar(page)
+
+  await page.getByRole('button', { name: 'Create New' }).click()
+
+  await expect(page.locator('.doc-drawer')).toBeVisible({ timeout: 10_000 })
+})
+
+test('CalendarView reopens the same reservation after its drawer is closed', async ({ page }) => {
+  await openSettledCalendar(page)
+
+  const event = page.locator('[title*="Customer:"]').first()
+  const drawer = page.locator('.doc-drawer')
+
+  await event.click()
+  await expect(drawer).toBeVisible({ timeout: 10_000 })
+
+  await page.locator('.doc-drawer__header-close').click()
+  await expect(drawer).toBeHidden({ timeout: 10_000 })
+
+  await event.click()
+  await expect(drawer).toBeVisible({ timeout: 10_000 })
+})
+
+test('CalendarView reopens the same pending reservation after its drawer is closed', async ({
+  page,
+}) => {
+  await openSettledCalendar(page)
+
+  await page.getByRole('button', { name: /^Pending/ }).click()
+  await page.waitForTimeout(1_000)
+
+  const customerLink = page.locator('td [role="button"]').first()
+  const drawer = page.locator('.doc-drawer')
+
+  await customerLink.click()
+  await expect(drawer).toBeVisible({ timeout: 10_000 })
+
+  await page.locator('.doc-drawer__header-close').click()
+  await expect(drawer).toBeHidden({ timeout: 10_000 })
+
+  await customerLink.click()
+  await expect(drawer).toBeVisible({ timeout: 10_000 })
+})

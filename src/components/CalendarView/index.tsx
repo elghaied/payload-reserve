@@ -251,14 +251,30 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     collectionSlug: reservationSlug,
   })
 
-  const pendingDrawerOpen = useRef(false)
+  // The drawer's modal slug embeds `drawerDocId`, so `openDrawer()` cannot run in
+  // the click handler — it would target the previously-opened document. It has to
+  // wait for the render that carries the new id. `openRequest` is what schedules
+  // that render: bumping a counter always produces a new value, whereas setting
+  // `drawerDocId`/`initialData` to what they already hold makes React bail out of
+  // the re-render entirely, silently swallowing the click (reopening the document
+  // you just closed, or "Create New" on a calendar where nothing has been opened).
+  const [openRequest, setOpenRequest] = useState(0)
+
+  const requestDrawer = useCallback((id: null | string, data?: Record<string, unknown>) => {
+    setDrawerDocId(id)
+    setInitialData(data)
+    setOpenRequest((n) => n + 1)
+  }, [])
 
   useEffect(() => {
-    if (pendingDrawerOpen.current) {
-      pendingDrawerOpen.current = false
-      openDrawer()
+    if (openRequest === 0) {
+      return
     }
-  })
+    openDrawer()
+    // Deliberately keyed on `openRequest` alone. `openDrawer`'s identity also tracks
+    // the modal context value, and re-firing on that would reopen a closed drawer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest])
 
   // Fetch active resources for filter dropdown
   useEffect(() => {
@@ -560,60 +576,61 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     void fetchPendingCount()
   }, [selectedIds, patchReservation, fetchPendingReservations, fetchPendingCount, t, confirmStatus])
 
-  const handleEventClick = useCallback((e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    setDrawerDocId(id)
-    setInitialData(undefined)
-    pendingDrawerOpen.current = true
-  }, [])
-
-  const handleEventKeyDown = useCallback((e: React.KeyboardEvent, id: string) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
+  const handleEventClick = useCallback(
+    (e: React.MouseEvent, id: string) => {
       e.stopPropagation()
-      setDrawerDocId(id)
-      setInitialData(undefined)
-      pendingDrawerOpen.current = true
-    }
-  }, [])
+      requestDrawer(id)
+    },
+    [requestDrawer],
+  )
+
+  const handleEventKeyDown = useCallback(
+    (e: React.KeyboardEvent, id: string) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        e.stopPropagation()
+        requestDrawer(id)
+      }
+    },
+    [requestDrawer],
+  )
 
   const handleCreateNew = useCallback(() => {
-    setDrawerDocId(null)
-    setInitialData(undefined)
-    pendingDrawerOpen.current = true
-  }, [])
+    requestDrawer(null)
+  }, [requestDrawer])
 
-  const handleDateClick = useCallback((date: Date) => {
-    setDrawerDocId(null)
-    setInitialData({ startTime: date.toISOString() })
-    pendingDrawerOpen.current = true
-  }, [])
+  const handleDateClick = useCallback(
+    (date: Date) => {
+      requestDrawer(null, { startTime: date.toISOString() })
+    },
+    [requestDrawer],
+  )
 
   // Click-to-book: open new-reservation drawer pre-filled with startTime + optional resource
   const handleSlotClick = useCallback(
     (startIso: string) => {
-      setDrawerDocId(null)
-      setInitialData({
+      requestDrawer(null, {
         ...(selectedResourceId ? { resource: selectedResourceId } : {}),
         startTime: startIso,
       })
-      pendingDrawerOpen.current = true
     },
-    [selectedResourceId],
+    [requestDrawer, selectedResourceId],
   )
 
   // Lane-specific book: pre-fills both the specific resource and startTime
-  const handleLaneBook = useCallback((resourceId: string, startIso: string) => {
-    setDrawerDocId(null)
-    setInitialData({ resource: resourceId, startTime: startIso })
-    pendingDrawerOpen.current = true
-  }, [])
+  const handleLaneBook = useCallback(
+    (resourceId: string, startIso: string) => {
+      requestDrawer(null, { resource: resourceId, startTime: startIso })
+    },
+    [requestDrawer],
+  )
 
-  const openDocDrawer = useCallback((id: string) => {
-    setDrawerDocId(id)
-    setInitialData(undefined)
-    pendingDrawerOpen.current = true
-  }, [])
+  const openDocDrawer = useCallback(
+    (id: string) => {
+      requestDrawer(id)
+    },
+    [requestDrawer],
+  )
 
   const navigate = useCallback(
     (direction: -1 | 1) => {
