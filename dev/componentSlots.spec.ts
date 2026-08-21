@@ -19,6 +19,13 @@ describe('resolveComponentSlot', () => {
   it('returns undefined when the slot is false, meaning do not register', () => {
     expect(resolveComponentSlot(false, FALLBACK)).toBeUndefined()
   })
+
+  it('returns the empty string unchanged, rather than coercing it to the fallback', () => {
+    // '' is a string, so it takes the `typeof override === 'string'` branch —
+    // not falsy-coerced to the fallback. Behaviour is correct by inspection;
+    // this pins it down.
+    expect(resolveComponentSlot('', FALLBACK)).toBe('')
+  })
 })
 
 describe('resolveConfig components', () => {

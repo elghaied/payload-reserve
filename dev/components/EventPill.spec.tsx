@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { EventPill } from '../../src/components/primitives/EventPill/index.js'
 import styles from '../../src/components/primitives/EventPill/EventPill.module.css'
+import { EventPill } from '../../src/components/primitives/EventPill/index.js'
 
 const reservation = { id: 'res-1', startTime: '2026-01-01T10:00:00.000Z', status: 'pending' }
 
