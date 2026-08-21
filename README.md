@@ -63,7 +63,7 @@ npm install payload-reserve
 
 ### ⚠️ Upgrading from an earlier version
 
-**Run `payload generate:importmap`, then restart your app, after upgrading to v3.2.0 or
+**Run `payload generate:importmap`, then restart your app, after upgrading to v4.0.0 or
 later — even if you never touch the `components` option.** The Reservations list view's
 default component changed from `payload-reserve/client#CalendarView` to
 `payload-reserve/rsc#CalendarViewServer`. Payload resolves admin component paths through an
@@ -410,7 +410,7 @@ payloadReserve({
 
 Each slot accepts a **string** (your own Payload component path, e.g. `'/components/MyCalendar.tsx#MyCalendar'`), **`false`** (opt out), or **unset** (use the plugin's own component — the default).
 
-**`false` is asymmetric.** For five of the six slots, `false` falls back to a Payload default — the collection's ordinary list view, a plain relationship or date field, or simply not registering a widget/view. `reservationDetail` has no Payload default to fall back to: setting it `false` instead restores v3.1.1 **click** behaviour — clicking a calendar event opens the document edit drawer directly, with no detail step in between. This is click behaviour specifically, not v3.1.1 behaviour byte-for-byte: the pending list's quick-action (✓/✗) failures now render the server's own error message instead of the old generic strings, and that change applies regardless of this flag — see the disclosures in the changelog for v3.2.0.
+**`false` is asymmetric.** For five of the six slots, `false` falls back to a Payload default — the collection's ordinary list view, a plain relationship or date field, or simply not registering a widget/view. `reservationDetail` has no Payload default to fall back to: setting it `false` instead restores v3.1.1 **click** behaviour — clicking a calendar event opens the document edit drawer directly, with no detail step in between. This is click behaviour specifically, not v3.1.1 behaviour byte-for-byte: the pending list's quick-action (✓/✗) failures now render the server's own error message instead of the old generic strings, and that change applies regardless of this flag — see the disclosures in the changelog for v4.0.0.
 
 **Whenever you set any slot to a string, run `payload generate:importmap` afterward.** Payload resolves every component path through a generated import map; a stale one means your component silently fails to render, and the server logs `PayloadComponent not found in importMap`.
 
