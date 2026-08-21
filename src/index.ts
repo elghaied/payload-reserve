@@ -1,3 +1,4 @@
+export type { Reservation, ReservationItem, ResourceOption } from './components/shared/types.js'
 export { provisionStaffResource, roleMatches } from './hooks/users/provisionStaffResource.js'
 export { payloadReserve } from './plugin.js'
 export {
@@ -26,3 +27,9 @@ export type { ResolvedItem } from './utilities/resolveReservationItems.js'
 export { resolveReservationItems } from './utilities/resolveReservationItems.js'
 export { buildSelectOptions } from './utilities/selectOptions.js'
 export { intersectIntervals } from './utilities/slotUtils.js'
+export {
+  buildStatusLabels,
+  buildStatusPresentation,
+  BUILTIN_STATUSES,
+} from './utilities/statusPresentation.js'
+export type { StatusPresentation } from './utilities/statusPresentation.js'
