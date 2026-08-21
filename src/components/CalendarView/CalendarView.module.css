@@ -614,7 +614,32 @@
    from its own left edge) keeps every row scannable regardless of viewport.
    This wraps whatever renders in the drawer body — the built-in
    ReservationDetail AND a consumer's own `detailSlot` — so both benefit. */
+/* Narrow the drawer panel itself.
+
+   Payload's Drawer sizes its panel with an INLINE style —
+   `width: calc(100% - (depth * var(--gutter-h)))` — so at depth 1 it is
+   effectively the full viewport, which is right for the document drawer's
+   full edit form and absurd for a handful of label/value rows.
+
+   There is no prop for it, so this reaches for Payload's internal
+   `.drawer__content` class, which the rest of this codebase avoids doing.
+   Two things keep the risk low enough to accept:
+
+   - It caps rather than overrides. `max-width` bounds an inline `width`
+     without competing with it, so no `!important` and no specificity fight.
+   - It fails soft. If Payload renames the class or restructures the drawer,
+     the cap silently stops applying and the panel returns to full width —
+     visibly wide again, but entirely functional. Nothing breaks.
+
+   Scoped under `.detailDrawer` so it can only ever affect this plugin's own
+   detail drawer, never the document drawer or a host's. */
+.detailDrawer :global(.drawer__content) {
+  max-width: 720px;
+}
+
 .detailDrawerBody {
+  /* Slightly under the panel cap above, minus Payload's gutters, so the rows
+     stay bounded even if a consumer's detailSlot renders something wider. */
   max-width: 600px;
   padding: 4px 0 8px;
 }

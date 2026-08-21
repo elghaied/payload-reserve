@@ -1475,7 +1475,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
           renders nothing for it; the context type documents `doc: null` for any
           detailSlot to do the same) until the next click or Escape. */}
       {detailId && (
-        <Drawer Header={detailDrawerHeader} slug={detailDrawerSlug}>
+        <Drawer
+          className={styles.detailDrawer}
+          Header={detailDrawerHeader}
+          slug={detailDrawerSlug}
+        >
           {/* Stable hook for e2e — the drawer's own markup comes from
               @faceless-ui/modal and is not a native <dialog>, so tests must not
               key off Payload's internal class names. */}
