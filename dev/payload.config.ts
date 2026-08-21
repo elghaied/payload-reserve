@@ -33,22 +33,21 @@ const MT = Boolean(process.env.MT)
 // RESERVE_DETAIL_SLOT=1 pnpm dev` boots the dev app with the detail slot
 // pointed at dev/components/ReservationDetailFixture.tsx, so e2e can assert a
 // consumer-supplied component really renders inside the drawer. Unset, this
-// changes nothing.
+// changes which component the plugin's `reservationDetail` slot resolves to —
+// it does NOT change what's in the import map (see below).
 //
-// Footgun: the committed dev/app/(payload)/admin/importMap.js is the GATED
-// superset — it was generated with RESERVE_DETAIL_SLOT=1 set, so it includes
-// the fixture's import-map entry. Running a plain `pnpm dev:generate-importmap`
-// (gate unset) regenerates that file WITHOUT the fixture entry, silently
-// breaking the gated e2e test ("a consumer-supplied components.reservationDetail
-// component renders in place of the plugin body"). Always regenerate with
-// `RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap` to keep the committed
-// map gated. This has been hit in practice, not just theorized: an ungated
-// `pnpm dev` left running (or anything that touches its config/build cache)
-// can leave the committed file stripped down to the ungated set with no
-// obvious cause in your own shell history. Before committing any change
-// touching this file or this fixture, run `git diff -- "dev/app/(payload)/admin/importMap.js"`
-// and expect NO diff; if there is one, restore it with `git checkout --` or
-// regenerate with the gate set, never commit the ungated version.
+// Formerly a footgun, now fixed: the fixture's import-map entry used to come
+// ONLY from `payloadReserve()`'s own `components.reservationDetail` option
+// below, so it existed only when generated with RESERVE_DETAIL_SLOT=1 set —
+// an ungated `pnpm dev:generate-importmap` silently stripped it, breaking the
+// gated e2e test with no obvious cause. Fixed by registering the fixture's
+// import in `admin.dependencies` (below) UNCONDITIONALLY, independent of the
+// gate — the same mechanism `payloadReserve()` itself uses for this component
+// (see `src/plugin.ts`'s own `admin.dependencies` write). Verified: regenerating
+// with the gate either set or unset now produces a byte-identical
+// dev/app/(payload)/admin/importMap.js. The gate below still controls whether
+// the admin UI actually USES the fixture (via `components.reservationDetail`);
+// it no longer controls whether the import map KNOWS about it.
 const RESERVE_DETAIL_SLOT = Boolean(process.env.RESERVE_DETAIL_SLOT)
 
 const buildConfigWithMemoryDB = async () => {
@@ -281,6 +280,25 @@ const buildConfigWithMemoryDB = async () => {
 
   return buildConfig({
     admin: {
+      // Registered UNCONDITIONALLY — not gated on RESERVE_DETAIL_SLOT — so the
+      // generated import map always carries this entry, whichever way the gate
+      // is set when `pnpm dev:generate-importmap` runs. This is the fix for the
+      // footgun documented on RESERVE_DETAIL_SLOT above: the map used to be a
+      // GATED superset (only complete when regenerated with the env var set),
+      // so an ungated regeneration silently stripped the fixture's entry and
+      // broke the gated e2e test with no obvious cause. Registering the import
+      // here, rather than through `payloadReserve()`'s own `components.
+      // reservationDetail` option (which stays gated — see RESERVE_DETAIL_SLOT
+      // above, that's what controls whether the plugin actually POINTS the
+      // slot at this fixture), makes the map stable under either regeneration:
+      // the entry exists either way, and only whether the admin UI actually
+      // uses it varies with the gate.
+      dependencies: {
+        reservationDetailFixture: {
+          type: 'component',
+          path: '/components/ReservationDetailFixture.tsx#ReservationDetailFixture',
+        },
+      },
       importMap: {
         baseDir: path.resolve(dirname),
       },
