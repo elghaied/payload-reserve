@@ -19,6 +19,7 @@ import { validateCancellation } from '../hooks/reservations/validateCancellation
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
 import { validateGuestBooking } from '../hooks/reservations/validateGuestBooking.js'
 import { validateStatusTransition } from '../hooks/reservations/validateStatusTransition.js'
+import { resolveComponentSlot } from '../utilities/componentSlots.js'
 import { statusToI18nKey } from '../utilities/i18nUtils.js'
 import { composeAccess, makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
 
@@ -64,17 +65,26 @@ export function createReservationsCollection(
   const access =
     composeAccess(rom ? makeReservationOwnerAccess(rom) : {}, config.access.reservations)
 
+  const listComponent = resolveComponentSlot(
+    config.components.calendarView,
+    'payload-reserve/client#CalendarView',
+  )
+  const customerFieldComponent = resolveComponentSlot(
+    config.components.customerField,
+    'payload-reserve/client#CustomerField',
+  )
+  const timeFieldComponent = resolveComponentSlot(
+    config.components.availabilityTimeField,
+    'payload-reserve/client#AvailabilityTimeField',
+  )
+
   return {
     slug: config.slugs.reservations,
     access,
     admin: {
-      components: {
-        views: {
-          list: {
-            Component: 'payload-reserve/client#CalendarView',
-          },
-        },
-      },
+      ...(listComponent
+        ? { components: { views: { list: { Component: listComponent } } } }
+        : {}),
       group: config.adminGroup,
       listSearchableFields: ['status'],
       useAsTitle: 'startTime',
@@ -100,9 +110,9 @@ export function createReservationsCollection(
         admin: {
           allowCreate: true,
           allowEdit: true,
-          components: {
-            Field: 'payload-reserve/client#CustomerField',
-          },
+          ...(customerFieldComponent
+            ? { components: { Field: customerFieldComponent } }
+            : {}),
         },
         label: ({ t }) => (t as PluginT)('reservation:fieldCustomer'),
         relationTo: config.slugs.customers as unknown as CollectionSlug,
@@ -155,9 +165,7 @@ export function createReservationsCollection(
         name: 'startTime',
         type: 'date',
         admin: {
-          components: {
-            Field: 'payload-reserve/client#AvailabilityTimeField',
-          },
+          ...(timeFieldComponent ? { components: { Field: timeFieldComponent } } : {}),
           date: {
             pickerAppearance: 'dayAndTime',
           },

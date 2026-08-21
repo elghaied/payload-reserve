@@ -24,6 +24,7 @@ import { createResourceAvailabilityEndpoint } from './endpoints/resourceAvailabi
 import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
 import { type PluginT, translations } from './translations/index.js'
 import { applyCollectionOverride } from './utilities/collectionOverrides.js'
+import { resolveComponentSlot } from './utilities/componentSlots.js'
 import { collectionHasTenantField } from './utilities/tenantFilter.js'
 import { supportsTransactions } from './utilities/transactionSupport.js'
 
@@ -502,27 +503,39 @@ export const payloadReserve =
     config.admin.custom.reservationTimezone = resolved.timezone
 
     // Add dashboard widget
-    if (!config.admin.dashboard) {
-      config.admin.dashboard = { widgets: [] }
+    const dashboardWidgetComponent = resolveComponentSlot(
+      resolved.components.dashboardWidget,
+      'payload-reserve/rsc#DashboardWidgetServer',
+    )
+    if (dashboardWidgetComponent) {
+      if (!config.admin.dashboard) {
+        config.admin.dashboard = { widgets: [] }
+      }
+      if (!config.admin.dashboard.widgets) {
+        config.admin.dashboard.widgets = []
+      }
+      config.admin.dashboard.widgets.push({
+        slug: DASHBOARD_WIDGET_SLUG,
+        Component: dashboardWidgetComponent,
+        label: ({ t }) => (t as PluginT)('reservation:dashboardTitle'),
+        maxWidth: 'large',
+        minWidth: 'medium',
+      })
     }
-    if (!config.admin.dashboard.widgets) {
-      config.admin.dashboard.widgets = []
-    }
-    config.admin.dashboard.widgets.push({
-      slug: DASHBOARD_WIDGET_SLUG,
-      Component: 'payload-reserve/rsc#DashboardWidgetServer',
-      label: ({ t }) => (t as PluginT)('reservation:dashboardTitle'),
-      maxWidth: 'large',
-      minWidth: 'medium',
-    })
 
     // Add availability overview as custom admin view
-    if (!config.admin.components.views) {
-      config.admin.components.views = {}
-    }
-    ;(config.admin.components.views as Record<string, unknown>)['reservation-availability'] = {
-      Component: 'payload-reserve/client#AvailabilityOverview',
-      path: '/reservation-availability',
+    const availabilityOverviewComponent = resolveComponentSlot(
+      resolved.components.availabilityOverview,
+      'payload-reserve/client#AvailabilityOverview',
+    )
+    if (availabilityOverviewComponent) {
+      if (!config.admin.components.views) {
+        config.admin.components.views = {}
+      }
+      ;(config.admin.components.views as Record<string, unknown>)['reservation-availability'] = {
+        Component: availabilityOverviewComponent,
+        path: '/reservation-availability',
+      }
     }
 
     // Merge plugin translations (user translations take precedence)
