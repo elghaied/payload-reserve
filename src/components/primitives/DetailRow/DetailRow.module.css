@@ -1,0 +1,22 @@
+.row {
+  border-bottom: 1px solid var(--theme-elevation-100);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 7px 0;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.key {
+  color: var(--theme-elevation-500);
+  flex: 0 0 auto;
+}
+
+.value {
+  font-weight: 550;
+  text-align: right;
+  word-break: break-word;
+}
