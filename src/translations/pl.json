@@ -161,5 +161,15 @@
   "slotTimeOff": "Urlop",
   "detailStatusChanged": "Status zaktualizowany.",
   "detailStatusFailed": "Nie udało się zaktualizować statusu.",
-  "detailNetworkError": "Nie można połączyć się z serwerem. Sprawdź połączenie i spróbuj ponownie."
+  "detailNetworkError": "Nie można połączyć się z serwerem. Sprawdź połączenie i spróbuj ponownie.",
+  "detailTitle": "Rezerwacja",
+  "detailCustomer": "Klient",
+  "detailGuest": "Gość",
+  "detailResource": "Zasób",
+  "detailGuests": "Goście",
+  "detailAlsoBooks": "Rezerwuje również",
+  "detailCancellationReason": "Powód anulowania",
+  "detailEdit": "Edytuj",
+  "detailCancelPrompt": "Dlaczego ta rezerwacja jest anulowana?",
+  "detailNoActions": "Brak dostępnych akcji dla tego statusu."
 }

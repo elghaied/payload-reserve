@@ -161,5 +161,15 @@
   "slotTimeOff": "إجازة",
   "detailStatusChanged": "تم تحديث الحالة.",
   "detailStatusFailed": "تعذر تحديث الحالة.",
-  "detailNetworkError": "تعذر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى."
+  "detailNetworkError": "تعذر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى.",
+  "detailTitle": "الحجز",
+  "detailCustomer": "العميل",
+  "detailGuest": "الضيف",
+  "detailResource": "المورد",
+  "detailGuests": "الضيوف",
+  "detailAlsoBooks": "يحجز أيضًا",
+  "detailCancellationReason": "سبب الإلغاء",
+  "detailEdit": "تعديل",
+  "detailCancelPrompt": "لماذا يتم إلغاء هذا الحجز؟",
+  "detailNoActions": "لا توجد إجراءات متاحة من هذه الحالة."
 }

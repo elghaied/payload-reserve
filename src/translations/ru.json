@@ -161,5 +161,15 @@
   "slotTimeOff": "Отгул",
   "detailStatusChanged": "Статус обновлён.",
   "detailStatusFailed": "Не удалось обновить статус.",
-  "detailNetworkError": "Не удалось подключиться к серверу. Проверьте соединение и повторите попытку."
+  "detailNetworkError": "Не удалось подключиться к серверу. Проверьте соединение и повторите попытку.",
+  "detailTitle": "Бронирование",
+  "detailCustomer": "Клиент",
+  "detailGuest": "Гость",
+  "detailResource": "Ресурс",
+  "detailGuests": "Гости",
+  "detailAlsoBooks": "Также бронирует",
+  "detailCancellationReason": "Причина отмены",
+  "detailEdit": "Изменить",
+  "detailCancelPrompt": "Почему это бронирование отменяется?",
+  "detailNoActions": "Для этого статуса нет доступных действий."
 }

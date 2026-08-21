@@ -161,5 +161,15 @@
   "slotTimeOff": "مرخصی",
   "detailStatusChanged": "وضعیت به‌روزرسانی شد.",
   "detailStatusFailed": "به‌روزرسانی وضعیت ممکن نشد.",
-  "detailNetworkError": "اتصال به سرور ممکن نشد. اتصال خود را بررسی کرده و دوباره تلاش کنید."
+  "detailNetworkError": "اتصال به سرور ممکن نشد. اتصال خود را بررسی کرده و دوباره تلاش کنید.",
+  "detailTitle": "رزرو",
+  "detailCustomer": "مشتری",
+  "detailGuest": "مهمان",
+  "detailResource": "منبع",
+  "detailGuests": "مهمانان",
+  "detailAlsoBooks": "همچنین رزرو می‌کند",
+  "detailCancellationReason": "دلیل لغو",
+  "detailEdit": "ویرایش",
+  "detailCancelPrompt": "چرا این رزرو لغو می‌شود؟",
+  "detailNoActions": "هیچ اقدامی از این وضعیت در دسترس نیست."
 }

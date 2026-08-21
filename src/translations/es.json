@@ -161,5 +161,15 @@
   "slotTimeOff": "Ausencia",
   "detailStatusChanged": "Estado actualizado.",
   "detailStatusFailed": "No se pudo actualizar el estado.",
-  "detailNetworkError": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo."
+  "detailNetworkError": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.",
+  "detailTitle": "Reserva",
+  "detailCustomer": "Cliente",
+  "detailGuest": "Invitado",
+  "detailResource": "Recurso",
+  "detailGuests": "Huéspedes",
+  "detailAlsoBooks": "También reserva",
+  "detailCancellationReason": "Motivo de cancelación",
+  "detailEdit": "Editar",
+  "detailCancelPrompt": "¿Por qué se cancela esta reserva?",
+  "detailNoActions": "No hay acciones disponibles desde este estado."
 }

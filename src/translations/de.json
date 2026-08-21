@@ -161,5 +161,15 @@
   "slotTimeOff": "Abwesend",
   "detailStatusChanged": "Status aktualisiert.",
   "detailStatusFailed": "Der Status konnte nicht aktualisiert werden.",
-  "detailNetworkError": "Der Server konnte nicht erreicht werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut."
+  "detailNetworkError": "Der Server konnte nicht erreicht werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+  "detailTitle": "Reservierung",
+  "detailCustomer": "Kunde",
+  "detailGuest": "Gast",
+  "detailResource": "Ressource",
+  "detailGuests": "Gäste",
+  "detailAlsoBooks": "Bucht außerdem",
+  "detailCancellationReason": "Stornierungsgrund",
+  "detailEdit": "Bearbeiten",
+  "detailCancelPrompt": "Warum wird diese Reservierung storniert?",
+  "detailNoActions": "Für diesen Status sind keine Aktionen verfügbar."
 }

@@ -161,5 +161,15 @@
   "slotTimeOff": "Congé",
   "detailStatusChanged": "Statut mis à jour.",
   "detailStatusFailed": "Impossible de mettre à jour le statut.",
-  "detailNetworkError": "Impossible de contacter le serveur. Vérifiez votre connexion et réessayez."
+  "detailNetworkError": "Impossible de contacter le serveur. Vérifiez votre connexion et réessayez.",
+  "detailTitle": "Réservation",
+  "detailCustomer": "Client",
+  "detailGuest": "Invité",
+  "detailResource": "Ressource",
+  "detailGuests": "Participants",
+  "detailAlsoBooks": "Réserve également",
+  "detailCancellationReason": "Motif d'annulation",
+  "detailEdit": "Modifier",
+  "detailCancelPrompt": "Pourquoi cette réservation est-elle annulée ?",
+  "detailNoActions": "Aucune action disponible depuis ce statut."
 }

@@ -24,9 +24,7 @@ export const ReservationDetailProvider: React.FC<{
   children: React.ReactNode
   value: ReservationDetailContextValue
 }> = ({ children, value }) => (
-  <ReservationDetailContext.Provider value={value}>
-    {children}
-  </ReservationDetailContext.Provider>
+  <ReservationDetailContext.Provider value={value}>{children}</ReservationDetailContext.Provider>
 )
 
 /**

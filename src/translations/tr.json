@@ -161,5 +161,15 @@
   "slotTimeOff": "İzin",
   "detailStatusChanged": "Durum güncellendi.",
   "detailStatusFailed": "Durum güncellenemedi.",
-  "detailNetworkError": "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin."
+  "detailNetworkError": "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+  "detailTitle": "Rezervasyon",
+  "detailCustomer": "Müşteri",
+  "detailGuest": "Misafir",
+  "detailResource": "Kaynak",
+  "detailGuests": "Misafirler",
+  "detailAlsoBooks": "Ayrıca rezerve ediyor",
+  "detailCancellationReason": "İptal Nedeni",
+  "detailEdit": "Düzenle",
+  "detailCancelPrompt": "Bu rezervasyon neden iptal ediliyor?",
+  "detailNoActions": "Bu durumdan kullanılabilir bir işlem yok."
 }

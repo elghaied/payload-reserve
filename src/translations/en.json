@@ -161,5 +161,15 @@
   "slotTimeOff": "Time off",
   "detailStatusChanged": "Status updated.",
   "detailStatusFailed": "Could not update the status.",
-  "detailNetworkError": "Could not reach the server. Check your connection and try again."
+  "detailNetworkError": "Could not reach the server. Check your connection and try again.",
+  "detailTitle": "Reservation",
+  "detailCustomer": "Customer",
+  "detailGuest": "Guest",
+  "detailResource": "Resource",
+  "detailGuests": "Guests",
+  "detailAlsoBooks": "Also books",
+  "detailCancellationReason": "Cancellation reason",
+  "detailEdit": "Edit",
+  "detailCancelPrompt": "Why is this reservation being cancelled?",
+  "detailNoActions": "No actions are available from this status."
 }

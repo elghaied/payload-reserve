@@ -161,5 +161,15 @@
   "slotTimeOff": "休假",
   "detailStatusChanged": "状态已更新。",
   "detailStatusFailed": "无法更新状态。",
-  "detailNetworkError": "无法连接到服务器。请检查您的网络连接后重试。"
+  "detailNetworkError": "无法连接到服务器。请检查您的网络连接后重试。",
+  "detailTitle": "预约",
+  "detailCustomer": "客户",
+  "detailGuest": "访客",
+  "detailResource": "资源",
+  "detailGuests": "宾客",
+  "detailAlsoBooks": "同时预约",
+  "detailCancellationReason": "取消原因",
+  "detailEdit": "编辑",
+  "detailCancelPrompt": "为什么要取消此预约？",
+  "detailNoActions": "此状态下没有可用操作。"
 }

@@ -161,5 +161,15 @@
   "slotTimeOff": "अवकाश",
   "detailStatusChanged": "स्थिति अपडेट की गई।",
   "detailStatusFailed": "स्थिति अपडेट नहीं की जा सकी।",
-  "detailNetworkError": "सर्वर तक नहीं पहुंचा जा सका। अपना कनेक्शन जांचें और पुनः प्रयास करें।"
+  "detailNetworkError": "सर्वर तक नहीं पहुंचा जा सका। अपना कनेक्शन जांचें और पुनः प्रयास करें।",
+  "detailTitle": "आरक्षण",
+  "detailCustomer": "ग्राहक",
+  "detailGuest": "अतिथि",
+  "detailResource": "संसाधन",
+  "detailGuests": "अतिथि",
+  "detailAlsoBooks": "यह भी बुक करता है",
+  "detailCancellationReason": "रद्दीकरण का कारण",
+  "detailEdit": "संपादित करें",
+  "detailCancelPrompt": "यह आरक्षण क्यों रद्द किया जा रहा है?",
+  "detailNoActions": "इस स्थिति से कोई कार्रवाई उपलब्ध नहीं है।"
 }

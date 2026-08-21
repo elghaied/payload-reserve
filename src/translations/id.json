@@ -161,5 +161,15 @@
   "slotTimeOff": "Cuti",
   "detailStatusChanged": "Status diperbarui.",
   "detailStatusFailed": "Status tidak dapat diperbarui.",
-  "detailNetworkError": "Tidak dapat menjangkau server. Periksa koneksi Anda dan coba lagi."
+  "detailNetworkError": "Tidak dapat menjangkau server. Periksa koneksi Anda dan coba lagi.",
+  "detailTitle": "Reservasi",
+  "detailCustomer": "Pelanggan",
+  "detailGuest": "Tamu",
+  "detailResource": "Sumber Daya",
+  "detailGuests": "Tamu",
+  "detailAlsoBooks": "Juga memesan",
+  "detailCancellationReason": "Alasan Pembatalan",
+  "detailEdit": "Edit",
+  "detailCancelPrompt": "Mengapa reservasi ini dibatalkan?",
+  "detailNoActions": "Tidak ada tindakan yang tersedia dari status ini."
 }

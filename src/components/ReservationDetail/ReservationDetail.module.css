@@ -1,0 +1,76 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.header {
+  border-bottom: 1px solid var(--theme-elevation-100);
+  padding-bottom: 12px;
+}
+
+.service {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.when {
+  color: var(--theme-elevation-500);
+  margin-top: 3px;
+}
+
+.badgeRow {
+  margin-top: 7px;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.pill {
+  background: var(--theme-elevation-100);
+  border-radius: 5px;
+  font-size: 11px;
+  padding: 2px 7px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.feedback {
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.feedbackError {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.feedbackSuccess {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.editButton {
+  background: var(--theme-elevation-0);
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+}
+
+.noActions {
+  color: var(--theme-elevation-400);
+  font-size: 12px;
+}
