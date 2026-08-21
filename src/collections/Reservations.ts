@@ -67,7 +67,7 @@ export function createReservationsCollection(
 
   const listComponent = resolveComponentSlot(
     config.components.calendarView,
-    'payload-reserve/client#CalendarView',
+    'payload-reserve/rsc#CalendarViewServer',
   )
   const customerFieldComponent = resolveComponentSlot(
     config.components.customerField,

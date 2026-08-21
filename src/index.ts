@@ -15,6 +15,8 @@ export type {
   DurationType,
   ExternalBusyInterval,
   GetExternalBusy,
+  ReservationComponentOverrides,
+  ReservationComponentSlot,
   ReservationPluginConfig,
   ReservationPluginHooks,
   ResolvedReservationPluginConfig,

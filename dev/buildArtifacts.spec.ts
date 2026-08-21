@@ -41,11 +41,15 @@ const repoRoot = path.resolve(dirname, '..')
 const translationsEntry = path.join(repoRoot, 'src/translations/index.ts')
 const swcBin = path.join(repoRoot, 'node_modules/.bin/swc')
 
-/** Compile one file exactly the way `pnpm build:swc` would, and return its output. */
-async function compileWithRepoConfig(filePath: string): Promise<string> {
+/**
+ * Compile one file exactly the way `pnpm build:swc` would, and return its
+ * output. `relPath` is relative to the repo root. Shared by every test in this
+ * file that needs to inspect real SWC output rather than source.
+ */
+async function compileWithSwc(relPath: string): Promise<string> {
   const { stdout } = await execFileAsync(
     swcBin,
-    [filePath, '--config-file', path.join(repoRoot, '.swcrc')],
+    [path.join(repoRoot, relPath), '--config-file', path.join(repoRoot, '.swcrc')],
     { cwd: repoRoot, maxBuffer: 20 * 1024 * 1024 },
   )
   return stdout
@@ -60,7 +64,7 @@ describe('build output: JSON import attributes', () => {
     // test is measuring nothing and should fail loudly rather than pass vacuously.
     expect(sourceImports.length).toBeGreaterThan(0)
 
-    const code = await compileWithRepoConfig(translationsEntry)
+    const code = await compileWithSwc('src/translations/index.ts')
 
     // SWC emits the attribute across newlines: `with {\n    type: 'json'\n}`.
     const emittedImports = code.match(/\.json'\s+with\s*\{\s*type:\s*['"]json['"]\s*(?:,\s*)?\}/g) ?? []
@@ -69,7 +73,7 @@ describe('build output: JSON import attributes', () => {
   })
 
   test('no bare JSON import survives compilation', async () => {
-    const code = await compileWithRepoConfig(translationsEntry)
+    const code = await compileWithSwc('src/translations/index.ts')
 
     // A `.json` specifier whose statement carries no `with` clause is exactly the
     // shape Node rejects with ERR_IMPORT_ATTRIBUTE_MISSING.
@@ -78,5 +82,16 @@ describe('build output: JSON import attributes', () => {
       .filter((line) => /^import\s.*\.json['"];?\s*$/.test(line.trim()))
 
     expect(bare).toEqual([])
+  })
+})
+
+describe('build output: server -> client component imports', () => {
+  test('CalendarViewServer imports CalendarView from the exports bundle, not a relative path', async () => {
+    // A server component importing a client component by relative path works in dev
+    // and breaks in production. Nothing else in the suite exercises the prod module
+    // graph, so this asserts the BUILD OUTPUT — asserting src would prove nothing.
+    const output = await compileWithSwc('src/components/CalendarView/CalendarViewServer.tsx')
+    expect(output).toContain('exports/client.js')
+    expect(output).not.toMatch(/from ["']\.\/index\.js["']/)
   })
 })

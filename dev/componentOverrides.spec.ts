@@ -28,7 +28,7 @@ const fieldComponent = (config: Config, name: string) => {
 
 describe('components option — calendarView', () => {
   it('uses the plugin component when unset', () => {
-    expect(listComponent(build())).toBe('payload-reserve/client#CalendarView')
+    expect(listComponent(build())).toBe('payload-reserve/rsc#CalendarViewServer')
   })
 
   it('uses the consumer component when a string', () => {
@@ -105,5 +105,31 @@ describe('components option — dashboard widget and availability view', () => {
         'reservation-availability'
       ],
     ).toBeUndefined()
+  })
+})
+
+describe('components option — reservationDetail', () => {
+  const custom = (config: Config) =>
+    config.admin?.custom as Record<string, unknown> | undefined
+
+  it('registers nothing when unset', () => {
+    const config = build()
+    expect(custom(config)?.reservationDetailComponent).toBeUndefined()
+    expect(config.admin?.dependencies?.reservationDetail).toBeUndefined()
+  })
+
+  it('records the path and an import-map dependency when a string', () => {
+    const config = build({ reservationDetail: '/components/D.tsx#D' })
+    expect(custom(config)?.reservationDetailComponent).toBe('/components/D.tsx#D')
+    expect(config.admin?.dependencies?.reservationDetail).toEqual({
+      type: 'component',
+      path: '/components/D.tsx#D',
+    })
+  })
+
+  it('records false without an import-map dependency', () => {
+    const config = build({ reservationDetail: false })
+    expect(custom(config)?.reservationDetailComponent).toBe(false)
+    expect(config.admin?.dependencies?.reservationDetail).toBeUndefined()
   })
 })

@@ -448,6 +448,22 @@ export const payloadReserve =
             'payload-reserve: this database does not support transactions, so concurrent bookings for the same slot can double-book. MongoDB needs a replica set (even single-node) for transaction support. Postgres supports transactions by default. SQLite requires transactionOptions to be set on the adapter, or it silently runs without them.',
           )
         }
+
+        // D5: a custom calendar plus a custom detail component. CalendarViewServer
+        // is what renders the detail slot, so replacing the calendar means nothing
+        // renders it unless the replacement calls useReservationDetail itself.
+        if (
+          typeof resolved.components.calendarView === 'string' &&
+          typeof resolved.components.reservationDetail === 'string'
+        ) {
+          payload.logger.warn(
+            'payload-reserve: components.reservationDetail is set, but components.calendarView ' +
+              'replaces the calendar that renders it, so the detail component will not appear ' +
+              'unless your calendar renders it itself (import ReservationDetailProvider and ' +
+              'useReservationDetail from payload-reserve/client). Remove one of the two options ' +
+              'if that is not what you intended.',
+          )
+        }
       } catch {
         // A diagnostic must never break boot — that is the whole reason these
         // are warnings and not throws. The host onInit await stays OUTSIDE.
@@ -501,6 +517,20 @@ export const payloadReserve =
     config.admin.custom.reservationStatusMachine = resolved.statusMachine
     config.admin.custom.reservationTenant = resolved.multiTenant
     config.admin.custom.reservationTimezone = resolved.timezone
+
+    // The detail component is resolved at render time by CalendarViewServer, so
+    // it lives in admin.custom rather than being written into Payload config as a
+    // component path. That makes it invisible to the import-map generator, which
+    // is why it also needs an explicit admin.dependencies entry — the documented
+    // mechanism for plugin authors registering imports the system cannot detect.
+    const reservationDetail = resolved.components.reservationDetail
+    config.admin.custom.reservationDetailComponent = reservationDetail ?? undefined
+    if (typeof reservationDetail === 'string') {
+      config.admin.dependencies = {
+        ...config.admin.dependencies,
+        reservationDetail: { type: 'component', path: reservationDetail },
+      }
+    }
 
     // Add dashboard widget
     const dashboardWidgetComponent = resolveComponentSlot(
