@@ -418,6 +418,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   // The drawer holds an id, not a document: the doc is resolved live from the
   // arrays the calendar already fetched, so a mutation + refetch updates the
   // drawer with no second cache to keep in sync.
+  //
+  // sameId, not ===, and deliberately not simplifiable back. Today the two are
+  // indistinguishable: detailId is only ever set from the `id` of a reservation
+  // in one of these very arrays, so both operands are the same value of the same
+  // type and no test can tell the two comparisons apart. It stops being a
+  // no-op the moment an id reaches this lookup from anywhere else — a
+  // `?reservation=123` deep link hands you the STRING "123" while a Postgres
+  // row's id is the NUMBER 123, at which point === matches nothing and the
+  // drawer silently never opens. That is the failure this file's own
+  // reservationResourceFilter comment records ("filtered out EVERY reservation
+  // on Postgres installs"). sameId's number/string behaviour is covered in
+  // dev/reservationResourceFilter.int.spec.ts.
   const detailDoc = useMemo(
     () =>
       detailId
