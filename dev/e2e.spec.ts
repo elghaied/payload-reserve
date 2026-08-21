@@ -809,7 +809,9 @@ test.describe('reservation detail drawer status actions', () => {
     const drawer = page.locator('[data-reservation-detail]')
     await expect(drawer).toBeVisible()
 
-    await drawer.getByRole('button', { name: 'Confirmed' }).click()
+    // The button carries the ACTION label ("Confirm"), not the target status
+    // name ("Confirmed") — see buildStatusActionLabels.
+    await drawer.getByRole('button', { name: 'Confirm', exact: true }).click()
 
     await expect(drawer.getByText('Status updated.')).toBeVisible()
     // The calendar's own data reflects the change with no reload: the same
@@ -846,7 +848,8 @@ test.describe('reservation detail drawer status actions', () => {
 
     // The cancel transition prompts for a reason; accept it empty.
     page.once('dialog', (dialog) => void dialog.accept(''))
-    await drawer.getByRole('button', { name: 'Cancelled' }).click()
+    // Action label, not the status name — "Cancel", not "Cancelled".
+    await drawer.getByRole('button', { name: 'Cancel', exact: true }).click()
 
     // extractErrorMessage pulls the hook's real message out of Payload's
     // nested error shape — not the generic wrapper string every naive read
