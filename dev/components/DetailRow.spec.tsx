@@ -22,6 +22,8 @@ describe('DetailRow', () => {
 
   it('renders nothing in the value column when neither is supplied', () => {
     render(<DetailRow label="Notes" />)
-    expect(screen.getByText('Notes')).toBeTruthy()
+    const label = screen.getByText('Notes')
+    expect(label).toBeTruthy()
+    expect(label.nextElementSibling?.textContent).toBe('')
   })
 })

@@ -11,7 +11,11 @@ const mockConfig = {
 }
 
 vi.mock('@payloadcms/ui', () => ({
+  // vi.mock stub named to match the real hook it replaces, not an actual React hook.
+  // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
   useConfig: () => ({ config: mockConfig }),
+  // vi.mock stub named to match the real hook it replaces, not an actual React hook.
+  // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
   useTranslation: () => ({ t: makeT() }),
 }))
 
@@ -35,6 +39,9 @@ describe('useReservationMutations', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:3000/api/reservations/res-1')
     expect(init.method).toBe('PATCH')
+    // Sends cookies along with the request — required for an authenticated admin
+    // fetch, and flagged as a behaviour change in the changeset for this hook.
+    expect(init.credentials).toBe('include')
     expect(JSON.parse(init.body as string)).toEqual({ status: 'confirmed' })
     expect(outcome).toEqual({ message: 'Status updated.', ok: true })
   })

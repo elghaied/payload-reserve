@@ -223,6 +223,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   const { closeModal, isModalOpen, openModal } = useModal()
   const detailModalOpen = isModalOpen(detailDrawerSlug)
 
+  // The detailId/detailModalOpen/detailWasOpen mechanism below (through the
+  // detailWasOpen effect and the sameId-based doc lookup further down) is
+  // mirrored — deliberately reimplemented, not imported — in
+  // dev/components/DrawerLifecycle.spec.tsx. This file is the only side
+  // anyone edits; keep that harness in sync when this mechanism changes.
   useEffect(() => {
     if (detailId) {
       openModal(detailDrawerSlug)
@@ -251,9 +256,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
       detailWasOpen.current = true
       return
     }
-    // Only clear once the modal has actually been open. Without this guard the
-    // effect fires on the render between `setDetailId(id)` and `openModal(...)`,
-    // when the modal is still closed, and immediately cancels the open.
+    // Only clear once the modal has actually been open. This effect is keyed on
+    // `detailModalOpen` alone, so it only re-runs when that value actually changes —
+    // it cannot fire on the render between `setDetailId(id)` and `openModal(...)`,
+    // because `detailModalOpen` is still `false` there, same as before. The guard
+    // is not defending against that; it's defending against a future where
+    // `detailId` gets a non-null initializer (e.g. deep-linking a `?reservation=`
+    // query param on mount) — without it, the mount render (modal still closed)
+    // would immediately call `setDetailId(null)` and cancel the open before
+    // `openModal()` ever ran.
     if (detailWasOpen.current) {
       detailWasOpen.current = false
       setDetailId(null)

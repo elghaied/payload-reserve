@@ -23,6 +23,10 @@ pnpm dev:generate-importmap # Regenerate import map after adding components
 
 Run a single test by pattern: `pnpm vitest -t "conflict detection"`
 
+`pnpm test:int` runs two Vitest projects, configured in `vitest.config.js`: `integration` (Node,
+MongoDB Memory Server, `dev/*.spec.ts`) and `components` (jsdom, no database — renders admin
+components in isolation, `dev/components/**/*.spec.{ts,tsx}`).
+
 ## Opt-in Dev Harnesses
 
 Two dev-app behaviours are gated behind environment variables that are unset (and therefore change nothing) by default:
@@ -30,25 +34,19 @@ Two dev-app behaviours are gated behind environment variables that are unset (an
 - **`MT=1`** — boots the dev app with `@payloadcms/plugin-multi-tenant` wired in (two tenants, a super-admin dev user), for manually verifying tenant-scoped admin views: `MT=1 pnpm dev:generate-importmap && MT=1 pnpm dev`.
 - **`RESERVE_DETAIL_SLOT=1`** — wires `dev/components/ReservationDetailFixture.tsx` into `components.reservationDetail` (see `dev/payload.config.ts`), so the e2e suite can assert that a consumer-supplied `reservationDetail` component really renders in place of the plugin's own drawer body. Boot it the same way: `RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap && RESERVE_DETAIL_SLOT=1 pnpm dev`.
 
-### Footgun: the committed import map is the gated superset
+### The committed import map is stable regardless of the gate
 
-`dev/app/(payload)/admin/importMap.js` is checked into the repo, and it was generated **with `RESERVE_DETAIL_SLOT=1` set** — so it includes the fixture component's import-map entry. Running a plain `pnpm dev:generate-importmap` (gate unset) regenerates that same file **without** the fixture entry, which silently breaks the e2e test that depends on it ("a consumer-supplied `components.reservationDetail` component renders in place of the plugin body") the next time anyone runs it — with no error at generation time, only a later test failure.
+`dev/app/(payload)/admin/importMap.js` is checked into the repo. It used to be a **gated superset**: the fixture component's import-map entry only came from `payloadReserve()`'s own `components.reservationDetail` option, which only names the fixture when `RESERVE_DETAIL_SLOT=1` is set — so a plain `pnpm dev:generate-importmap` (gate unset) silently regenerated the file without that entry, breaking the gated e2e test with no error at generation time.
 
-**Always regenerate with the gate set:**
+That was fixed (`dev/payload.config.ts`'s `admin.dependencies`) by registering the fixture's import **unconditionally**, independent of the gate — the same mechanism `payloadReserve()` itself uses for its own components. `RESERVE_DETAIL_SLOT` now only controls whether the admin UI actually *points* the `reservationDetail` slot at the fixture; it no longer controls whether the import map *knows about* it. Regenerating with the gate either set or unset produces a byte-identical `importMap.js` — verified directly against the real CLI.
 
-```bash
-RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap
-```
-
-This has been hit in practice, not just theorized — an ungated `pnpm dev` left running (or anything else that touches the config/build cache) can leave the committed file stripped down to the ungated set with no obvious cause in your own shell history. Before committing any change that touches `dev/payload.config.ts` or the `ReservationDetailFixture` component, check the import map for an unexpected diff:
+You can still regenerate the map whenever you like; there's no ceremony required:
 
 ```bash
-git diff -- "dev/app/(payload)/admin/importMap.js"
+pnpm dev:generate-importmap
 ```
 
-Expect **no** diff. If there is one, restore it with `git checkout --` or regenerate with `RESERVE_DETAIL_SLOT=1` set — never commit the ungated version.
-
-To actually run the gated e2e test:
+To actually exercise the fixture — this gate is still live, it's what wires `components.reservationDetail` to `ReservationDetailFixture.tsx` — run the gated e2e test:
 
 ```bash
 RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap
@@ -133,6 +131,7 @@ dev/
   seed.ts                     # Sample salon data
   int.spec.ts                 # Vitest integration tests
   e2e.spec.ts                 # Playwright E2E tests
+  components/                 # jsdom component tests (vitest "components" project)
 ```
 
 ## Key Conventions

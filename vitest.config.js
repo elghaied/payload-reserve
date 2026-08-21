@@ -56,6 +56,11 @@ export default defineConfig(() => {
           esbuild: {
             jsx: 'automatic',
           },
+          plugins: [
+            tsconfigPaths({
+              ignoreConfigErrors: true,
+            }),
+          ],
           test: {
             name: 'components',
             // No database: these render components, they do not boot Payload.
@@ -64,7 +69,11 @@ export default defineConfig(() => {
             css: false,
             environment: 'jsdom',
             exclude: ['node_modules/**', ...WORKTREE_GLOBS],
-            include: ['dev/components/**/*.spec.tsx'],
+            // Not just *.spec.tsx: a non-JSX .spec.ts file under dev/components/
+            // still belongs to this project (it's excluded wholesale from the
+            // integration project above) and must still be picked up here, or it
+            // silently never runs in either project.
+            include: ['dev/components/**/*.spec.{ts,tsx}'],
             server: {
               deps: {
                 // @payloadcms/ui's client entry transitively imports

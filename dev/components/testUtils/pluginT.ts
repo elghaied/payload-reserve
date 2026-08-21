@@ -20,6 +20,8 @@ export function makeT(): (key: string, vars?: Record<string, unknown>) => string
     if (!vars) {
       return template
     }
+    // Test stub; every caller here interpolates primitives (names, counts), never an object.
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
     return template.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => String(vars[name] ?? ''))
   }
 }

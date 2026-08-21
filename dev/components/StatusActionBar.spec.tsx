@@ -11,9 +11,13 @@ import { CUSTOM_STATUS_MACHINE, DEFAULT_STATUS_MACHINE } from './testUtils/statu
 const configState = vi.hoisted(() => ({ machine: {} as Record<string, unknown> }))
 
 vi.mock('@payloadcms/ui', () => ({
+  // vi.mock stub named to match the real hook it replaces, not an actual React hook.
+  // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
   useConfig: () => ({
     config: { admin: { custom: { reservationStatusMachine: configState.machine } } },
   }),
+  // vi.mock stub named to match the real hook it replaces, not an actual React hook.
+  // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
   useTranslation: () => ({ t: makeT() }),
 }))
 

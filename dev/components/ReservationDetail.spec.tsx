@@ -23,7 +23,11 @@ const mockConfig = {
 }
 
 vi.mock('@payloadcms/ui', () => ({
+  // vi.mock stub named to match the real hook it replaces, not an actual React hook.
+  // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
   useConfig: () => ({ config: mockConfig }),
+  // vi.mock stub named to match the real hook it replaces, not an actual React hook.
+  // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
   useTranslation: () => ({ t: makeT() }),
 }))
 
