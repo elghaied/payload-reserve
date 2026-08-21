@@ -449,20 +449,29 @@ export const payloadReserve =
           )
         }
 
-        // D5: a custom calendar plus a custom detail component. CalendarViewServer
-        // is what renders the detail slot, so replacing the calendar means nothing
-        // renders it unless the replacement calls useReservationDetail itself.
-        if (
-          typeof resolved.components.calendarView === 'string' &&
-          typeof resolved.components.reservationDetail === 'string'
-        ) {
-          payload.logger.warn(
-            'payload-reserve: components.reservationDetail is set, but components.calendarView ' +
-              'replaces the calendar that renders it, so the detail component will not appear ' +
-              'unless your calendar renders it itself (import ReservationDetailProvider and ' +
-              'useReservationDetail from payload-reserve/client). Remove one of the two options ' +
-              'if that is not what you intended.',
-          )
+        // D5: a custom detail component whose calendar slot is set to ANYTHING —
+        // a replacement string, or `false`. CalendarViewServer is what renders the
+        // detail slot; a string calendarView means the replacement doesn't call it
+        // unless it chooses to, and `false` means no plugin calendar renders at all
+        // (resolveComponentSlot falls back to Payload's stock list view instead) —
+        // both leave reservationDetail silently inert, so both need the warning.
+        if (typeof resolved.components.reservationDetail === 'string') {
+          if (typeof resolved.components.calendarView === 'string') {
+            payload.logger.warn(
+              'payload-reserve: components.reservationDetail is set, but components.calendarView ' +
+                'replaces the calendar that renders it, so the detail component will not appear ' +
+                'unless your calendar renders it itself (import ReservationDetailProvider and ' +
+                'useReservationDetail from payload-reserve/client). Remove one of the two options ' +
+                'if that is not what you intended.',
+            )
+          } else if (resolved.components.calendarView === false) {
+            payload.logger.warn(
+              'payload-reserve: components.reservationDetail is set, but components.calendarView ' +
+                "is false, so Payload's own list view renders instead of the plugin calendar that " +
+                'would have rendered the detail component — it will not appear at all. Remove one ' +
+                'of the two options if that is not what you intended.',
+            )
+          }
         }
       } catch {
         // A diagnostic must never break boot — that is the whole reason these
