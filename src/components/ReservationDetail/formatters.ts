@@ -26,6 +26,37 @@ export function formatCustomerName(reservation: CalendarReservation, fallback: s
   return fallback
 }
 
+/**
+ * Locale-aware clock time (`HH:mm`) for an ISO instant, in the given IANA
+ * timezone. `iso` is optional because it's used for both `startTime`
+ * (required on `CalendarReservation`) and `endTime` (optional) — an
+ * undefined/empty input renders as `'—'` rather than throwing or printing
+ * `Invalid Date`.
+ */
+export function formatReservationTime(iso: string | undefined, timeZone: string): string {
+  if (!iso) {
+    return '—'
+  }
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone,
+  })
+}
+
+/**
+ * Locale-aware date label (weekday, day, short month) for an ISO instant, in
+ * the given IANA timezone — e.g. `Thu, 1 Jan`.
+ */
+export function formatReservationDateLabel(iso: string, timeZone: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    timeZone,
+    weekday: 'short',
+  })
+}
+
 /** Every populated resource name on the booking, top-level first, de-duplicated. */
 export function formatResourceNames(reservation: CalendarReservation): string[] {
   const names: string[] = []

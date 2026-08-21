@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
+
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { CalendarReservation } from '../../src/components/shared/types.js'
@@ -27,9 +28,9 @@ vi.mock('@payloadcms/ui', () => ({
 }))
 
 const baseDoc: CalendarReservation = {
+  id: 'res-1',
   customer: { name: 'Jane Doe' },
   endTime: '2026-01-01T11:00:00.000Z',
-  id: 'res-1',
   resource: { id: 'r1', name: 'Chair 1' },
   service: { name: 'Haircut' },
   startTime: '2026-01-01T10:00:00.000Z',
@@ -88,7 +89,7 @@ describe('ReservationDetail', () => {
     const guestDoc: CalendarReservation = {
       ...baseDoc,
       customer: undefined,
-      guest: { email: 'guest@example.com', name: 'Guest Person' },
+      guest: { name: 'Guest Person', email: 'guest@example.com' },
     }
     renderDetail(guestDoc)
 
@@ -147,6 +148,37 @@ describe('ReservationDetail', () => {
     expect(screen.getByRole('button', { name: 'Confirmed' })).not.toBeDisabled()
   })
 
+  it('does not paint a stale result when the same reservation is closed and reopened while a mutation is in flight', async () => {
+    let resolveFetch!: (value: Response) => void
+    const pending = new Promise<Response>((resolve) => {
+      resolveFetch = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(pending))
+
+    const refresh = vi.fn()
+    const { rerender } = renderDetail(baseDoc, { refresh })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmed' }))
+    // Busy while the request against res-1 is still in flight.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirmed' })).toBeDisabled())
+
+    // Close the drawer (doc goes null), then reopen the SAME reservation
+    // before the in-flight request resolves.
+    rerenderDetail(rerender, null, { refresh })
+    rerenderDetail(rerender, baseDoc, { refresh })
+    expect(screen.getByRole('button', { name: 'Confirmed' })).not.toBeDisabled()
+
+    // Now let the stale request from the first open resolve.
+    resolveFetch(jsonResponse(null, 200))
+    await new Promise((r) => setTimeout(r, 0))
+
+    // The mutation genuinely happened against the server...
+    expect(refresh).toHaveBeenCalledTimes(1)
+    // ...but the reopened drawer must not show its stale feedback or be left busy.
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Confirmed' })).not.toBeDisabled()
+  })
+
   it('prompts for a reason when cancelling, and sends it', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(null, 200))
     vi.stubGlobal('fetch', fetchMock)
@@ -181,11 +213,11 @@ describe('ReservationDetail', () => {
     const body = {
       errors: [
         {
+          name: 'ValidationError',
           data: {
             errors: [{ message: 'You must cancel at least 24 hours in advance.', path: 'status' }],
           },
           message: 'The following field is invalid: status',
-          name: 'ValidationError',
         },
       ],
     }

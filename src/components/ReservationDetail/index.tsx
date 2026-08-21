@@ -10,7 +10,12 @@ import { DetailRow } from '../primitives/DetailRow/index.js'
 import { StatusActionBar } from '../primitives/StatusActionBar/index.js'
 import { StatusBadge } from '../primitives/StatusBadge/index.js'
 import { useReservationDetail } from './context.js'
-import { formatCustomerName, formatResourceNames } from './formatters.js'
+import {
+  formatCustomerName,
+  formatReservationDateLabel,
+  formatReservationTime,
+  formatResourceNames,
+} from './formatters.js'
 import styles from './ReservationDetail.module.css'
 
 export type ReservationDetailProps = {
@@ -27,7 +32,7 @@ export type ReservationDetailProps = {
  */
 export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) => {
   const { doc, refresh } = useReservationDetail()
-  const { cancelStatus, labels, presentation, transitionsFrom } = useReservationStatusMachine()
+  const { cancelStatus, labels, presentation } = useReservationStatusMachine()
   const { cancel, transition } = useReservationMutations()
   const { config } = useConfig()
   const { t: _t } = useTranslation()
@@ -37,20 +42,25 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null)
 
   // This is a single persistent drawer whose `doc` is swapped in place as the
-  // calendar routes different reservations through it (see context.tsx). A
-  // mutation kicked off against one reservation must never paint its result
-  // onto a different, later-opened one: this ref tracks the *currently* open
-  // id (updated every render, ahead of the effect below) so an in-flight
-  // request can tell, after it resolves, whether it is still looking at the
-  // reservation it started against.
-  const openIdRef = useRef(doc?.id)
-  openIdRef.current = doc?.id
+  // calendar routes different reservations through it (see context.tsx), and
+  // it can also be closed and reopened on the SAME id while a mutation is
+  // still in flight. Comparing ids alone can't tell those two situations
+  // apart, so this tracks a monotonically increasing "open-and-request"
+  // epoch instead: bumped every time the open reservation changes (below)
+  // and every time a mutation is dispatched. A result is only painted into
+  // state if the epoch it was dispatched under still matches the current
+  // one — closing and reopening the same reservation bumps the epoch twice
+  // (once on close, once on reopen), which is enough to invalidate a request
+  // that started before either happened, even though `doc.id` ends up
+  // identical.
+  const epochRef = useRef(0)
 
   // Reset local, per-reservation UI state whenever the open reservation
   // changes — otherwise a stale success/error banner (or a stuck `busy`) from
   // the previous reservation would bleed into the next one until the user
   // takes a new action.
   useEffect(() => {
+    epochRef.current += 1
     setFeedback(null)
     setBusy(false)
   }, [doc?.id])
@@ -66,11 +76,6 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
         return
       }
 
-      // The reservation this particular request was made against. If the
-      // drawer has since moved on to a different reservation by the time this
-      // resolves, its result belongs to a reservation that is no longer open.
-      const requestId = doc.id
-
       // The cancel transition is the only one that collects extra input. It is
       // identified by the configured cancelStatus, never by the literal
       // 'cancelled', so a custom vocabulary keeps the prompt.
@@ -81,6 +86,11 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
           return
         }
       }
+
+      // The epoch this particular request was dispatched under. Bumping here
+      // (rather than only reading the current value) means a second dispatch
+      // against the same open reservation also invalidates the first one.
+      const requestEpoch = (epochRef.current += 1)
 
       setBusy(true)
       const result =
@@ -96,9 +106,11 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
       }
 
       // But the drawer's own busy/feedback state belongs to whichever
-      // reservation is open NOW — never overwrite it with a stale result for
-      // a reservation the user has already navigated away from.
-      if (openIdRef.current !== requestId) {
+      // open-and-request generation is current NOW — never overwrite it with
+      // a stale result from an earlier generation, whether that's because the
+      // drawer moved to a different reservation or was closed and reopened on
+      // this same one.
+      if (epochRef.current !== requestEpoch) {
         return
       }
 
@@ -117,33 +129,19 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
       ? doc.service.name
       : t('reservation:detailTitle')
 
-  const formatTime = (iso?: string) =>
-    iso
-      ? new Date(iso).toLocaleTimeString(undefined, {
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone,
-        })
-      : '—'
-
-  const dateLabel = new Date(doc.startTime).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    timeZone,
-    weekday: 'short',
-  })
+  const dateLabel = formatReservationDateLabel(doc.startTime, timeZone)
 
   const resourceNames = formatResourceNames(doc)
   const [primaryResource, ...additionalResources] = resourceNames
   const isGuest = Boolean(doc.guest && !doc.customer)
-  const hasActions = transitionsFrom(doc.status).length > 0
 
   return (
     <div className={styles.wrapper}>
       <div className={styles.header}>
         <div className={styles.service}>{serviceName}</div>
         <div className={styles.when}>
-          {dateLabel} &middot; {formatTime(doc.startTime)} – {formatTime(doc.endTime)}
+          {dateLabel} &middot; {formatReservationTime(doc.startTime, timeZone)} –{' '}
+          {formatReservationTime(doc.endTime, timeZone)}
         </div>
         <div className={styles.badgeRow}>
           <StatusBadge
@@ -193,11 +191,14 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
       )}
 
       <div className={styles.footer}>
-        {hasActions ? (
-          <StatusActionBar busy={busy} onSelect={(s) => void handleSelect(s)} status={doc.status} />
-        ) : (
-          <span className={styles.noActions}>{t('reservation:detailNoActions')}</span>
-        )}
+        <StatusActionBar
+          busy={busy}
+          noActionsFallback={
+            <span className={styles.noActions}>{t('reservation:detailNoActions')}</span>
+          }
+          onSelect={(s) => void handleSelect(s)}
+          status={doc.status}
+        />
         {onEdit && (
           <button className={styles.editButton} onClick={() => onEdit(doc.id)} type="button">
             {t('reservation:detailEdit')}

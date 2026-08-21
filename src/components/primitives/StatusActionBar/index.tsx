@@ -7,6 +7,13 @@ import styles from './StatusActionBar.module.css'
 export type StatusActionBarProps = {
   /** Disables every button — set while a mutation is in flight. */
   busy?: boolean
+  /**
+   * Rendered instead of the bar when `status` has no outgoing transitions.
+   * Defaults to `null` (renders nothing), same as before this prop existed —
+   * a caller that needs a "no actions available" message can supply it here
+   * rather than re-deriving `transitionsFrom(status).length === 0` itself.
+   */
+  noActionsFallback?: React.ReactNode
   onSelect: (status: string) => void
   /** The reservation's current status. */
   status: string
@@ -21,12 +28,17 @@ export type StatusActionBarProps = {
  * transition, so a button here may still be refused; callers surface that
  * refusal rather than trying to predict it.
  */
-export const StatusActionBar: React.FC<StatusActionBarProps> = ({ busy, onSelect, status }) => {
+export const StatusActionBar: React.FC<StatusActionBarProps> = ({
+  busy,
+  noActionsFallback = null,
+  onSelect,
+  status,
+}) => {
   const { labels, transitionsFrom } = useReservationStatusMachine()
   const next = transitionsFrom(status)
 
   if (next.length === 0) {
-    return null
+    return noActionsFallback
   }
 
   return (

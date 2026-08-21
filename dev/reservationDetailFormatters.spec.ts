@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   formatCustomerName,
+  formatReservationDateLabel,
+  formatReservationTime,
   formatResourceNames,
 } from '../src/components/ReservationDetail/formatters.js'
 
@@ -69,5 +71,38 @@ describe('formatResourceNames', () => {
 
   it('returns an empty array when nothing is populated', () => {
     expect(formatResourceNames({ id: '1', startTime: '', status: '' })).toEqual([])
+  })
+})
+
+describe('formatReservationTime', () => {
+  it('formats an ISO instant as HH:mm in the given timezone', () => {
+    expect(formatReservationTime('2026-01-01T10:00:00.000Z', 'UTC')).toBe('10:00 AM')
+  })
+
+  it('respects a timezone override, not just UTC', () => {
+    // 10:00 UTC is 05:00 in America/New_York (EST, UTC-5, in January).
+    expect(formatReservationTime('2026-01-01T10:00:00.000Z', 'America/New_York')).toBe('05:00 AM')
+  })
+
+  it('returns the placeholder for an undefined input rather than throwing or "Invalid Date"', () => {
+    expect(formatReservationTime(undefined, 'UTC')).toBe('—')
+  })
+
+  it('returns the placeholder for an empty-string input', () => {
+    expect(formatReservationTime('', 'UTC')).toBe('—')
+  })
+})
+
+describe('formatReservationDateLabel', () => {
+  it('formats an ISO instant as a short weekday/day/month label', () => {
+    // 2026-01-01 is a Thursday.
+    expect(formatReservationDateLabel('2026-01-01T10:00:00.000Z', 'UTC')).toBe('Thu, Jan 1')
+  })
+
+  it('respects a timezone override that shifts the calendar day', () => {
+    // 2026-01-01T02:00:00Z is still 2025-12-31 in America/Los_Angeles (PST, UTC-8).
+    expect(formatReservationDateLabel('2026-01-01T02:00:00.000Z', 'America/Los_Angeles')).toBe(
+      'Wed, Dec 31',
+    )
   })
 })

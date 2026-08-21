@@ -36,6 +36,33 @@ describe('StatusActionBar', () => {
     expect(container.firstChild).toBeNull()
   })
 
+  it('renders noActionsFallback instead of nothing, when supplied, for a terminal status', () => {
+    configState.machine = DEFAULT_STATUS_MACHINE
+    render(
+      <StatusActionBar
+        noActionsFallback={<span>Nothing to do here</span>}
+        onSelect={vi.fn()}
+        status="completed"
+      />,
+    )
+
+    expect(screen.getByText('Nothing to do here')).toBeTruthy()
+  })
+
+  it('ignores noActionsFallback and renders the bar when transitions exist', () => {
+    configState.machine = DEFAULT_STATUS_MACHINE
+    render(
+      <StatusActionBar
+        noActionsFallback={<span>Nothing to do here</span>}
+        onSelect={vi.fn()}
+        status="pending"
+      />,
+    )
+
+    expect(screen.queryByText('Nothing to do here')).toBeNull()
+    expect(screen.getAllByRole('button')).toHaveLength(2)
+  })
+
   it('disables every button while busy, and a disabled button does not fire onSelect', () => {
     configState.machine = DEFAULT_STATUS_MACHINE
     const onSelect = vi.fn()
