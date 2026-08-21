@@ -3,14 +3,11 @@ import { useConfig, useTranslation } from '@payloadcms/ui'
 import { useCallback, useMemo } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
+import type { MutationResult } from '../../utilities/reservationPatch.js'
 
-import { extractErrorMessage } from '../../utilities/extractErrorMessage.js'
+import { performReservationPatch } from '../../utilities/reservationPatch.js'
 
-export type MutationResult = {
-  /** Ready to display: the server's own message on failure, a success string otherwise. */
-  message: string
-  ok: boolean
-}
+export type { MutationResult } from '../../utilities/reservationPatch.js'
 
 export type ReservationMutations = {
   /**
@@ -32,7 +29,10 @@ export type ReservationMutations = {
  * The server is the authority on which transitions are legal: `validateStatusTransition`
  * and `validateCancellation` both reject with a Payload `ValidationError` whose useful
  * text is nested (see `extractErrorMessage`). These functions never pre-judge a
- * transition — they attempt it and surface whatever the server says.
+ * transition — they attempt it and surface whatever the server says. The actual
+ * request/response handling lives in `performReservationPatch`
+ * (`src/utilities/reservationPatch.ts`) so it can be unit-tested without this hook's
+ * `@payloadcms/ui` dependency; this hook is a thin binding over it.
  */
 export function useReservationMutations(): ReservationMutations {
   const { config } = useConfig()
@@ -46,36 +46,17 @@ export function useReservationMutations(): ReservationMutations {
   }, [config])
 
   const patch = useCallback(
-    async (id: string, data: Record<string, unknown>): Promise<MutationResult> => {
-      let response: Response
-      try {
-        response = await fetch(`${apiUrl}/${id}`, {
-          body: JSON.stringify(data),
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          method: 'PATCH',
-        })
-      } catch {
-        return { message: t('reservation:detailNetworkError'), ok: false }
-      }
-
-      if (response.ok) {
-        return { message: t('reservation:detailStatusChanged'), ok: true }
-      }
-
-      // A non-JSON error body (a proxy 502, say) must not throw here.
-      let body: unknown = null
-      try {
-        body = await response.json()
-      } catch {
-        body = null
-      }
-
-      return {
-        message: extractErrorMessage(body, t('reservation:detailStatusFailed')),
-        ok: false,
-      }
-    },
+    (id: string, data: Record<string, unknown>): Promise<MutationResult> =>
+      performReservationPatch({
+        data,
+        fetchImpl: fetch,
+        messages: {
+          failure: t('reservation:detailStatusFailed'),
+          network: t('reservation:detailNetworkError'),
+          success: t('reservation:detailStatusChanged'),
+        },
+        url: `${apiUrl}/${id}`,
+      }),
     [apiUrl, t],
   )
 

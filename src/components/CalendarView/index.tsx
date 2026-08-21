@@ -473,7 +473,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       setActionFeedback({
         type: result.ok ? 'success' : 'error',
         // The server's own message on failure — a notice-period rejection used to
-        // render as the generic pendingCancelError string.
+        // render as the generic pendingConfirmError string.
         message: result.ok ? t('reservation:pendingConfirmSuccess') : result.message,
       })
       if (result.ok) {
