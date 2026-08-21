@@ -171,5 +171,10 @@
   "detailCancellationReason": "سبب الإلغاء",
   "detailEdit": "تعديل",
   "detailCancelPrompt": "لماذا يتم إلغاء هذا الحجز؟",
-  "detailNoActions": "لا توجد إجراءات متاحة من هذه الحالة."
+  "detailNoActions": "لا توجد إجراءات متاحة من هذه الحالة.",
+  "actionPending": "إعادة الفتح",
+  "actionConfirmed": "تأكيد",
+  "actionCompleted": "إكمال",
+  "actionCancelled": "إلغاء",
+  "actionNoShow": "تحديد كغياب"
 }

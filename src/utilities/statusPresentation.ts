@@ -1,4 +1,4 @@
-import { statusToI18nKey } from './i18nUtils.js'
+import { statusToActionI18nKey, statusToI18nKey } from './i18nUtils.js'
 
 export type StatusPresentation = {
   background: string
@@ -76,6 +76,30 @@ export function buildStatusLabels(
     const translated = t(key)
     // A missing translation returns the key itself — fall back to the raw status.
     labels[status] = translated !== key ? translated : titleCaseStatus(status)
+  }
+  return labels
+}
+
+/**
+ * Builds the ACTION label for each status — the verb a button that
+ * transitions TO this status should read (e.g. "Confirm" for `confirmed`),
+ * as opposed to `buildStatusLabels`' noun/adjective label for the status
+ * itself (e.g. "Confirmed").
+ *
+ * A status with no translated action falls back to its already-resolved
+ * status label (translated, or title-cased raw status), never straight to
+ * the raw status — `statusLabels` has already made that fallback decision.
+ */
+export function buildStatusActionLabels(
+  statuses: string[],
+  statusLabels: Record<string, string>,
+  t: (key: string) => string,
+): Record<string, string> {
+  const labels: Record<string, string> = {}
+  for (const status of statuses) {
+    const key = statusToActionI18nKey(status)
+    const translated = t(key)
+    labels[status] = translated !== key ? translated : (statusLabels[status] ?? status)
   }
   return labels
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildStatusActionLabels,
   buildStatusLabels,
   buildStatusPresentation,
   BUILTIN_STATUSES,
@@ -72,5 +73,51 @@ describe('buildStatusLabels', () => {
     expect(labels.completed).toBe('Completed')
     expect(labels.cancelled).toBe('Cancelled')
     expect(labels['no-show']).toBe('No Show')
+  })
+})
+
+describe('buildStatusActionLabels', () => {
+  const t = ((key: string) => key) as never
+  const statusLabels = buildStatusLabels(BUILTIN_STATUSES, t)
+
+  it('uses the translated action label when one exists, not the status label', () => {
+    const actionT = ((key: string) =>
+      key === 'reservation:actionConfirmed' ? 'Confirm' : key) as never
+    const actions = buildStatusActionLabels(['confirmed'], statusLabels, actionT)
+    expect(actions.confirmed).toBe('Confirm')
+  })
+
+  it('resolves the real action label for every built-in status', () => {
+    const realActionT = ((key: string) => {
+      const map: Record<string, string> = {
+        'reservation:actionCancelled': 'Cancel',
+        'reservation:actionCompleted': 'Complete',
+        'reservation:actionConfirmed': 'Confirm',
+        'reservation:actionNoShow': 'Mark no-show',
+        'reservation:actionPending': 'Reopen',
+      }
+      return map[key] ?? key
+    }) as never
+    const realStatusLabels = buildStatusLabels(BUILTIN_STATUSES, realActionT)
+    const actions = buildStatusActionLabels(BUILTIN_STATUSES, realStatusLabels, realActionT)
+    expect(actions.pending).toBe('Reopen')
+    expect(actions.confirmed).toBe('Confirm')
+    expect(actions.completed).toBe('Complete')
+    expect(actions.cancelled).toBe('Cancel')
+    expect(actions['no-show']).toBe('Mark no-show')
+  })
+
+  it('falls back to the already-resolved status label for a custom status with no action translation', () => {
+    const custom = buildStatusLabels(['voided'], t)
+    const actions = buildStatusActionLabels(['voided'], custom, t)
+    // No `reservation:actionVoided` translation exists, so it falls back to
+    // the status label — which itself already fell back to the title-cased
+    // raw status — not to the raw status directly.
+    expect(actions.voided).toBe('Voided')
+    expect(actions.voided).toBe(custom.voided)
+  })
+
+  it('returns an empty map for no statuses', () => {
+    expect(buildStatusActionLabels([], {}, t)).toEqual({})
   })
 })

@@ -171,5 +171,10 @@
   "detailCancellationReason": "Stornierungsgrund",
   "detailEdit": "Bearbeiten",
   "detailCancelPrompt": "Warum wird diese Reservierung storniert?",
-  "detailNoActions": "Für diesen Status sind keine Aktionen verfügbar."
+  "detailNoActions": "Für diesen Status sind keine Aktionen verfügbar.",
+  "actionPending": "Wieder öffnen",
+  "actionConfirmed": "Bestätigen",
+  "actionCompleted": "Abschließen",
+  "actionCancelled": "Stornieren",
+  "actionNoShow": "Als nicht erschienen markieren"
 }

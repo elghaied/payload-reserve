@@ -171,5 +171,10 @@
   "detailCancellationReason": "Motivo de cancelación",
   "detailEdit": "Editar",
   "detailCancelPrompt": "¿Por qué se cancela esta reserva?",
-  "detailNoActions": "No hay acciones disponibles desde este estado."
+  "detailNoActions": "No hay acciones disponibles desde este estado.",
+  "actionPending": "Reabrir",
+  "actionConfirmed": "Confirmar",
+  "actionCompleted": "Completar",
+  "actionCancelled": "Cancelar",
+  "actionNoShow": "Marcar como no presentado"
 }

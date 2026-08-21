@@ -38,10 +38,23 @@
   padding: 2px 7px;
 }
 
+/* Owns the rule and the top padding for the WHOLE footer row (StatusActionBar's
+   buttons plus the Edit button below), rather than StatusActionBar owning a
+   `.bar`-scoped border/padding of its own — that used to make the rule stop
+   short of Edit (it only spanned the action bar's box) and push only the
+   action-bar buttons down (Edit, a sibling with no matching top offset,
+   stayed flush with the top of the row). A single rule/padding applied once,
+   above both children, puts every footer button on the same baseline.
+   `align-items: baseline` handles the rest: without it, flex's default
+   `stretch` still lets each child's OWN content sit at a different height
+   inside its stretched box (a `<button>`'s text baseline isn't its box top). */
 .footer {
+  align-items: baseline;
+  border-top: 1px solid var(--theme-elevation-100);
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+  padding-top: 11px;
 }
 
 .feedback {

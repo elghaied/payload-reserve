@@ -171,5 +171,10 @@
   "detailCancellationReason": "Cancellation reason",
   "detailEdit": "Edit",
   "detailCancelPrompt": "Why is this reservation being cancelled?",
-  "detailNoActions": "No actions are available from this status."
+  "detailNoActions": "No actions are available from this status.",
+  "actionPending": "Reopen",
+  "actionConfirmed": "Confirm",
+  "actionCompleted": "Complete",
+  "actionCancelled": "Cancel",
+  "actionNoShow": "Mark no-show"
 }

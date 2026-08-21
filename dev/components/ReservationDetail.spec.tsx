@@ -85,8 +85,8 @@ describe('ReservationDetail', () => {
     expect(screen.getByText('Chair 1')).toBeTruthy()
     expect(screen.getByText('Jane Doe')).toBeTruthy()
     // pending -> [confirmed, cancelled]
-    expect(screen.getByRole('button', { name: 'Confirmed' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Cancelled' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
   })
 
   it('shows the guest name in place of a customer for a guest booking', () => {
@@ -110,7 +110,7 @@ describe('ReservationDetail', () => {
     const refresh = vi.fn()
     const { rerender } = renderDetail(baseDoc, { refresh })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmed' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await screen.findByRole('status')
     expect(screen.getByText('Status updated.')).toBeTruthy()
 
@@ -119,7 +119,7 @@ describe('ReservationDetail', () => {
 
     expect(screen.queryByRole('status')).toBeNull()
     // busy also reset: the fresh doc's buttons are not stuck disabled.
-    expect(screen.getByRole('button', { name: 'Confirmed' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Confirm' })).not.toBeDisabled()
   })
 
   it('does not paint a late-resolving mutation result onto a different, already-open doc', async () => {
@@ -132,9 +132,9 @@ describe('ReservationDetail', () => {
     const refresh = vi.fn()
     const { rerender } = renderDetail(baseDoc, { refresh })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmed' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     // Busy while the request against res-1 is still in flight.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirmed' })).toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled())
 
     const otherDoc: CalendarReservation = { ...baseDoc, id: 'res-2', status: 'pending' }
     rerenderDetail(rerender, otherDoc, { refresh })
@@ -149,7 +149,7 @@ describe('ReservationDetail', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
     // ...but nothing writes into res-2's banner, and res-2 isn't left busy.
     expect(screen.queryByRole('status')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Confirmed' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Confirm' })).not.toBeDisabled()
   })
 
   it('does not paint a stale result when the same reservation is closed and reopened while a mutation is in flight', async () => {
@@ -162,15 +162,15 @@ describe('ReservationDetail', () => {
     const refresh = vi.fn()
     const { rerender } = renderDetail(baseDoc, { refresh })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmed' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     // Busy while the request against res-1 is still in flight.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirmed' })).toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled())
 
     // Close the drawer (doc goes null), then reopen the SAME reservation
     // before the in-flight request resolves.
     rerenderDetail(rerender, null, { refresh })
     rerenderDetail(rerender, baseDoc, { refresh })
-    expect(screen.getByRole('button', { name: 'Confirmed' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Confirm' })).not.toBeDisabled()
 
     // Now let the stale request from the first open resolve.
     resolveFetch(jsonResponse(null, 200))
@@ -180,7 +180,7 @@ describe('ReservationDetail', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
     // ...but the reopened drawer must not show its stale feedback or be left busy.
     expect(screen.queryByRole('status')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Confirmed' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Confirm' })).not.toBeDisabled()
   })
 
   it('prompts for a reason when cancelling, and sends it', async () => {
@@ -189,7 +189,7 @@ describe('ReservationDetail', () => {
     vi.spyOn(window, 'prompt').mockReturnValue('Client requested refund')
 
     renderDetail(baseDoc)
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelled' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(window.prompt).toHaveBeenCalledWith('Why is this reservation being cancelled?')
     await screen.findByRole('status')
@@ -206,7 +206,7 @@ describe('ReservationDetail', () => {
     vi.spyOn(window, 'prompt').mockReturnValue(null)
 
     renderDetail(baseDoc)
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelled' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(window.prompt).toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
@@ -229,7 +229,7 @@ describe('ReservationDetail', () => {
     vi.spyOn(window, 'prompt').mockReturnValue('reason')
 
     renderDetail(baseDoc)
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelled' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     const banner = await screen.findByRole('status')
     expect(banner.textContent).toBe('You must cancel at least 24 hours in advance.')

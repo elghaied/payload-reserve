@@ -171,5 +171,10 @@
   "detailCancellationReason": "取消原因",
   "detailEdit": "编辑",
   "detailCancelPrompt": "为什么要取消此预约？",
-  "detailNoActions": "此状态下没有可用操作。"
+  "detailNoActions": "此状态下没有可用操作。",
+  "actionPending": "重新打开",
+  "actionConfirmed": "确认",
+  "actionCompleted": "完成",
+  "actionCancelled": "取消",
+  "actionNoShow": "标记为未到店"
 }

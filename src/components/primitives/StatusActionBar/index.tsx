@@ -34,7 +34,7 @@ export const StatusActionBar: React.FC<StatusActionBarProps> = ({
   onSelect,
   status,
 }) => {
-  const { labels, transitionsFrom } = useReservationStatusMachine()
+  const { actionLabels, transitionsFrom } = useReservationStatusMachine()
   const next = transitionsFrom(status)
 
   if (next.length === 0) {
@@ -51,7 +51,7 @@ export const StatusActionBar: React.FC<StatusActionBarProps> = ({
           onClick={() => onSelect(target)}
           type="button"
         >
-          {labels[target] ?? target}
+          {actionLabels[target] ?? target}
         </button>
       ))}
     </div>

@@ -604,7 +604,18 @@
   padding: 1px 4px;
 }
 
+/* The Drawer's own content width is controlled by Payload's JS
+   (`calc(100% - depth * gutter)`) and is essentially full-viewport at depth 1
+   — that's Payload's own behaviour (its document drawer does the same) and
+   is not something this plugin overrides. What IS ours to fix is that our
+   content doesn't cope with that width: a label/value row stretched across
+   ~1900px reads as two words with a canyon between them. Capping the
+   measure here (not centering it — the drawer already reads left-to-right
+   from its own left edge) keeps every row scannable regardless of viewport.
+   This wraps whatever renders in the drawer body — the built-in
+   ReservationDetail AND a consumer's own `detailSlot` — so both benefit. */
 .detailDrawerBody {
+  max-width: 600px;
   padding: 4px 0 8px;
 }
 

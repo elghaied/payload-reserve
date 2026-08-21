@@ -30,6 +30,7 @@ export type {
   ResourceOption,
 } from '../components/shared/types.js'
 export {
+  buildStatusActionLabels,
   buildStatusLabels,
   buildStatusPresentation,
   BUILTIN_STATUSES,

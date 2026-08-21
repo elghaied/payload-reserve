@@ -72,6 +72,7 @@ Every row's value shares a right edge, so the drawer scans top-to-bottom in one 
 
 **Footer:** transition buttons for every status reachable from the current one, per the configured status machine, plus **Edit**.
 
+- **Buttons are labelled as actions, not as the target status name.** A button that transitions a reservation to `confirmed` reads **Confirm**, not "Confirmed" — the five built-in statuses (`pending`, `confirmed`, `completed`, `cancelled`, `no-show`) get **Reopen**, **Confirm**, **Complete**, **Cancel**, and **Mark no-show** respectively. A custom status with no matching translation falls back to its status label (and from there to the title-cased raw status), exactly like `buildStatusLabels` already does — never to a blank or missing button text. `useReservationStatusMachine` exposes this mapping as `actionLabels`, and `buildStatusActionLabels` (exported from `payload-reserve/client` and the package root) is the pure helper it's built from, for anyone composing a replacement action bar.
 - **There is deliberately no separate "Cancel" button.** The transition targeting the configured `cancelStatus` raises a `window.prompt` asking for a cancellation reason before submitting. This is what keeps the drawer working unmodified with a custom status vocabulary — there is no hardcoded `'cancelled'` anywhere in it, only the machine's own `cancelStatus`.
 - **The buttons are candidates, not permissions.** The drawer renders whatever the status machine says is reachable from the current status; it does not predict whether the server will accept the transition. The server (`validateStatusTransition`, `validateCancellation`) is the sole authority, and a refusal is surfaced to the user as the server's own message — for example, a cancellation attempted inside the notice period now shows "Cancellations require at least N hours notice…" instead of Payload's generic "The following field is invalid: status".
 - **Edit** closes the detail drawer and opens the existing document edit drawer, unchanged from before this feature — nothing about editing a reservation's raw fields is different.
@@ -210,7 +211,7 @@ If you also replace `calendarView` with your own component, nothing renders your
 | `ReservationDetail` | component | the built-in detail-drawer body |
 | `ReservationDetailProvider` | component | supplies `useReservationDetail()` to its subtree — needed only if you replace `calendarView` too |
 | `useReservationDetail` | hook | `() => { doc, close, refresh }` — the open reservation (or `null`), and drawer controls |
-| `useReservationStatusMachine` | hook | `() => { statuses, defaultStatus, cancelStatus, confirmStatus, labels, presentation, transitionsFrom }` — the resolved status machine plus derived labels/colours |
+| `useReservationStatusMachine` | hook | `() => { statuses, defaultStatus, cancelStatus, confirmStatus, labels, actionLabels, presentation, transitionsFrom }` — the resolved status machine plus derived labels/colours; `actionLabels` is the action-verb label for a button transitioning TO that status (`confirmed` -> "Confirm"), as opposed to `labels`' label for the status itself (`confirmed` -> "Confirmed") |
 | `useReservationMutations` | hook | `() => { transition, cancel }` — performs a status-change `PATCH` against the reservation and reports the outcome |
 | `StatusBadge` | component | a status pill — `{ label, presentation? }` |
 | `DetailRow` | component | one label/value line — `{ label, value?, children? }` |
@@ -222,6 +223,7 @@ If you also replace `calendarView` with your own component, nothing renders your
 | `StatusPresentation` | type | `{ background, foreground }` colour pair for one status |
 | `BUILTIN_STATUSES` | value | the five built-in status strings, for `buildStatusPresentation`/`buildStatusLabels` |
 | `buildStatusLabels` | function | `(statuses, t) => Record<string, string>` — translated labels, falling back to the raw string for a custom status with no translation |
+| `buildStatusActionLabels` | function | `(statuses, statusLabels, t) => Record<string, string>` — translated action-verb labels (`confirmed` -> "Confirm"), falling back to the already-resolved `statusLabels` entry (never straight to the raw status) for a custom status with no matching translation |
 | `buildStatusPresentation` | function | `(statuses) => Record<string, StatusPresentation>` — colour assignment; see the palette note below |
 
 Each component and hook above also exports its own prop/return type by name (`StatusBadgeProps`, `DetailRowProps`, `EventPillProps`, `StatusActionBarProps`, `ReservationDetailProps`, `ReservationDetailContextValue`, `ReservationStatusMachine`, `ReservationMutations`, `MutationResult`) — not enumerated separately above, but discoverable from `payload-reserve/client`'s own type exports if you're typing a wrapper around one of them.

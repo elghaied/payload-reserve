@@ -8,12 +8,15 @@ import type { StatusPresentation } from '../../utilities/statusPresentation.js'
 
 import { deriveCancelConfirm } from '../../utilities/statusMachineFallback.js'
 import {
+  buildStatusActionLabels,
   buildStatusLabels,
   buildStatusPresentation,
   BUILTIN_STATUSES,
 } from '../../utilities/statusPresentation.js'
 
 export type ReservationStatusMachine = {
+  /** The action-verb label for a button transitioning TO this status, e.g. `confirmed` -> "Confirm". */
+  actionLabels: Record<string, string>
   cancelStatus: string
   confirmStatus: string
   defaultStatus: string
@@ -41,12 +44,14 @@ export function useReservationStatusMachine(): ReservationStatusMachine {
     const defaultStatus = machine?.defaultStatus ?? 'pending'
     const { cancelStatus, confirmStatus } = deriveCancelConfirm(machine, defaultStatus)
     const transitions = machine?.transitions ?? {}
+    const labels = buildStatusLabels(statuses, t)
 
     return {
+      actionLabels: buildStatusActionLabels(statuses, labels, t),
       cancelStatus,
       confirmStatus,
       defaultStatus,
-      labels: buildStatusLabels(statuses, t),
+      labels,
       presentation: buildStatusPresentation(statuses),
       statuses,
       transitionsFrom: (status: string) => transitions[status] ?? [],

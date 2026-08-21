@@ -34,6 +34,7 @@ export { resolveReservationItems } from './utilities/resolveReservationItems.js'
 export { buildSelectOptions } from './utilities/selectOptions.js'
 export { intersectIntervals } from './utilities/slotUtils.js'
 export {
+  buildStatusActionLabels,
   buildStatusLabels,
   buildStatusPresentation,
   BUILTIN_STATUSES,

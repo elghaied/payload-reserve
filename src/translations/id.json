@@ -171,5 +171,10 @@
   "detailCancellationReason": "Alasan Pembatalan",
   "detailEdit": "Edit",
   "detailCancelPrompt": "Mengapa reservasi ini dibatalkan?",
-  "detailNoActions": "Tidak ada tindakan yang tersedia dari status ini."
+  "detailNoActions": "Tidak ada tindakan yang tersedia dari status ini.",
+  "actionPending": "Buka kembali",
+  "actionConfirmed": "Konfirmasi",
+  "actionCompleted": "Selesaikan",
+  "actionCancelled": "Batalkan",
+  "actionNoShow": "Tandai tidak hadir"
 }

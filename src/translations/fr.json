@@ -171,5 +171,10 @@
   "detailCancellationReason": "Motif d'annulation",
   "detailEdit": "Modifier",
   "detailCancelPrompt": "Pourquoi cette réservation est-elle annulée ?",
-  "detailNoActions": "Aucune action disponible depuis ce statut."
+  "detailNoActions": "Aucune action disponible depuis ce statut.",
+  "actionPending": "Rouvrir",
+  "actionConfirmed": "Confirmer",
+  "actionCompleted": "Terminer",
+  "actionCancelled": "Annuler",
+  "actionNoShow": "Marquer comme absence"
 }

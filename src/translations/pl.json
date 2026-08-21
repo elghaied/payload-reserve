@@ -171,5 +171,10 @@
   "detailCancellationReason": "Powód anulowania",
   "detailEdit": "Edytuj",
   "detailCancelPrompt": "Dlaczego ta rezerwacja jest anulowana?",
-  "detailNoActions": "Brak dostępnych akcji dla tego statusu."
+  "detailNoActions": "Brak dostępnych akcji dla tego statusu.",
+  "actionPending": "Otwórz ponownie",
+  "actionConfirmed": "Potwierdź",
+  "actionCompleted": "Zakończ",
+  "actionCancelled": "Anuluj",
+  "actionNoShow": "Oznacz jako nieobecność"
 }

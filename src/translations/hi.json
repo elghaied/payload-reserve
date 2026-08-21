@@ -171,5 +171,10 @@
   "detailCancellationReason": "रद्दीकरण का कारण",
   "detailEdit": "संपादित करें",
   "detailCancelPrompt": "यह आरक्षण क्यों रद्द किया जा रहा है?",
-  "detailNoActions": "इस स्थिति से कोई कार्रवाई उपलब्ध नहीं है।"
+  "detailNoActions": "इस स्थिति से कोई कार्रवाई उपलब्ध नहीं है।",
+  "actionPending": "फिर से खोलें",
+  "actionConfirmed": "पुष्टि करें",
+  "actionCompleted": "पूर्ण करें",
+  "actionCancelled": "रद्द करें",
+  "actionNoShow": "अनुपस्थित के रूप में चिह्नित करें"
 }

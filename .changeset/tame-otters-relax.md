@@ -115,3 +115,30 @@ are unaffected — their exact background/foreground pairs were carried over ver
   transitions, so a caller wanting a "no actions available" message doesn't have to
   re-derive that check itself. Fully backward compatible: omitting it preserves the
   existing render-nothing behaviour exactly.
+
+### Fixes from first real use
+
+- **The detail drawer's rows are now width-constrained instead of stretching across the
+  full viewport.** Payload's `Drawer` sets its content width by design (`calc(100% -
+  depth * gutter)`, essentially full-viewport at depth 1 — the same as Payload's own
+  document drawer), so at a wide viewport each label/value row used to read as two words
+  separated by an enormous gap. The drawer body now caps its measure at 600px,
+  left-aligned, so rows stay comfortably scannable regardless of viewport width. This
+  applies to a consumer's own `detailSlot` replacement too, not only the built-in
+  `ReservationDetail` — both render inside the same drawer-side wrapper.
+- **Footer buttons (the status action bar plus Edit) now sit on one baseline under a
+  single full-width rule**, instead of the rule stopping short of Edit and Edit sitting
+  higher than the other buttons. `StatusActionBar` no longer draws its own border/padding
+  above its buttons — that responsibility moved to `ReservationDetail`'s footer, which now
+  owns the single rule spanning the whole row. `StatusActionBar` is otherwise unaffected
+  and still renders correctly when used standalone (it is exported from
+  `payload-reserve/client` for exactly that use).
+- **Footer buttons are now labelled as actions, not as the target status name** — e.g. a
+  button that moves a reservation to `confirmed` now reads **Confirm** rather than
+  "Confirmed". The five built-in statuses get **Reopen** (back to `pending`), **Confirm**,
+  **Complete**, **Cancel**, and **Mark no-show**. A custom status with no matching
+  translation falls back to its existing status label, then the title-cased raw status,
+  exactly like the existing status-label fallback. `useReservationStatusMachine` exposes
+  this mapping as `actionLabels`; the pure helper it's built from, `buildStatusActionLabels`,
+  is newly exported from `payload-reserve/client` and the package root for anyone composing
+  a replacement action bar.

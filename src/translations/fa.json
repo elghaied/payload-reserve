@@ -171,5 +171,10 @@
   "detailCancellationReason": "دلیل لغو",
   "detailEdit": "ویرایش",
   "detailCancelPrompt": "چرا این رزرو لغو می‌شود؟",
-  "detailNoActions": "هیچ اقدامی از این وضعیت در دسترس نیست."
+  "detailNoActions": "هیچ اقدامی از این وضعیت در دسترس نیست.",
+  "actionPending": "بازگشایی",
+  "actionConfirmed": "تأیید",
+  "actionCompleted": "تکمیل",
+  "actionCancelled": "لغو",
+  "actionNoShow": "علامت‌گذاری به‌عنوان عدم حضور"
 }

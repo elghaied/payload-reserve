@@ -171,5 +171,10 @@
   "detailCancellationReason": "İptal Nedeni",
   "detailEdit": "Düzenle",
   "detailCancelPrompt": "Bu rezervasyon neden iptal ediliyor?",
-  "detailNoActions": "Bu durumdan kullanılabilir bir işlem yok."
+  "detailNoActions": "Bu durumdan kullanılabilir bir işlem yok.",
+  "actionPending": "Yeniden aç",
+  "actionConfirmed": "Onayla",
+  "actionCompleted": "Tamamla",
+  "actionCancelled": "İptal Et",
+  "actionNoShow": "Gelmedi olarak işaretle"
 }

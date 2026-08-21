@@ -1,9 +1,13 @@
+/* Deliberately no border/top-padding here: this component is exported
+   standalone (`payload-reserve/client`) and must render correctly on its
+   own, so it owns only its own buttons, not a separator that assumes a
+   sibling above it. A caller that renders this next to other footer content
+   (see `ReservationDetail`'s `.footer`) is the one who owns the rule that
+   spans the whole row. */
 .bar {
-  border-top: 1px solid var(--theme-elevation-100);
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  padding: 11px 0 0;
 }
 
 .button {
