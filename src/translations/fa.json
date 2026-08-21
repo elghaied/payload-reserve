@@ -158,5 +158,8 @@
   "slotFree": "آزاد",
   "slotFull": "پر",
   "slotOffShift": "خارج از شیفت",
-  "slotTimeOff": "مرخصی"
+  "slotTimeOff": "مرخصی",
+  "detailStatusChanged": "وضعیت به‌روزرسانی شد.",
+  "detailStatusFailed": "به‌روزرسانی وضعیت ممکن نشد.",
+  "detailNetworkError": "اتصال به سرور ممکن نشد. اتصال خود را بررسی کرده و دوباره تلاش کنید."
 }

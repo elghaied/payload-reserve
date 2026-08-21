@@ -158,5 +158,8 @@
   "slotFree": "空闲",
   "slotFull": "已满",
   "slotOffShift": "非排班时段",
-  "slotTimeOff": "休假"
+  "slotTimeOff": "休假",
+  "detailStatusChanged": "状态已更新。",
+  "detailStatusFailed": "无法更新状态。",
+  "detailNetworkError": "无法连接到服务器。请检查您的网络连接后重试。"
 }

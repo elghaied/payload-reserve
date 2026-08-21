@@ -158,5 +158,8 @@
   "slotFree": "Free",
   "slotFull": "Full",
   "slotOffShift": "Off shift",
-  "slotTimeOff": "Time off"
+  "slotTimeOff": "Time off",
+  "detailStatusChanged": "Status updated.",
+  "detailStatusFailed": "Could not update the status.",
+  "detailNetworkError": "Could not reach the server. Check your connection and try again."
 }

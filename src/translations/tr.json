@@ -158,5 +158,8 @@
   "slotFree": "Boş",
   "slotFull": "Dolu",
   "slotOffShift": "Mesai dışı",
-  "slotTimeOff": "İzin"
+  "slotTimeOff": "İzin",
+  "detailStatusChanged": "Durum güncellendi.",
+  "detailStatusFailed": "Durum güncellenemedi.",
+  "detailNetworkError": "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin."
 }

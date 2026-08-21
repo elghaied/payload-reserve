@@ -158,5 +158,8 @@
   "slotFree": "Libre",
   "slotFull": "Completo",
   "slotOffShift": "Fuera de turno",
-  "slotTimeOff": "Ausencia"
+  "slotTimeOff": "Ausencia",
+  "detailStatusChanged": "Estado actualizado.",
+  "detailStatusFailed": "No se pudo actualizar el estado.",
+  "detailNetworkError": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo."
 }

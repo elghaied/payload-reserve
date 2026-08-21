@@ -158,5 +158,8 @@
   "slotFree": "Свободно",
   "slotFull": "Занято",
   "slotOffShift": "Не в смене",
-  "slotTimeOff": "Отгул"
+  "slotTimeOff": "Отгул",
+  "detailStatusChanged": "Статус обновлён.",
+  "detailStatusFailed": "Не удалось обновить статус.",
+  "detailNetworkError": "Не удалось подключиться к серверу. Проверьте соединение и повторите попытку."
 }

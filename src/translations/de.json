@@ -158,5 +158,8 @@
   "slotFree": "Frei",
   "slotFull": "Ausgebucht",
   "slotOffShift": "Außer Dienst",
-  "slotTimeOff": "Abwesend"
+  "slotTimeOff": "Abwesend",
+  "detailStatusChanged": "Status aktualisiert.",
+  "detailStatusFailed": "Der Status konnte nicht aktualisiert werden.",
+  "detailNetworkError": "Der Server konnte nicht erreicht werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut."
 }

@@ -25,6 +25,7 @@ import {
   getHourInTimezone,
 } from '../../utilities/timezoneUtils.js'
 import { useTenantFilter } from '../../utilities/useTenantFilter.js'
+import { useReservationMutations } from '../hooks/useReservationMutations.js'
 import styles from './CalendarView.module.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
 import { useResourceAvailability } from './useResourceAvailability.js'
@@ -122,6 +123,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const resourceSlug = slugs?.resources ?? 'resources'
   const reservationTenantParams = useTenantFilter(reservationSlug)
   const resourceTenantParams = useTenantFilter(resourceSlug)
+  const { cancel: cancelReservation, transition: transitionReservation } = useReservationMutations()
 
   // Day-boundary rendering uses the business timezone. In multiTenant mode that's
   // the SELECTED tenant's zone, resolved server-side from the tenant cookie (the
@@ -458,39 +460,23 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     return () => clearTimeout(timer)
   }, [actionFeedback])
 
-  const patchReservation = useCallback(
-    async (id: string, data: Record<string, unknown>): Promise<boolean> => {
-      try {
-        const response = await fetch(`${apiUrl}/${id}`, {
-          body: JSON.stringify(data),
-          headers: { 'Content-Type': 'application/json' },
-          method: 'PATCH',
-        })
-        return response.ok
-      } catch {
-        return false
-      }
-    },
-    [apiUrl],
-  )
-
   // Uses confirmStatus derived from config transitions
   const handleQuickConfirm = useCallback(
     async (id: string) => {
       setConfirmingIds((prev) => new Set(prev).add(id))
-      const ok = await patchReservation(id, { status: confirmStatus })
+      const result = await transitionReservation(id, confirmStatus)
       setConfirmingIds((prev) => {
         const next = new Set(prev)
         next.delete(id)
         return next
       })
       setActionFeedback({
-        type: ok ? 'success' : 'error',
-        message: ok
-          ? t('reservation:pendingConfirmSuccess')
-          : t('reservation:pendingConfirmError'),
+        type: result.ok ? 'success' : 'error',
+        // The server's own message on failure — a notice-period rejection used to
+        // render as the generic pendingCancelError string.
+        message: result.ok ? t('reservation:pendingConfirmSuccess') : result.message,
       })
-      if (ok) {
+      if (result.ok) {
         setSelectedIds((prev) => {
           const next = new Set(prev)
           next.delete(id)
@@ -500,26 +486,26 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         void fetchPendingCount()
       }
     },
-    [patchReservation, fetchPendingReservations, fetchPendingCount, t, confirmStatus],
+    [transitionReservation, fetchPendingReservations, fetchPendingCount, t, confirmStatus],
   )
 
   // Uses cancelStatus derived from config transitions
   const handleQuickCancel = useCallback(
     async (id: string) => {
       setConfirmingIds((prev) => new Set(prev).add(id))
-      const ok = await patchReservation(id, { status: cancelStatus })
+      const result = await cancelReservation(id, cancelStatus)
       setConfirmingIds((prev) => {
         const next = new Set(prev)
         next.delete(id)
         return next
       })
       setActionFeedback({
-        type: ok ? 'success' : 'error',
-        message: ok
-          ? t('reservation:pendingCancelSuccess')
-          : t('reservation:pendingCancelError'),
+        type: result.ok ? 'success' : 'error',
+        // The server's own message on failure — a notice-period rejection used to
+        // render as the generic pendingCancelError string.
+        message: result.ok ? t('reservation:pendingCancelSuccess') : result.message,
       })
-      if (ok) {
+      if (result.ok) {
         setSelectedIds((prev) => {
           const next = new Set(prev)
           next.delete(id)
@@ -529,7 +515,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         void fetchPendingCount()
       }
     },
-    [patchReservation, fetchPendingReservations, fetchPendingCount, t, cancelStatus],
+    [cancelReservation, fetchPendingReservations, fetchPendingCount, t, cancelStatus],
   )
 
   const confirmSelected = useCallback(async () => {
@@ -543,7 +529,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     })
 
     const results = await Promise.allSettled(
-      ids.map((id) => patchReservation(id, { status: confirmStatus })),
+      ids.map((id) => transitionReservation(id, confirmStatus).then((r) => r.ok)),
     )
 
     setConfirmingIds((prev) => {
@@ -574,7 +560,14 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     setSelectedIds(new Set())
     void fetchPendingReservations()
     void fetchPendingCount()
-  }, [selectedIds, patchReservation, fetchPendingReservations, fetchPendingCount, t, confirmStatus])
+  }, [
+    selectedIds,
+    transitionReservation,
+    fetchPendingReservations,
+    fetchPendingCount,
+    t,
+    confirmStatus,
+  ])
 
   const handleEventClick = useCallback(
     (e: React.MouseEvent, id: string) => {

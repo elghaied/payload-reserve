@@ -158,5 +158,8 @@
   "slotFree": "متاح",
   "slotFull": "ممتلئ",
   "slotOffShift": "خارج الدوام",
-  "slotTimeOff": "إجازة"
+  "slotTimeOff": "إجازة",
+  "detailStatusChanged": "تم تحديث الحالة.",
+  "detailStatusFailed": "تعذر تحديث الحالة.",
+  "detailNetworkError": "تعذر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى."
 }

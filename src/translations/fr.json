@@ -158,5 +158,8 @@
   "slotFree": "Libre",
   "slotFull": "Complet",
   "slotOffShift": "Hors service",
-  "slotTimeOff": "Congé"
+  "slotTimeOff": "Congé",
+  "detailStatusChanged": "Statut mis à jour.",
+  "detailStatusFailed": "Impossible de mettre à jour le statut.",
+  "detailNetworkError": "Impossible de contacter le serveur. Vérifiez votre connexion et réessayez."
 }

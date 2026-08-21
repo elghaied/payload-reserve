@@ -158,5 +158,8 @@
   "slotFree": "Kosong",
   "slotFull": "Penuh",
   "slotOffShift": "Di luar jam kerja",
-  "slotTimeOff": "Cuti"
+  "slotTimeOff": "Cuti",
+  "detailStatusChanged": "Status diperbarui.",
+  "detailStatusFailed": "Status tidak dapat diperbarui.",
+  "detailNetworkError": "Tidak dapat menjangkau server. Periksa koneksi Anda dan coba lagi."
 }

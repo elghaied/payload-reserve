@@ -158,5 +158,8 @@
   "slotFree": "खाली",
   "slotFull": "भरा हुआ",
   "slotOffShift": "शिफ़्ट से बाहर",
-  "slotTimeOff": "अवकाश"
+  "slotTimeOff": "अवकाश",
+  "detailStatusChanged": "स्थिति अपडेट की गई।",
+  "detailStatusFailed": "स्थिति अपडेट नहीं की जा सकी।",
+  "detailNetworkError": "सर्वर तक नहीं पहुंचा जा सका। अपना कनेक्शन जांचें और पुनः प्रयास करें।"
 }
