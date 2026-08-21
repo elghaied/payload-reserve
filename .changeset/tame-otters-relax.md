@@ -4,7 +4,7 @@
 
 feat(calendar): add a reservation detail drawer and a `components` option for customising six admin components
 
-## ⚠️ Action required after upgrading — even if you never touch the new `components` option
+### ⚠️ Action required after upgrading — even if you never touch the new `components` option
 
 The Reservations list view's default component changed from `payload-reserve/client#CalendarView`
 to `payload-reserve/rsc#CalendarViewServer`. Payload resolves every admin component path through

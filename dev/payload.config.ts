@@ -34,6 +34,21 @@ const MT = Boolean(process.env.MT)
 // pointed at dev/components/ReservationDetailFixture.tsx, so e2e can assert a
 // consumer-supplied component really renders inside the drawer. Unset, this
 // changes nothing.
+//
+// Footgun: the committed dev/app/(payload)/admin/importMap.js is the GATED
+// superset — it was generated with RESERVE_DETAIL_SLOT=1 set, so it includes
+// the fixture's import-map entry. Running a plain `pnpm dev:generate-importmap`
+// (gate unset) regenerates that file WITHOUT the fixture entry, silently
+// breaking the gated e2e test ("a consumer-supplied components.reservationDetail
+// component renders in place of the plugin body"). Always regenerate with
+// `RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap` to keep the committed
+// map gated. This has been hit in practice, not just theorized: an ungated
+// `pnpm dev` left running (or anything that touches its config/build cache)
+// can leave the committed file stripped down to the ungated set with no
+// obvious cause in your own shell history. Before committing any change
+// touching this file or this fixture, run `git diff -- "dev/app/(payload)/admin/importMap.js"`
+// and expect NO diff; if there is one, restore it with `git checkout --` or
+// regenerate with the gate set, never commit the ungated version.
 const RESERVE_DETAIL_SLOT = Boolean(process.env.RESERVE_DETAIL_SLOT)
 
 const buildConfigWithMemoryDB = async () => {

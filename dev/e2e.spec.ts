@@ -670,8 +670,11 @@ async function apiFindOne(page: Page, collection: string, name: string): Promise
   const res = await page.request.get(`/api/${collection}`, {
     params: { limit: '1', 'where[name][equals]': name },
   })
-  const body = (await res.json()) as { docs: Array<{ id: string }> }
-  if (!body.docs[0]) {
+  const body = (await res.json()) as { docs?: Array<{ id: string }> }
+  // Guard the shape before indexing: on a non-2xx response `body.docs` is
+  // undefined (Payload returns an `errors` array instead), and indexing it
+  // directly throws a TypeError that hides the deliberate message below.
+  if (!body.docs?.[0]) {
     throw new Error(`No ${collection} named "${name}" found — check dev/seed.ts.`)
   }
   return body.docs[0]
@@ -721,31 +724,63 @@ async function createTestReservation(
 // earlier run — this is a real, reproducible failure this suite hit: a prior
 // run's uncleaned reservation for the same resource landed inside the next
 // run's buffered window and "All units are booked for this time" rejected the
-// new create outright. Cleanup runs in a `finally` so it happens even when an
-// assertion above throws (including under CI's retries).
+// new create outright. A failed (non-2xx) delete is not swallowed silently —
+// it's logged, so a leftover row shows up in test output instead of just
+// resurfacing as a mystery "All units are booked" failure later.
 async function deleteTestReservation(page: Page, id: string): Promise<void> {
-  await page.request.delete(`/api/reservations/${id}`).catch(() => undefined)
+  try {
+    const res = await page.request.delete(`/api/reservations/${id}`)
+    if (!res.ok()) {
+      // eslint-disable-next-line no-console
+      console.warn(`deleteTestReservation: DELETE /api/reservations/${id} returned ${res.status()}`)
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`deleteTestReservation: DELETE /api/reservations/${id} threw`, err)
+  }
 }
 
-test('a status action in the reservation detail drawer transitions the reservation and the calendar reflects it', async ({
-  page,
-}) => {
-  await loginAsAdmin(page)
+test.describe('reservation detail drawer status actions', () => {
+  // Cleanup lives in `afterEach`, not an inline `try/finally`, because
+  // Playwright's default 30s test timeout (playwright.config.js sets none)
+  // can fire mid-test — a hard timeout unwinds past a `finally` block just
+  // like it would past any other code, since the test function itself is
+  // abandoned. `afterEach` runs on its own budget regardless, so a timed-out
+  // attempt still gets its reservation deleted, which matters under CI's
+  // `retries: 2`: an undeleted row from a timed-out attempt is exactly the
+  // kind of leftover that made the immediately-following retry's create fail
+  // with "All units are booked for this time", re-arming the collision this
+  // cleanup exists to prevent.
+  const createdReservationIds: string[] = []
 
-  const service = await apiFindOne(page, 'services', 'Haircut')
-  const resource = await apiFindOne(page, 'resources', 'Alice Johnson')
-  const customer = await createTestCustomer(page, 'StatusAction')
-  // A few hours out (today) — inside the calendar's month-view grid on load,
-  // with no navigation required, and status-transition behaviour doesn't
-  // depend on notice period.
-  const reservation = await createTestReservation(page, {
-    customerId: customer.id,
-    hoursFromNow: 3,
-    resourceId: resource.id,
-    serviceId: service.id,
+  test.afterEach(async ({ page }) => {
+    while (createdReservationIds.length > 0) {
+      const id = createdReservationIds.pop()
+      if (id) {
+        await deleteTestReservation(page, id)
+      }
+    }
   })
 
-  try {
+  test('a status action in the reservation detail drawer transitions the reservation and the calendar reflects it', async ({
+    page,
+  }) => {
+    await loginAsAdmin(page)
+
+    const service = await apiFindOne(page, 'services', 'Haircut')
+    const resource = await apiFindOne(page, 'resources', 'Alice Johnson')
+    const customer = await createTestCustomer(page, 'StatusAction')
+    // A few hours out (today) — inside the calendar's month-view grid on load,
+    // with no navigation required, and status-transition behaviour doesn't
+    // depend on notice period.
+    const reservation = await createTestReservation(page, {
+      customerId: customer.id,
+      hoursFromNow: 3,
+      resourceId: resource.id,
+      serviceId: service.id,
+    })
+    createdReservationIds.push(reservation.id)
+
     await page.goto('/admin/collections/reservations')
     await page.waitForSelector('text="Pending"', { timeout: 15_000 })
 
@@ -763,28 +798,25 @@ test('a status action in the reservation detail drawer transitions the reservati
     // The calendar's own data reflects the change with no reload: the same
     // event pill's tooltip flips from Pending to Confirmed.
     await expect(event).toHaveAttribute('title', /Status: Confirmed/, { timeout: 10_000 })
-  } finally {
-    await deleteTestReservation(page, reservation.id)
-  }
-})
-
-test('cancelling inside the notice period shows the real sentence, not "The following field is invalid: status"', async ({
-  page,
-}) => {
-  await loginAsAdmin(page)
-
-  const service = await apiFindOne(page, 'services', 'Haircut')
-  const resource = await apiFindOne(page, 'resources', 'Bob Smith')
-  const customer = await createTestCustomer(page, 'NoticePeriod')
-  // 2 hours out is inside the dev config's 24-hour cancellationNoticePeriod.
-  const reservation = await createTestReservation(page, {
-    customerId: customer.id,
-    hoursFromNow: 2,
-    resourceId: resource.id,
-    serviceId: service.id,
   })
 
-  try {
+  test('cancelling inside the notice period shows the real sentence, not "The following field is invalid: status"', async ({
+    page,
+  }) => {
+    await loginAsAdmin(page)
+
+    const service = await apiFindOne(page, 'services', 'Haircut')
+    const resource = await apiFindOne(page, 'resources', 'Bob Smith')
+    const customer = await createTestCustomer(page, 'NoticePeriod')
+    // 2 hours out is inside the dev config's 24-hour cancellationNoticePeriod.
+    const reservation = await createTestReservation(page, {
+      customerId: customer.id,
+      hoursFromNow: 2,
+      resourceId: resource.id,
+      serviceId: service.id,
+    })
+    createdReservationIds.push(reservation.id)
+
     await page.goto('/admin/collections/reservations')
     await page.waitForSelector('text="Pending"', { timeout: 15_000 })
 
@@ -808,9 +840,7 @@ test('cancelling inside the notice period shows the real sentence, not "The foll
     await expect(drawer.getByText('The following field is invalid: status')).toHaveCount(0)
     // Nothing actually transitioned.
     await expect(event).toHaveAttribute('title', /Status: Pending/)
-  } finally {
-    await deleteTestReservation(page, reservation.id)
-  }
+  })
 })
 
 // ---------------------------------------------------------------------------
