@@ -29,6 +29,7 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Guest Bookings** — Account-less reservations with inline contact details (name + email/phone); `allowGuestBooking` plugin option and per-service `inherit`/`enabled`/`disabled` override; guests receive a `cancellationToken` via the `afterBookingCreate` hook for cancel-link delivery
 - **Idempotency** — Optional `idempotencyKey` prevents duplicate submissions
 - **Collection Overrides** — Customize any generated collection (add fields like a `join`, tweak admin options, attach your own hooks) via `collectionOverrides` without forking — the plugin's hooks and access are merged, not clobbered (supersedes the deprecated `extraReservationFields`)
+- **Admin Component Overrides** — Replace any of six admin components (calendar, customer field, availability-aware time field, dashboard widget, availability overview, reservation detail) with your own via `components`, string-path-by-string-path, without forking — see [Customising the admin components](#customising-the-admin-components)
 - **Services ↔ Resources Join** — Services show a read-only `resources` field (a `join` over `Resources.services`) listing which resources currently perform them; assignment still happens on the Resource
 - **Active Enforcement** — `active: false` on a Service or Resource — including one referenced by a multi-resource `items[]` entry — blocks new bookings against it, blocks rescheduling or re-pointing an existing booking onto it, and excludes it from availability; non-scheduling edits such as confirm and cancel always remain allowed, and `enforceActive: false` opts out entirely
 - **Concurrency-Safe Booking** — A transactional `bookingLock` on Resources serializes simultaneous bookers for the same slot; automatic retry recovers lost capacity on MongoDB, and a surviving conflict maps to a clean HTTP 409 rather than a raw 500 — see [Concurrent booking: database adapter support](#concurrent-booking-database-adapter-support)
@@ -38,7 +39,7 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 - **Plugin Hooks API** — Seven lifecycle hooks (`beforeBookingCreate`, `afterBookingCreate`, `beforeBookingConfirm`, `afterBookingConfirm`, `beforeBookingCancel`, `afterBookingCancel`, `afterStatusChange`) for integrating email, Stripe, and external systems — all fire inside the write's own database transaction, never after
 - **Availability Service** — Pure functions and DB helpers for slot generation (15-min step) and conflict checking with guest-count-aware filtering
 - **Public REST API** — Seven pre-built endpoints for availability, slot listing, resource availability, booking (incl. guest bookings), cancellation, and customer search, plus two more for slot holds when enabled — with ownership enforcement and input validation
-- **Calendar View** — Month/week/day/lanes/pending calendar replacing the default reservations list view, with per-resource availability shading and click-a-free-slot-to-book; plus an availability-aware slot picker on the reservation form
+- **Calendar View** — Month/week/day/lanes/pending calendar replacing the default reservations list view, with per-resource availability shading and click-a-free-slot-to-book; plus an availability-aware slot picker on the reservation form. Clicking a reservation opens a detail drawer (status, key fields, and status actions) before the full edit form — opt out with `components.reservationDetail: false` to restore the old click-straight-to-edit behaviour
 - **Dashboard Widget** — Server component showing today's booking stats
 - **Availability Overview** — Weekly grid of resource availability vs. booked slots
 - **Recurring and Manual Schedules** — Weekly patterns with exception dates, or specific one-off dates
@@ -371,6 +372,77 @@ If a `collectionOverrides.resources` override removes, renames, or nests `servic
 Payload join fields resolve via a DB-level aggregation (`$lookup`) and ignore `depth`, so every internal `findByID` the plugin makes on Services now passes `joins: false` to avoid that extra query cost. If your own code reads Services on a hot path, consider doing the same — `payload.findByID({ collection: 'services', id, joins: false })`.
 
 One path still pays for the join: when a Reservation is read at `depth >= 1`, Payload populates its `service` relationship through the internal dataloader, which offers no `joins: false` seam from plugin code. If that shows up in your profiles, read Reservations with `depth: 0` and fetch the service yourself.
+
+### Customising the admin components
+
+`components` replaces any of the plugin's six admin components with your own, without forking the plugin:
+
+```typescript
+payloadReserve({
+  components: {
+    dashboardWidget: false,
+    reservationDetail: '/components/MyReservationDetail.tsx#MyReservationDetail',
+  },
+})
+```
+
+| Slot | Plugin default | `false` falls back to |
+|------|-----------------|------------------------|
+| `calendarView` | the calendar (month/week/day/pending) | Payload's default list view |
+| `customerField` | the customer picker (search-or-create) | a plain relationship field |
+| `availabilityTimeField` | the availability-aware slot picker | a plain date field |
+| `dashboardWidget` | today's stats widget | not registering the widget |
+| `availabilityOverview` | the weekly availability grid | not registering the view |
+| `reservationDetail` | the reservation detail drawer body | see below — **not** a Payload default |
+
+Each slot accepts a **string** (your own Payload component path, e.g. `'/components/MyCalendar.tsx#MyCalendar'`), **`false`** (opt out), or **unset** (use the plugin's own component — the default).
+
+**`false` is asymmetric.** For five of the six slots, `false` falls back to a Payload default — the collection's ordinary list view, a plain relationship or date field, or simply not registering a widget/view. `reservationDetail` has no Payload default to fall back to: setting it `false` instead restores pre-3.2 behaviour (v3.1.1 and earlier) — clicking a calendar event opens the document edit drawer directly, with no detail step in between.
+
+**Whenever you set any slot to a string, run `payload generate:importmap` afterward.** Payload resolves every component path through a generated import map; a stale one means your component silently fails to render, and the server logs `PayloadComponent not found in importMap`.
+
+#### `reservationDetail`
+
+Clicking a calendar event (or a row in the Pending view) opens a drawer. Its body is, by default, the plugin's own `ReservationDetail` — a status badge, key fields, and a status action bar wired to the real transition rules. Point `components.reservationDetail` at your own component to replace that body.
+
+Two constraints are load-bearing, not stylistic:
+
+- **Your component must be a Client Component** (`'use client'` at the top of the file). The drawer body is resolved on the server by `CalendarViewServer` (a React Server Component) via Payload's own `RenderServerComponent`, and rendered into the client calendar as a pre-built element — the same mechanism Payload uses for every other admin component slot.
+- **It reads its data from `useReservationDetail()`, not props.** The document it receives (`doc`) is the SAME `depth: 1` fetch the calendar already made to draw the grid — `service`, `resource`, `customer`, and `items` are populated; nothing deeper is. There is deliberately no second fetch when the drawer opens — that would add a second cache and a loading state the design specifically avoids. If your component needs a field or relationship the calendar doesn't fetch, fetch it yourself (keyed off `doc.id`) rather than expecting the drawer to provide it.
+
+If you also replace `calendarView` with your own component, nothing renders your `reservationDetail` slot automatically — `CalendarViewServer` is what wires it up. The plugin logs a boot warning when both are set together, as a reminder that your replacement calendar needs to render `ReservationDetailProvider`/`useReservationDetail` itself if it wants the same drawer behaviour.
+
+A worked example, using the primitives and hooks the built-in component is built from:
+
+```tsx
+'use client'
+import {
+  DetailRow,
+  StatusActionBar,
+  StatusBadge,
+  useReservationDetail,
+  useReservationStatusMachine,
+} from 'payload-reserve/client'
+
+export const MyReservationDetail = () => {
+  const { doc, refresh } = useReservationDetail()
+  const { labels, presentation } = useReservationStatusMachine()
+  if (!doc) return null
+  return (
+    <div>
+      <StatusBadge label={labels[doc.status] ?? doc.status} presentation={presentation[doc.status]} />
+      <DetailRow label="Booking ref" value={doc.id} />
+      <StatusActionBar onSelect={() => refresh()} status={doc.status} />
+    </div>
+  )
+}
+```
+
+`StatusActionBar` only ever shows candidate transitions from the configured status machine — it never decides whether one succeeds. The server (`validateStatusTransition`, `validateCancellation`) is the sole authority; a rejected transition surfaces the server's own error rather than being pre-judged on the client.
+
+#### Newly exported (v3.2)
+
+`payload-reserve/client` additionally exports the primitives and hooks the built-in `ReservationDetail` is composed from, so a replacement component doesn't have to reinvent them: `DetailRow`, `EventPill`, `ReservationDetail`, `ReservationDetailProvider`, `StatusActionBar`, `StatusBadge`, `useReservationDetail`, `useReservationMutations`, and `useReservationStatusMachine`. `payload-reserve/rsc` additionally exports `CalendarViewServer` — the server wrapper that resolves `components.reservationDetail` out of the import map and hands the client calendar a pre-rendered element.
 
 ---
 

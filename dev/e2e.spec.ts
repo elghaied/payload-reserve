@@ -599,3 +599,58 @@ test('CalendarView reopens the pending reservation detail drawer after it is clo
   await customerLink.click()
   await expect(drawer).toBeVisible({ timeout: 10_000 })
 })
+
+// ---------------------------------------------------------------------------
+// Reservation detail drawer (Task 13 e2e coverage)
+// ---------------------------------------------------------------------------
+
+test('CalendarView opens the reservation detail drawer instead of the edit form', async ({
+  page,
+}) => {
+  await loginAsAdmin(page)
+  await page.goto('/admin/collections/reservations')
+  await page.waitForSelector('text="Pending"', { timeout: 15_000 })
+
+  const event = page.locator('[role="button"][title]').first()
+  await event.click()
+
+  // The detail drawer, not the document edit form.
+  const drawer = page.locator('[data-reservation-detail]')
+  await expect(drawer).toBeVisible()
+  await expect(drawer.getByRole('button', { name: 'Edit' })).toBeVisible()
+  // The edit form's Save button must NOT be present yet.
+  await expect(drawer.getByRole('button', { name: 'Save' })).toHaveCount(0)
+})
+
+test('Reservation detail Edit swaps to the document drawer', async ({ page }) => {
+  await loginAsAdmin(page)
+  await page.goto('/admin/collections/reservations')
+  await page.waitForSelector('text="Pending"', { timeout: 15_000 })
+
+  await page.locator('[role="button"][title]').first().click()
+  await page.locator('[data-reservation-detail]').getByRole('button', { name: 'Edit' }).click()
+
+  // The detail drawer is replaced by the document drawer, which has a Save button.
+  await expect(page.locator('[data-reservation-detail]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Save' })).toBeVisible()
+})
+
+test('Reservation detail reopens after being closed', async ({ page }) => {
+  await loginAsAdmin(page)
+  await page.goto('/admin/collections/reservations')
+  await page.waitForSelector('text="Pending"', { timeout: 15_000 })
+
+  const event = page.locator('[role="button"][title]').first()
+  const drawer = page.locator('[data-reservation-detail]')
+
+  await event.click()
+  await expect(drawer).toBeVisible()
+
+  // Closing via the drawer's own affordance, not by our own state — this is the
+  // path that regresses if the isModalOpen sync in Task 11 is dropped.
+  await page.keyboard.press('Escape')
+  await expect(drawer).toHaveCount(0)
+
+  await event.click()
+  await expect(drawer).toBeVisible()
+})
