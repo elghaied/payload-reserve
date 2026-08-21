@@ -12,6 +12,10 @@ npm install payload-reserve
 
 **Peer dependencies:** `payload ^3.79.0`, `@payloadcms/ui ^3.79.0`, `@payloadcms/translations ^3.79.0`
 
+### ⚠️ Upgrading from an earlier version
+
+**Run `payload generate:importmap`, then restart your app, after upgrading — even if you never touch the new `components` option.** The Reservations list view's default component changed from `payload-reserve/client#CalendarView` to `payload-reserve/rsc#CalendarViewServer`. Payload resolves admin component paths through an import map generated **into your own app**, not this package, so restarting on the new version without regenerating it leaves the old key in place and the new one missing — silently: a missing import-map key logs a `console.error` server-side, and the admin just shows a plain reservations table where the calendar used to be, with nothing explaining why. See the README's "⚠️ Upgrading from an earlier version" section and [Admin UI → Customising the admin components](./admin-ui.md#customising-the-admin-components) for the full detail, including the new reservation detail drawer this release adds.
+
 ## Quick Start
 
 Add the plugin to your `payload.config.ts`:
@@ -44,9 +48,11 @@ By default, with no options set, the plugin creates:
 - `reservations` — the core booking records
 
 **3 admin UI components:**
-- Calendar view replacing the default reservations list (month/week/day/lanes/pending, with availability shading and click-to-book)
+- Calendar view replacing the default reservations list (month/week/day/lanes/pending, with availability shading and click-to-book). Clicking a reservation opens a read-optimized detail drawer (status, key fields, and status actions) before the full edit form — see [Admin UI → Reservation Detail Drawer](./admin-ui.md#reservation-detail-drawer)
 - Dashboard widget showing today's booking stats
 - Availability overview at `/admin/reservation-availability`
+
+All six of the admin components above (including the detail drawer) can be replaced with your own via the `components` plugin option — see [Admin UI → Customising the admin components](./admin-ui.md#customising-the-admin-components).
 
 **6 public REST endpoints:**
 - `GET /api/reserve/availability` — available slots for a date (guest-count and multi-resource aware)

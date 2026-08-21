@@ -1,5 +1,5 @@
 ---
-'payload-reserve': minor
+'payload-reserve': major
 ---
 
 feat(calendar): add a reservation detail drawer and a `components` option for customising six admin components

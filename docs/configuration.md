@@ -160,6 +160,17 @@ payloadReserve({
   // Resolver folding external busy intervals (calendar sync, legacy booking
   // system, ops tooling, etc.) into availability — see README § External Busy.
   // getExternalBusy: async ({ resourceId, start, end, req }) => [],
+
+  // Replace any of six admin components with your own, without forking the
+  // plugin. Each slot takes a Payload component path (string), `false` to opt
+  // out, or stays unset to use the plugin's own component — see
+  // docs/admin-ui.md § Customising the admin components for the full slot
+  // table, the `false`-is-asymmetric note for `reservationDetail`, and a
+  // worked example of a replacement `reservationDetail` component.
+  components: {
+    dashboardWidget: false,
+    reservationDetail: '/components/MyReservationDetail.tsx#MyReservationDetail',
+  },
 })
 ```
 
@@ -208,6 +219,7 @@ payloadReserve({
 | `staffProvisioning.nameFrom` | `string` | `'name'` | User field copied into `Resource.name` (falls back to email) |
 | `staffProvisioning.beforeCreate` | `function` | `undefined` | Stamp tenant/custom fields onto the Resource before create |
 | `getExternalBusy` | `GetExternalBusy` | `undefined` | Resolver folding external busy intervals (calendar sync etc.) into availability — see README § External Busy |
+| `components` | `ReservationComponentOverrides` | `{}` | Per-slot overrides for six admin components (`calendarView`, `customerField`, `availabilityTimeField`, `dashboardWidget`, `availabilityOverview`, `reservationDetail`). Each slot is a Payload component path string, `false` to opt out, or unset for the plugin's own component. `false` is asymmetric — it falls back to a genuine Payload default for five slots, but restores only the pre-feature *click* behaviour for `reservationDetail`, which has no Payload default. Setting any slot to a string requires running `payload generate:importmap` afterward. See [Admin UI → Customising the admin components](./admin-ui.md#customising-the-admin-components) |
 
 > **Vocabularies:** `resourceTypes` (default `['staff', 'equipment', 'room']`) and `leaveTypes` (default `['vacation', 'sick', 'personal', 'closure', 'other']`) customize the option lists for `Resource.resourceType` and `Schedule.exceptions[].type`. See [Staff Scheduling](../README.md#staff-scheduling).
 

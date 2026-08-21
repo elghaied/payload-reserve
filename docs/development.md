@@ -23,6 +23,39 @@ pnpm dev:generate-importmap # Regenerate import map after adding components
 
 Run a single test by pattern: `pnpm vitest -t "conflict detection"`
 
+## Opt-in Dev Harnesses
+
+Two dev-app behaviours are gated behind environment variables that are unset (and therefore change nothing) by default:
+
+- **`MT=1`** — boots the dev app with `@payloadcms/plugin-multi-tenant` wired in (two tenants, a super-admin dev user), for manually verifying tenant-scoped admin views: `MT=1 pnpm dev:generate-importmap && MT=1 pnpm dev`.
+- **`RESERVE_DETAIL_SLOT=1`** — wires `dev/components/ReservationDetailFixture.tsx` into `components.reservationDetail` (see `dev/payload.config.ts`), so the e2e suite can assert that a consumer-supplied `reservationDetail` component really renders in place of the plugin's own drawer body. Boot it the same way: `RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap && RESERVE_DETAIL_SLOT=1 pnpm dev`.
+
+### Footgun: the committed import map is the gated superset
+
+`dev/app/(payload)/admin/importMap.js` is checked into the repo, and it was generated **with `RESERVE_DETAIL_SLOT=1` set** — so it includes the fixture component's import-map entry. Running a plain `pnpm dev:generate-importmap` (gate unset) regenerates that same file **without** the fixture entry, which silently breaks the e2e test that depends on it ("a consumer-supplied `components.reservationDetail` component renders in place of the plugin body") the next time anyone runs it — with no error at generation time, only a later test failure.
+
+**Always regenerate with the gate set:**
+
+```bash
+RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap
+```
+
+This has been hit in practice, not just theorized — an ungated `pnpm dev` left running (or anything else that touches the config/build cache) can leave the committed file stripped down to the ungated set with no obvious cause in your own shell history. Before committing any change that touches `dev/payload.config.ts` or the `ReservationDetailFixture` component, check the import map for an unexpected diff:
+
+```bash
+git diff -- "dev/app/(payload)/admin/importMap.js"
+```
+
+Expect **no** diff. If there is one, restore it with `git checkout --` or regenerate with `RESERVE_DETAIL_SLOT=1` set — never commit the ungated version.
+
+To actually run the gated e2e test:
+
+```bash
+RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap
+RESERVE_DETAIL_SLOT=1 DATABASE_URL=... pnpm dev
+RESERVE_DETAIL_SLOT=1 DATABASE_URL=... pnpm test:e2e --workers=1 -g "consumer-supplied"
+```
+
 ## Project Structure
 
 ```
