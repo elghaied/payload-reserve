@@ -157,7 +157,18 @@
   margin-bottom: 2px;
 }
 
-.eventItemExternal {
+/*
+ * Doubled selector (`.eventItemExternal.eventItemExternal`) is deliberate, not
+ * a typo: this overrides `.eventItem`/`.eventItem:hover` from
+ * `EventPill.module.css`, which is a DIFFERENT stylesheet. An element carries
+ * both classes at once, and a single-class selector here has the exact same
+ * specificity as `.eventItem` there, so without this the winner would be
+ * decided by stylesheet emission order — correct today only because of
+ * import order, and silently reversible by any future bundler change. Doubling
+ * the class raises specificity from (0,1,0) to (0,2,0), so this always wins
+ * regardless of order.
+ */
+.eventItemExternal.eventItemExternal {
   background: repeating-linear-gradient(
     45deg,
     var(--theme-elevation-100),
@@ -169,7 +180,7 @@
   cursor: default;
 }
 
-.eventItemExternal:hover {
+.eventItemExternal.eventItemExternal:hover {
   opacity: 1;
 }
 

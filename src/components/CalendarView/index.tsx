@@ -226,12 +226,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   useEffect(() => {
     if (detailId) {
       openModal(detailDrawerSlug)
-    } else {
+    } else if (detailModalOpen) {
+      // Guarded on the modal actually being open: without this, closing (and
+      // mount, where nothing is open yet) called closeModal() anyway, which
+      // still builds a new modalState object and re-renders every useModal()
+      // consumer in the admin panel for no reason.
       closeModal(detailDrawerSlug)
     }
-    // Keyed on detailId alone: openModal/closeModal identities track modal
-    // context and re-firing on them would reopen a drawer the user just closed —
-    // the same hazard documented on the document drawer's openRequest effect.
+    // Keyed on detailId and the slug alone, NOT on openModal/closeModal or
+    // detailModalOpen. For @faceless-ui/modal@3.0.0, openModal/closeModal are
+    // useCallback(..., []) and permanently stable, so they aren't the hazard —
+    // the hazard is detailModalOpen: it flips to false the instant the user
+    // closes the drawer via its own close affordance (see the detailWasOpen
+    // effect below), and if this effect depended on it, that flip would
+    // re-run it while detailId is still set and call openModal() again,
+    // reopening the drawer the user just closed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailId, detailDrawerSlug])
 
@@ -401,8 +410,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   const detailDoc = useMemo(
     () =>
       detailId
-        ? (reservations.find((r) => r.id === detailId) ??
-          pendingReservations.find((r) => r.id === detailId) ??
+        ? (reservations.find((r) => sameId(r.id, detailId)) ??
+          pendingReservations.find((r) => sameId(r.id, detailId)) ??
           null)
         : null,
     [detailId, pendingReservations, reservations],
@@ -419,6 +428,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   const detailContextValue = useMemo(
     () => ({ close: closeDetail, doc: detailDoc, refresh: refreshDetail }),
     [closeDetail, detailDoc, refreshDetail],
+  )
+
+  // Memoized so the Drawer's `Header` prop is referentially stable across
+  // renders that don't touch the translation — a fresh element every render
+  // would defeat Payload's own memoization inside `Drawer`.
+  const detailDrawerHeader = useMemo(
+    () => <h2 className={styles.detailDrawerTitle}>{t('reservation:detailTitle')}</h2>,
+    [t],
   )
 
   // Client-side resource filtering. Delegated to a pure, unit-tested helper:
@@ -1447,10 +1464,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
           renders nothing for it; the context type documents `doc: null` for any
           detailSlot to do the same) until the next click or Escape. */}
       {detailId && (
-        <Drawer
-          Header={<h2 className={styles.detailDrawerTitle}>{t('reservation:detailTitle')}</h2>}
-          slug={detailDrawerSlug}
-        >
+        <Drawer Header={detailDrawerHeader} slug={detailDrawerSlug}>
           {/* Stable hook for e2e — the drawer's own markup comes from
               @faceless-ui/modal and is not a native <dialog>, so tests must not
               key off Payload's internal class names. */}

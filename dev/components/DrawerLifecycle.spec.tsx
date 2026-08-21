@@ -1,7 +1,7 @@
 import { Drawer, useDrawerSlug } from '@payloadcms/ui/elements/Drawer'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { facelessModal } from './testUtils/facelessModal.js'
 
@@ -36,20 +36,38 @@ type Doc = { id: string }
  */
 function DrawerHarness({
   gateOnId = true,
+  guardRedundantClose = true,
   list,
+  onOwnCloseModalCall,
 }: {
   gateOnId?: boolean
+  /**
+   * Toggles the item-6 fix: whether the open/close effect's `else` branch is
+   * guarded on the modal actually being open. `false` reproduces the
+   * historical behaviour (a `closeModal` dispatch on every mount and every
+   * close, even when nothing was open to close).
+   */
+  guardRedundantClose?: boolean
   list: Doc[]
+  /** Counts calls to closeModal made BY THIS EFFECT — not the drawer's own
+   *  close-button handler, which calls the real closeModal directly and
+   *  bypasses this wrapper entirely. That's what makes the count a clean
+   *  signal of redundant dispatches specifically. */
+  onOwnCloseModalCall?: () => void
 }) {
   const [detailId, setDetailId] = useState<null | string>(null)
   const slug = useDrawerSlug('reservation-detail')
-  const { closeModal, isModalOpen, openModal } = useModal()
+  const { closeModal: realCloseModal, isModalOpen, openModal } = useModal()
   const modalOpen = isModalOpen(slug)
+  const closeModal = (s: string) => {
+    onOwnCloseModalCall?.()
+    realCloseModal(s)
+  }
 
   useEffect(() => {
     if (detailId) {
       openModal(slug)
-    } else {
+    } else if (!guardRedundantClose || modalOpen) {
       closeModal(slug)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,5 +185,54 @@ describe('reservation detail drawer lifecycle (harness over CalendarView mechani
     fireEvent.click(closeButton())
     expect(screen.getByTestId('modal-open').textContent).toBe('false')
     expect(screen.queryByTestId('drawer-body')).toBeNull()
+  })
+
+  it('does not dispatch a redundant closeModal on mount or after an already-closed close', () => {
+    const onOwnCloseModalCall = vi.fn()
+    render(
+      <ModalProvider>
+        <ModalContainer />
+        <DrawerHarness
+          list={[{ id: 'a' }]}
+          onOwnCloseModalCall={onOwnCloseModalCall}
+        />
+      </ModalProvider>,
+    )
+
+    // Nothing is open on mount, so the effect's own closeModal must not fire.
+    expect(onOwnCloseModalCall).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('open-a'))
+    // The drawer's own close button closes the modal directly (bypassing this
+    // effect's wrapped closeModal, which is the point — see the harness
+    // comment). The subsequent detailId-goes-null render must not ALSO
+    // dispatch a second, redundant closeModal for a modal already closed.
+    fireEvent.click(closeButton())
+
+    expect(onOwnCloseModalCall).not.toHaveBeenCalled()
+  })
+
+  it('regression: without the guard, mount and an already-closed close each dispatch redundantly', () => {
+    const onOwnCloseModalCall = vi.fn()
+    render(
+      <ModalProvider>
+        <ModalContainer />
+        <DrawerHarness
+          guardRedundantClose={false}
+          list={[{ id: 'a' }]}
+          onOwnCloseModalCall={onOwnCloseModalCall}
+        />
+      </ModalProvider>,
+    )
+
+    // The unguarded `else` branch fires on mount, even though nothing is open.
+    expect(onOwnCloseModalCall).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByText('open-a'))
+    fireEvent.click(closeButton())
+
+    // ...and again after a close that already happened via the drawer's own
+    // affordance — this second call is the exact redundancy item 6 removes.
+    expect(onOwnCloseModalCall).toHaveBeenCalledTimes(2)
   })
 })
