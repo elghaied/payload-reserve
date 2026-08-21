@@ -607,6 +607,10 @@ test('CalendarView reopens the pending reservation detail drawer after it is clo
 test('CalendarView opens the reservation detail drawer instead of the edit form', async ({
   page,
 }) => {
+  // Wide enough that a full-bleed drawer panel would be obviously wrong —
+  // the width assertion below only means something against a viewport this
+  // much larger than the panel's own cap.
+  await page.setViewportSize({ height: 900, width: 1600 })
   await loginAsAdmin(page)
   await page.goto('/admin/collections/reservations')
   await page.waitForSelector('text="Pending"', { timeout: 15_000 })
@@ -620,6 +624,19 @@ test('CalendarView opens the reservation detail drawer instead of the edit form'
   await expect(drawer.getByRole('button', { name: 'Edit' })).toBeVisible()
   // The edit form's Save button must NOT be present yet.
   await expect(drawer.getByRole('button', { name: 'Save' })).toHaveCount(0)
+
+  // The panel-width cap (`.detailDrawer :global(.drawer__content)` in
+  // CalendarView.module.css, max-width: 720px) is invisible to jsdom, which
+  // does no layout — this is the only place it's observable. Assert a bound,
+  // not an exact pixel value, so a Payload gutter/border tweak doesn't make
+  // this brittle; the point is "bounded", not "exactly 720px".
+  const panel = page.locator('.drawer__content', { has: drawer })
+  const box = await panel.boundingBox()
+  expect(box).not.toBeNull()
+  if (box) {
+    expect(box.width).toBeLessThan(800)
+    expect(box.width).toBeLessThan(1600 * 0.6)
+  }
 })
 
 test('Reservation detail Edit swaps to the document drawer', async ({ page }) => {

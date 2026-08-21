@@ -225,9 +225,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
 
   // The detailId/detailModalOpen/detailWasOpen mechanism below (through the
   // detailWasOpen effect and the sameId-based doc lookup further down) is
-  // mirrored — deliberately reimplemented, not imported — in
-  // dev/components/DrawerLifecycle.spec.tsx. This file is the only side
-  // anyone edits; keep that harness in sync when this mechanism changes.
+  // covered directly on this component in dev/components/CalendarView.spec.tsx
+  // (open/close/reopen, the closeModal guard, and the doc-goes-null-while-open
+  // case) — no separate harness to keep in sync.
   useEffect(() => {
     if (detailId) {
       openModal(detailDrawerSlug)
