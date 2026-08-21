@@ -5,6 +5,150 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.0.0] - 2026-08-21
+
+A new reservation detail drawer, and a `components` plugin option for replacing any of six
+admin components with your own, without forking the plugin. Both ship no collection schema
+change and need no data migration. The one thing every consumer must do on upgrade — whether
+or not any new feature is used — is regenerate the admin import map, because the Reservations
+list view's default component path changed; skipping it silently drops back to Payload's plain
+table with no UI explanation. A handful of smaller behavioural changes ride along and are
+disclosed below.
+
+### Breaking
+
+- **Action required after upgrading, even if you never touch the new `components` option: run
+  `payload generate:importmap`, then restart your app.**
+
+  The Reservations list view's default component changed from `payload-reserve/client#CalendarView`
+  to `payload-reserve/rsc#CalendarViewServer`. Payload resolves every admin component path through
+  an import map generated **into your own app**, not this package, so an install that upgrades and
+  restarts without regenerating it still has the _old_ key and is missing the _new_ one. The
+  result is silent: a missing import-map key logs a `console.error` server-side and Payload's List
+  view falls back to its default table — your admin sees a plain reservations table where the
+  calendar used to be, with nothing in the UI explaining why.
+
+- **Type-only: the package-root `Reservation` type is renamed to `CalendarReservation`.** It is a
+  deliberately loose, UI-shaped structural type for the calendar/detail-drawer components —
+  exported as plain `Reservation` it was too easy to mistake for your own generated `payload-types`
+  `Reservation`, which is what most people would assume a bare `Reservation` import from this
+  package to be. No runtime change; update `import type { Reservation } from 'payload-reserve'` to
+  `CalendarReservation` if you use it. `ReservationItem` is unchanged.
+
+- **Type-only: `CalendarView`'s exported prop type changed from `React.FC<AdminViewServerProps>`
+  to `React.FC<CalendarViewProps>`.** Runtime-compatible — nothing changes if you just render the
+  component — but a type-level break for anyone who imported and typed against it directly.
+
+- **Status action buttons are now labelled as actions, not as the target status name** — e.g. a
+  button that moves a reservation to `confirmed` now reads **Confirm** rather than "Confirmed".
+  The five built-in statuses get **Reopen** (back to `pending`), **Confirm**, **Complete**,
+  **Cancel**, and **Mark no-show**. A custom status with no matching translation falls back to
+  its existing status label, then the title-cased raw status. `useReservationStatusMachine`
+  exposes this mapping as `actionLabels`; the pure helper it's built from,
+  `buildStatusActionLabels`, is newly exported from `payload-reserve/client` and the package root.
+
+- **A custom status may render in a different colour than before, and now gets a matching text
+  colour.** Palette assignment changed from "index into the whole `statuses` array" to "index
+  over custom (non-built-in) statuses only" — for a machine like `['pending', 'confirmed',
+  'waitlisted']`, the `waitlisted` swatch changes, and now has an explicit foreground colour
+  instead of inheriting the default. Built-in statuses (`pending`, `confirmed`, `completed`,
+  `cancelled`, `no-show`) are unaffected — their exact background/foreground pairs were carried
+  over verbatim.
+
+- **The pending list's quick-action (✓/✗ buttons) failures now render the server's own error
+  message instead of the generic `reservation:pendingConfirmError`/`pendingCancelError`
+  strings** — for example, a notice-period rejection now shows the real sentence. This applies
+  **even with `components.reservationDetail: false`**, which is why that flag restores v3.1.1
+  **click** behaviour, not v3.1.1 behaviour byte-for-byte.
+
+- **The fetch behind the detail drawer's status mutations (`patchReservation` /
+  `performReservationPatch`) now sends `credentials: 'include'`**; previously it sent none, which
+  defaults to `same-origin`. Better for a cross-origin `serverURL`, but undisclosed until now.
+
+### Added
+
+- **Clicking a reservation (on the calendar, or a row in the Pending view) now opens a detail
+  drawer first** — a status badge, key fields, and a status action bar wired to the real
+  transition rules — rather than jumping straight to the document edit form. An **Edit** button
+  in the drawer opens the full form for anyone who needs it. Opt out entirely with
+  `components.reservationDetail: false` to restore the previous click-straight-to-edit behaviour
+  (see the Breaking notes above for the one way this isn't quite byte-for-byte).
+
+- **New plugin option, `components`, lets you replace any of six admin components with your own
+  Payload component, without forking the plugin:**
+
+  ```typescript
+  payloadReserve({
+    components: {
+      dashboardWidget: false,
+      reservationDetail: '/components/MyReservationDetail.tsx#MyReservationDetail',
+    },
+  })
+  ```
+
+  Each slot (`calendarView`, `customerField`, `availabilityTimeField`, `dashboardWidget`,
+  `availabilityOverview`, `reservationDetail`) takes a component path string, `false` to opt out,
+  or stays unset to use the plugin's own component. `false` is asymmetric: for the first five it
+  falls back to a Payload default; `reservationDetail` has none, so `false` there restores v3.1.1
+  click behaviour instead (see Breaking, above). **Run `payload generate:importmap` after setting
+  any slot to a string** — same reason as the upgrade step above: a stale import map means silent
+  non-rendering.
+
+- **Newly exported UI parts for composing custom admin views.** `payload-reserve/client` now
+  exports the primitives and hooks the built-in detail drawer is composed from — `DetailRow`,
+  `EventPill`, `ReservationDetail`, `ReservationDetailProvider`, `StatusActionBar`, `StatusBadge`,
+  `useReservationDetail`, `useReservationMutations`, and `useReservationStatusMachine` — so a
+  replacement `reservationDetail` component doesn't have to reinvent them. `payload-reserve/rsc`
+  newly exports `CalendarViewServer`, the server wrapper that resolves
+  `components.reservationDetail` out of the import map and hands the client calendar a
+  pre-rendered element; it is now the calendar's default list-view component, up from the plain
+  client `CalendarView`. The UI types and helpers a replacement component needs —
+  `ReservationItem`, `ResourceOption`, `buildStatusLabels`, `buildStatusPresentation`,
+  `BUILTIN_STATUSES`, `StatusPresentation`, and `CalendarReservation` — are now also exported
+  from `payload-reserve/client`, not only the server-only package root, so a `'use client'`
+  detail component no longer needs to import the server plugin barrel. `buildStatusLabels`'s
+  translate-function parameter is also widened from the plugin's internal, unexported `PluginT`
+  to a plain `(key: string) => string`, so it can be called from outside the plugin.
+  `StatusActionBar` also gained an optional `noActionsFallback` prop (`React.ReactNode`, default
+  `null`) — rendered in place of the bar when the current status has no outgoing transitions —
+  fully backward compatible, since omitting it preserves the existing render-nothing behaviour.
+
+### Fixed
+
+- **Hyphenated/underscored custom statuses now render correctly.** A custom status like
+  `awaiting-deposit` used to fall back to `Awaiting-deposit` (only the first character
+  capitalised) when no translation was configured for it. It now title-cases each hyphen- or
+  underscore-separated word instead: `Awaiting Deposit`. Built-in statuses always resolve through
+  a real translation, so this fallback never applied to them.
+
+- **Fixed a rare stale-paint bug in the reservation detail drawer:** closing a reservation while
+  a status-change mutation was still in flight, then reopening the _same_ reservation before that
+  mutation resolved, could paint the earlier request's result — a success/error banner, a
+  disabled button — into the reopened drawer. The guard now tracks a monotonically increasing
+  request generation rather than comparing reservation ids, which couldn't distinguish "a
+  different reservation is now open" from "the same reservation was closed and reopened."
+
+- **The detail drawer's rows are now width-constrained instead of stretching across the full
+  viewport.** Payload's `Drawer` sets its content width by design (essentially full-viewport at
+  depth 1, the same as Payload's own document drawer), so at a wide viewport each label/value row
+  used to read as two words separated by an enormous gap. The drawer body now caps its measure at
+  600px, left-aligned. This applies to a consumer's own `detailSlot` replacement too, not only the
+  built-in `ReservationDetail` — both render inside the same drawer-side wrapper.
+
+- **Footer buttons (the status action bar plus Edit) now sit on one baseline under a single
+  full-width rule**, instead of the rule stopping short of Edit and Edit sitting higher than the
+  other buttons. `StatusActionBar` no longer draws its own border/padding above its buttons — that
+  responsibility moved to `ReservationDetail`'s footer, which now owns the single rule spanning
+  the whole row. `StatusActionBar` is otherwise unaffected and still renders correctly when used
+  standalone.
+
+### Internal
+
+- The repo gained a jsdom component-test project (`@testing-library/react`), so the admin
+  components have real test coverage for the first time. The suite went from 550 to 661 tests —
+  most of the confidence behind this release comes from those new tests, not just the manual
+  passes noted above.
+
 ## [3.1.1] - 2026-08-13
 
 Two admin-panel fixes. Both are long-standing rather than regressions: one made
@@ -16,24 +160,24 @@ no migration.
 
 - **The calendar silently swallowed any click that re-requested the document it was already holding — most visibly, "Create New" did nothing at all on a freshly loaded calendar.**
 
-  `CalendarView` opens its document drawer indirectly: a click sets `drawerDocId` state, and an effect calls `openDrawer()` on the resulting render. That indirection is necessary, because `useDocumentDrawer` bakes the document id into the modal slug — opening synchronously from the click handler would target the *previously* opened document. What it assumed was that a render would always follow.
+  `CalendarView` opens its document drawer indirectly: a click sets `drawerDocId` state, and an effect calls `openDrawer()` on the resulting render. That indirection is necessary, because `useDocumentDrawer` bakes the document id into the modal slug — opening synchronously from the click handler would target the _previously_ opened document. What it assumed was that a render would always follow.
 
   When a click set `drawerDocId` and `initialData` to the values they already held, React bailed out of the re-render entirely. No render meant the effect never ran, and the click did nothing. Three consequences, all reproduced in a browser:
   - **"Create New" was dead on a freshly loaded calendar.** On mount `drawerDocId` is already `null` and `initialData` already `undefined`, so the button set both to what they already were. It only began working after some other document had been opened and closed.
-  - **A reservation could not be reopened after closing its drawer** — from the month, week and day event blocks (mouse or keyboard) and from the pending tab's customer link. Clicking a *different* reservation still worked, which is why this read as intermittent rather than broken.
+  - **A reservation could not be reopened after closing its drawer** — from the month, week and day event blocks (mouse or keyboard) and from the pending tab's customer link. Clicking a _different_ reservation still worked, which is why this read as intermittent rather than broken.
   - **A drawer could open by itself.** The swallowed click left the open request armed, so the next unrelated re-render — changing month, a background refetch — consumed it and opened the drawer with no click at all.
 
   The open request is now carried on a monotonic counter, which always produces a new value, so the render the effect depends on is guaranteed. All seven entry points route through a single `requestDrawer` helper. The three click-to-book handlers were never affected, but only by accident: they pass a fresh object literal to `setInitialData`, which is never equal to the previous value. Routing them through the same helper means memoizing that object can no longer reintroduce the bug.
 
 - **The "Today's Reservations" dashboard widget had never rendered, in any release that shipped it.**
 
-  `admin.dashboard.widgets` only *registers* a widget. Payload renders whatever `admin.dashboard.defaultLayout` lists, resolving each entry's component by slug. The plugin pushed its widget into `widgets` and never added it to `defaultLayout`, so the widget was registered, present in the import map, and never placed on the dashboard.
+  `admin.dashboard.widgets` only _registers_ a widget. Payload renders whatever `admin.dashboard.defaultLayout` lists, resolving each entry's component by slug. The plugin pushed its widget into `widgets` and never added it to `defaultLayout`, so the widget was registered, present in the import map, and never placed on the dashboard.
 
-  The placement now happens at init rather than at plugin time, and that ordering is load-bearing. Payload sanitizes the config *after* plugins run, and sanitize both appends its own `collections` widget and sets `defaultLayout ??= [{ widgetSlug: 'collections' }]`. Assigning `defaultLayout` from plugin code would win over that `??=` and drop the Collections cards off the dashboard — trading this bug for a worse one. By `onInit` the default is materialised and the widget can be appended to it.
+  The placement now happens at init rather than at plugin time, and that ordering is load-bearing. Payload sanitizes the config _after_ plugins run, and sanitize both appends its own `collections` widget and sets `defaultLayout ??= [{ widgetSlug: 'collections' }]`. Assigning `defaultLayout` from plugin code would win over that `??=` and drop the Collections cards off the dashboard — trading this bug for a worse one. By `onInit` the default is materialised and the widget can be appended to it.
 
   A `defaultLayout` supplied as a function is wrapped rather than replaced, an existing entry for the widget is never duplicated, and the whole step is guarded so it can neither break boot nor suppress the plugin's other boot diagnostics.
 
-  **You may need to reset your dashboard layout to see it.** Payload gives a user's *saved* dashboard preferences precedence over `defaultLayout`, so anyone who has already customised their dashboard keeps the layout they saved and can add the widget themselves. That is Payload's own behaviour, not something this fix can override.
+  **You may need to reset your dashboard layout to see it.** Payload gives a user's _saved_ dashboard preferences precedence over `defaultLayout`, so anyone who has already customised their dashboard keeps the layout they saved and can add the widget themselves. That is Payload's own behaviour, not something this fix can override.
 
 ### Internal
 
