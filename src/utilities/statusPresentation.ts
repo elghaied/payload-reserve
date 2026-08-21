@@ -1,5 +1,3 @@
-import type { PluginT } from '../translations/index.js'
-
 import { statusToI18nKey } from './i18nUtils.js'
 
 export type StatusPresentation = {
@@ -49,7 +47,15 @@ export function buildStatusPresentation(statuses: string[]): Record<string, Stat
   return result
 }
 
-export function buildStatusLabels(statuses: string[], t: PluginT): Record<string, string> {
+/**
+ * `t` is widened to the minimal shape this function actually needs, rather than
+ * the plugin's internal `PluginT` — `PluginT` is exported from no entry point,
+ * so a consumer calling this from `payload-reserve/client` couldn't name it.
+ */
+export function buildStatusLabels(
+  statuses: string[],
+  t: (key: string) => string,
+): Record<string, string> {
   const labels: Record<string, string> = {}
   for (const status of statuses) {
     const key = statusToI18nKey(status)

@@ -28,6 +28,14 @@ if (!process.env.ROOT_DIR) {
 
 const MT = Boolean(process.env.MT)
 
+// Opt-in fixture harness for `components.reservationDetail`, following the
+// `MT=1` precedent above: `RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap &&
+// RESERVE_DETAIL_SLOT=1 pnpm dev` boots the dev app with the detail slot
+// pointed at dev/components/ReservationDetailFixture.tsx, so e2e can assert a
+// consumer-supplied component really renders inside the drawer. Unset, this
+// changes nothing.
+const RESERVE_DETAIL_SLOT = Boolean(process.env.RESERVE_DETAIL_SLOT)
+
 const buildConfigWithMemoryDB = async () => {
   // Opt-in Postgres harness: `PG_URL=... pnpm test:int` runs the same suite
   // against a real Postgres instead of the in-memory Mongo replica set. It
@@ -166,6 +174,15 @@ const buildConfigWithMemoryDB = async () => {
       },
       allowGuestBooking: true,
       cancellationNoticePeriod: 24,
+      // Only present under RESERVE_DETAIL_SLOT=1 — see the constant above.
+      // `components: undefined` (the unset case) is equivalent to omitting the
+      // key entirely; `defaults.ts` resolves it as `pluginOptions.components ?? {}`.
+      components: RESERVE_DETAIL_SLOT
+        ? {
+            reservationDetail:
+              '/components/ReservationDetailFixture.tsx#ReservationDetailFixture',
+          }
+        : undefined,
       defaultBufferTime: 10,
       getExternalBusy: externalBusyResolver,
       hooks: {

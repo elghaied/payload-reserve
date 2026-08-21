@@ -24,3 +24,14 @@ export {
 export type { ReservationDetailContextValue } from '../components/ReservationDetail/context.js'
 export { ReservationDetail } from '../components/ReservationDetail/index.js'
 export type { ReservationDetailProps } from '../components/ReservationDetail/index.js'
+export type {
+  CalendarReservation,
+  ReservationItem,
+  ResourceOption,
+} from '../components/shared/types.js'
+export {
+  buildStatusLabels,
+  buildStatusPresentation,
+  BUILTIN_STATUSES,
+} from '../utilities/statusPresentation.js'
+export type { StatusPresentation } from '../utilities/statusPresentation.js'

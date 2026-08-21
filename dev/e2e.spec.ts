@@ -654,3 +654,216 @@ test('Reservation detail reopens after being closed', async ({ page }) => {
   await event.click()
   await expect(drawer).toBeVisible()
 })
+
+// ---------------------------------------------------------------------------
+// Spec-mandated default-path coverage the plan dropped: a status action
+// transitioning the reservation, and the notice-period error message. Both
+// need a reservation whose `startTime` is computed relative to "now" at test
+// run time, so both are created fresh via the REST API rather than reusing
+// seed data (dev/seed.ts's reservations are pinned to whatever date the dev
+// server was first seeded on, not "now"). Business-hours schedules are not
+// enforced by the write-path hooks (only by the availability/slot endpoints),
+// so any future startTime is a valid create regardless of business hours.
+// ---------------------------------------------------------------------------
+
+async function apiFindOne(page: Page, collection: string, name: string): Promise<{ id: string }> {
+  const res = await page.request.get(`/api/${collection}`, {
+    params: { limit: '1', 'where[name][equals]': name },
+  })
+  const body = (await res.json()) as { docs: Array<{ id: string }> }
+  if (!body.docs[0]) {
+    throw new Error(`No ${collection} named "${name}" found — check dev/seed.ts.`)
+  }
+  return body.docs[0]
+}
+
+// A fresh customer per test, distinctively named so the calendar's tooltip
+// (which embeds "Customer: <name>") uniquely identifies the fixture reservation
+// among everything else the seed/other tests may have created.
+async function createTestCustomer(page: Page, lastName: string): Promise<{ id: string }> {
+  const email = `zzz-e2e-${lastName.toLowerCase()}@example.com`
+  const existing = await page.request.get('/api/customers', {
+    params: { limit: '1', 'where[email][equals]': email },
+  })
+  const existingBody = (await existing.json()) as { docs: Array<{ id: string }> }
+  if (existingBody.docs[0]) {
+    return existingBody.docs[0]
+  }
+  const res = await page.request.post('/api/customers', {
+    data: { email, firstName: 'ZzzE2E', lastName, password: 'e2eTestPassword123!' },
+  })
+  const body = (await res.json()) as { doc: { id: string } }
+  return body.doc
+}
+
+async function createTestReservation(
+  page: Page,
+  args: { customerId: string; hoursFromNow: number; resourceId: string; serviceId: string },
+): Promise<{ id: string }> {
+  const startTime = new Date(Date.now() + args.hoursFromNow * 60 * 60 * 1000).toISOString()
+  const res = await page.request.post('/api/reservations', {
+    data: {
+      customer: args.customerId,
+      resource: args.resourceId,
+      service: args.serviceId,
+      startTime,
+    },
+  })
+  if (!res.ok()) {
+    throw new Error(`Failed to seed test reservation: ${res.status()} ${await res.text()}`)
+  }
+  const body = (await res.json()) as { doc: { id: string } }
+  return body.doc
+}
+
+// Deletes the reservation this test created. Without this, a fixed
+// `hoursFromNow` offset collides with the SAME test's own leftovers from an
+// earlier run — this is a real, reproducible failure this suite hit: a prior
+// run's uncleaned reservation for the same resource landed inside the next
+// run's buffered window and "All units are booked for this time" rejected the
+// new create outright. Cleanup runs in a `finally` so it happens even when an
+// assertion above throws (including under CI's retries).
+async function deleteTestReservation(page: Page, id: string): Promise<void> {
+  await page.request.delete(`/api/reservations/${id}`).catch(() => undefined)
+}
+
+test('a status action in the reservation detail drawer transitions the reservation and the calendar reflects it', async ({
+  page,
+}) => {
+  await loginAsAdmin(page)
+
+  const service = await apiFindOne(page, 'services', 'Haircut')
+  const resource = await apiFindOne(page, 'resources', 'Alice Johnson')
+  const customer = await createTestCustomer(page, 'StatusAction')
+  // A few hours out (today) — inside the calendar's month-view grid on load,
+  // with no navigation required, and status-transition behaviour doesn't
+  // depend on notice period.
+  const reservation = await createTestReservation(page, {
+    customerId: customer.id,
+    hoursFromNow: 3,
+    resourceId: resource.id,
+    serviceId: service.id,
+  })
+
+  try {
+    await page.goto('/admin/collections/reservations')
+    await page.waitForSelector('text="Pending"', { timeout: 15_000 })
+
+    const event = page.locator('[title*="ZzzE2E StatusAction"]')
+    await expect(event).toBeVisible({ timeout: 15_000 })
+    await expect(event).toHaveAttribute('title', /Status: Pending/)
+
+    await event.click()
+    const drawer = page.locator('[data-reservation-detail]')
+    await expect(drawer).toBeVisible()
+
+    await drawer.getByRole('button', { name: 'Confirmed' }).click()
+
+    await expect(drawer.getByText('Status updated.')).toBeVisible()
+    // The calendar's own data reflects the change with no reload: the same
+    // event pill's tooltip flips from Pending to Confirmed.
+    await expect(event).toHaveAttribute('title', /Status: Confirmed/, { timeout: 10_000 })
+  } finally {
+    await deleteTestReservation(page, reservation.id)
+  }
+})
+
+test('cancelling inside the notice period shows the real sentence, not "The following field is invalid: status"', async ({
+  page,
+}) => {
+  await loginAsAdmin(page)
+
+  const service = await apiFindOne(page, 'services', 'Haircut')
+  const resource = await apiFindOne(page, 'resources', 'Bob Smith')
+  const customer = await createTestCustomer(page, 'NoticePeriod')
+  // 2 hours out is inside the dev config's 24-hour cancellationNoticePeriod.
+  const reservation = await createTestReservation(page, {
+    customerId: customer.id,
+    hoursFromNow: 2,
+    resourceId: resource.id,
+    serviceId: service.id,
+  })
+
+  try {
+    await page.goto('/admin/collections/reservations')
+    await page.waitForSelector('text="Pending"', { timeout: 15_000 })
+
+    const event = page.locator('[title*="ZzzE2E NoticePeriod"]')
+    await expect(event).toBeVisible({ timeout: 15_000 })
+
+    await event.click()
+    const drawer = page.locator('[data-reservation-detail]')
+    await expect(drawer).toBeVisible()
+
+    // The cancel transition prompts for a reason; accept it empty.
+    page.once('dialog', (dialog) => void dialog.accept(''))
+    await drawer.getByRole('button', { name: 'Cancelled' }).click()
+
+    // extractErrorMessage pulls the hook's real message out of Payload's
+    // nested error shape — not the generic wrapper string every naive read
+    // would show.
+    await expect(
+      drawer.getByText(/Cancellations require at least \d+ hours notice/),
+    ).toBeVisible()
+    await expect(drawer.getByText('The following field is invalid: status')).toHaveCount(0)
+    // Nothing actually transitioned.
+    await expect(event).toHaveAttribute('title', /Status: Pending/)
+  } finally {
+    await deleteTestReservation(page, reservation.id)
+  }
+})
+
+// ---------------------------------------------------------------------------
+// components.reservationDetail with a consumer-supplied component
+// (dev/components/ReservationDetailFixture.tsx), gated behind
+// RESERVE_DETAIL_SLOT=1 (see dev/payload.config.ts). This is the only test in
+// the repo that proves the detailSlot path actually renders a consumer
+// component — everything else exercises the plugin's own ReservationDetail.
+//
+// Skipped unless the dev server this suite runs against was itself booted
+// with the gate on:
+//   RESERVE_DETAIL_SLOT=1 pnpm dev:generate-importmap
+//   RESERVE_DETAIL_SLOT=1 DATABASE_URL=... pnpm dev
+//   RESERVE_DETAIL_SLOT=1 DATABASE_URL=... pnpm test:e2e --workers=1 -g "consumer-supplied"
+//
+// Run this test SCOPED (the -g above), not as part of a full-suite gated run.
+// `components.reservationDetail` is a single plugin-wide setting — the gate
+// swaps EVERY reservation's drawer body to this fixture, not just the one(s)
+// this test opens — so a full-suite run under the gate also fails several
+// pre-existing tests that assert the plugin's OWN ReservationDetail markup
+// (its Edit/Confirmed/Cancelled buttons), e.g. "CalendarView opens the
+// reservation detail drawer instead of the edit form" and the two tests
+// above this one. That is expected, not a bug in either the fixture or those
+// tests — it is why this fixture harness is opt-in and narrowly scoped
+// rather than folded into the default config.
+// ---------------------------------------------------------------------------
+
+test('a consumer-supplied components.reservationDetail component renders in place of the plugin body', async ({
+  page,
+}) => {
+  test.skip(
+    !process.env.RESERVE_DETAIL_SLOT,
+    'requires the dev server booted with RESERVE_DETAIL_SLOT=1 — see dev/payload.config.ts',
+  )
+
+  await loginAsAdmin(page)
+  await page.goto('/admin/collections/reservations')
+  await page.waitForSelector('text="Pending"', { timeout: 15_000 })
+
+  await page.locator('[role="button"][title]').first().click()
+
+  const drawer = page.locator('[data-reservation-detail]')
+  await expect(drawer).toBeVisible()
+
+  // The fixture's own marker, proving the consumer component rendered...
+  const fixture = drawer.locator('[data-reservation-detail-fixture]')
+  await expect(fixture).toBeVisible()
+  await expect(fixture).toContainText('RESERVE_DETAIL_SLOT_FIXTURE')
+  // ...and that it received the real document (not a stub) via
+  // useReservationDetail().
+  await expect(fixture).toContainText(/reservation \S+/i)
+
+  // ...in place of, not alongside, the plugin's own ReservationDetail body —
+  // its Edit button must not be present.
+  await expect(drawer.getByRole('button', { name: 'Edit' })).toHaveCount(0)
+})

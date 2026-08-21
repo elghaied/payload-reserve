@@ -6,7 +6,17 @@ export type ReservationItem = {
   startTime?: string
 }
 
-export type Reservation = {
+/**
+ * The UI-shaped reservation shape the calendar and detail drawer work with —
+ * deliberately loose (every relationship may arrive unpopulated as a bare id
+ * string, or populated to whatever depth the fetch that produced it used).
+ *
+ * Named `CalendarReservation`, not `Reservation`, because it is exported from
+ * the package root: `Reservation` there would collide conceptually with the
+ * consumer's own generated `payload-types` `Reservation`, which is what a
+ * plain `Reservation` import would be assumed to be.
+ */
+export type CalendarReservation = {
   cancellationReason?: string
   customer?: { firstName?: string; lastName?: string; name?: string } | string
   endTime?: string

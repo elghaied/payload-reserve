@@ -1,7 +1,7 @@
 'use client'
 import React, { createContext, useContext } from 'react'
 
-import type { Reservation } from '../shared/types.js'
+import type { CalendarReservation } from '../shared/types.js'
 
 export type ReservationDetailContextValue = {
   /** Close the detail drawer. */
@@ -13,7 +13,7 @@ export type ReservationDetailContextValue = {
    * resource, customer and items are populated, nothing else is. A component
    * needing more must fetch for itself.
    */
-  doc: null | Reservation
+  doc: CalendarReservation | null
   /** Re-fetch the calendar's reservations so `doc` reflects a server change. */
   refresh: () => void
 }

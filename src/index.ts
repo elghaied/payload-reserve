@@ -1,4 +1,8 @@
-export type { Reservation, ReservationItem, ResourceOption } from './components/shared/types.js'
+export type {
+  CalendarReservation,
+  ReservationItem,
+  ResourceOption,
+} from './components/shared/types.js'
 export { provisionStaffResource, roleMatches } from './hooks/users/provisionStaffResource.js'
 export { payloadReserve } from './plugin.js'
 export {

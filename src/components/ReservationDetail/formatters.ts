@@ -1,4 +1,4 @@
-import type { Reservation } from '../shared/types.js'
+import type { CalendarReservation } from '../shared/types.js'
 
 /**
  * Display name for whoever the booking is for.
@@ -6,7 +6,7 @@ import type { Reservation } from '../shared/types.js'
  * A booking has either a customer or a guest, never both. An unpopulated
  * relationship (a bare id string) yields the fallback rather than the id.
  */
-export function formatCustomerName(reservation: Reservation, fallback: string): string {
+export function formatCustomerName(reservation: CalendarReservation, fallback: string): string {
   const { customer, guest } = reservation
 
   if (customer && typeof customer === 'object') {
@@ -27,11 +27,11 @@ export function formatCustomerName(reservation: Reservation, fallback: string): 
 }
 
 /** Every populated resource name on the booking, top-level first, de-duplicated. */
-export function formatResourceNames(reservation: Reservation): string[] {
+export function formatResourceNames(reservation: CalendarReservation): string[] {
   const names: string[] = []
   const seen = new Set<string>()
 
-  const push = (value: Reservation['resource']) => {
+  const push = (value: CalendarReservation['resource']) => {
     if (!value || typeof value !== 'object' || !value.name) {
       return
     }

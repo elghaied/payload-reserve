@@ -11,7 +11,7 @@ import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } fr
 
 import type { PluginT } from '../../translations/index.js'
 import type { SlotInfo } from '../../utilities/computeSlotStates.js'
-import type { Reservation, ResourceOption } from '../shared/types.js'
+import type { CalendarReservation, ResourceOption } from '../shared/types.js'
 
 import {
   dayKeySequence,
@@ -58,7 +58,7 @@ const DEFAULT_HOUR_END = 20
  * time views share one window.
  */
 function computeHourWindow(
-  reservations: Reservation[],
+  reservations: CalendarReservation[],
   timeZone: string,
 ): { endHour: number; startHour: number } {
   let startHour = DEFAULT_HOUR_START
@@ -164,7 +164,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
 
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('month')
-  const [reservations, setReservations] = useState<Reservation[]>([])
+  const [reservations, setReservations] = useState<CalendarReservation[]>([])
   const [loading, setLoading] = useState(true)
   // { shown, total } when a fetch hit its cap, else null — drives a non-silent notice (D9)
   const [truncation, setTruncation] = useState<{ shown: number; total: number } | null>(null)
@@ -180,7 +180,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   const [selectedResourceId, setSelectedResourceId] = useState<string>('')
 
   // Pending tab state
-  const [pendingReservations, setPendingReservations] = useState<Reservation[]>([])
+  const [pendingReservations, setPendingReservations] = useState<CalendarReservation[]>([])
   const [pendingCount, setPendingCount] = useState(0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [confirmingIds, setConfirmingIds] = useState<Set<string>>(() => new Set())
@@ -426,7 +426,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   // REST while the filter/auto-select value is a string, and strict `===` on
   // the raw values filtered out EVERY reservation on Postgres installs.
   const matchesResourceFilter = useCallback(
-    (r: Reservation): boolean => reservationMatchesResource(r, selectedResourceId),
+    (r: CalendarReservation): boolean => reservationMatchesResource(r, selectedResourceId),
     [selectedResourceId],
   )
 
@@ -644,14 +644,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     return field.name ?? ''
   }
 
-  const getCustomerName = (field: Reservation['customer']): string => {
+  const getCustomerName = (field: CalendarReservation['customer']): string => {
     if (!field) {return ''}
     if (typeof field === 'string') {return ''}
     const parts = [field.firstName, field.lastName].filter(Boolean)
     return parts.length > 0 ? parts.join(' ') : (field.name ?? '')
   }
 
-  const getEventLabel = (r: Reservation, compact: boolean) => {
+  const getEventLabel = (r: CalendarReservation, compact: boolean) => {
     const time = new Date(r.startTime).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
@@ -667,7 +667,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   }
 
   // Returns all resource names for a reservation — from items array if present, otherwise top-level resource
-  const getResourceNames = (r: Reservation): string[] => {
+  const getResourceNames = (r: CalendarReservation): string[] => {
     if (r.items && r.items.length > 0) {
       const names = r.items
         .map((item) => getResName(item.resource))
@@ -678,7 +678,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     return single ? [single] : []
   }
 
-  const getEventTooltip = (r: Reservation): string => {
+  const getEventTooltip = (r: CalendarReservation): string => {
     const serviceName = getResName(r.service) || t('reservation:calendarUnknownService')
     const startStr = new Date(r.startTime).toLocaleTimeString([], {
       hour: '2-digit',
@@ -708,7 +708,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     ].join('\n')
   }
 
-  const renderEventItem = (r: Reservation, compact: boolean) => {
+  const renderEventItem = (r: CalendarReservation, compact: boolean) => {
     const hasItems = Array.isArray(r.items) && r.items.length > 0
     return (
       <EventPill

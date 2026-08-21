@@ -61,6 +61,19 @@ npm install payload-reserve
 
 **Peer dependencies:** `payload ^3.86.0`, `@payloadcms/ui ^3.86.0`, `@payloadcms/translations ^3.86.0`
 
+### ⚠️ Upgrading from an earlier version
+
+**Run `payload generate:importmap`, then restart your app, after upgrading to v3.2.0 or
+later — even if you never touch the `components` option.** The Reservations list view's
+default component changed from `payload-reserve/client#CalendarView` to
+`payload-reserve/rsc#CalendarViewServer`. Payload resolves admin component paths through an
+import map generated **into your own app**, not this package, so restarting on the new
+version without regenerating it leaves the old key in place and the new one missing. That
+failure is silent from the admin's point of view: a missing import-map key logs a
+`console.error` on the server and Payload's List view falls back to its own default table —
+your users just see a plain reservations table where the calendar used to be, with nothing
+telling them why.
+
 ---
 
 ## Quick Start
@@ -397,7 +410,7 @@ payloadReserve({
 
 Each slot accepts a **string** (your own Payload component path, e.g. `'/components/MyCalendar.tsx#MyCalendar'`), **`false`** (opt out), or **unset** (use the plugin's own component — the default).
 
-**`false` is asymmetric.** For five of the six slots, `false` falls back to a Payload default — the collection's ordinary list view, a plain relationship or date field, or simply not registering a widget/view. `reservationDetail` has no Payload default to fall back to: setting it `false` instead restores pre-3.2 behaviour (v3.1.1 and earlier) — clicking a calendar event opens the document edit drawer directly, with no detail step in between.
+**`false` is asymmetric.** For five of the six slots, `false` falls back to a Payload default — the collection's ordinary list view, a plain relationship or date field, or simply not registering a widget/view. `reservationDetail` has no Payload default to fall back to: setting it `false` instead restores v3.1.1 **click** behaviour — clicking a calendar event opens the document edit drawer directly, with no detail step in between. This is click behaviour specifically, not v3.1.1 behaviour byte-for-byte: the pending list's quick-action (✓/✗) failures now render the server's own error message instead of the old generic strings, and that change applies regardless of this flag — see the disclosures in the changelog for v3.2.0.
 
 **Whenever you set any slot to a string, run `payload generate:importmap` afterward.** Payload resolves every component path through a generated import map; a stale one means your component silently fails to render, and the server logs `PayloadComponent not found in importMap`.
 
@@ -421,28 +434,50 @@ import {
   StatusActionBar,
   StatusBadge,
   useReservationDetail,
+  useReservationMutations,
   useReservationStatusMachine,
 } from 'payload-reserve/client'
 
 export const MyReservationDetail = () => {
   const { doc, refresh } = useReservationDetail()
   const { labels, presentation } = useReservationStatusMachine()
+  const { transition } = useReservationMutations()
   if (!doc) return null
+
+  const handleSelect = async (next: string) => {
+    // `onSelect` receives the TARGET status — it's the caller's job to perform
+    // the mutation, `StatusActionBar` only renders the candidate buttons.
+    const result = await transition(doc.id, next)
+    // The server is the sole authority on whether a transition is legal
+    // (`validateStatusTransition`, `validateCancellation`); only re-fetch on
+    // success, and surface `result.message` yourself on failure — the built-in
+    // `ReservationDetail` (`src/components/ReservationDetail/index.tsx`) shows
+    // one pattern for that if you want a fuller reference.
+    if (result.ok) refresh()
+  }
+
   return (
     <div>
       <StatusBadge label={labels[doc.status] ?? doc.status} presentation={presentation[doc.status]} />
       <DetailRow label="Booking ref" value={doc.id} />
-      <StatusActionBar onSelect={() => refresh()} status={doc.status} />
+      <StatusActionBar onSelect={(next) => void handleSelect(next)} status={doc.status} />
     </div>
   )
 }
 ```
 
-`StatusActionBar` only ever shows candidate transitions from the configured status machine — it never decides whether one succeeds. The server (`validateStatusTransition`, `validateCancellation`) is the sole authority; a rejected transition surfaces the server's own error rather than being pre-judged on the client.
+`StatusActionBar` only ever shows candidate transitions from the configured status machine — it never decides whether one succeeds, and it never performs the mutation itself: `onSelect` receives the target status string and the caller is responsible for calling `useReservationMutations()` and refreshing. The server (`validateStatusTransition`, `validateCancellation`) is the sole authority; a rejected transition surfaces the server's own error rather than being pre-judged on the client. `useReservationMutations()` also exposes `cancel(id, status, reason?)` for the cancel transition specifically, if you want to collect a cancellation reason — the built-in component uses it for exactly that.
 
 #### Newly exported (v3.2)
 
-`payload-reserve/client` additionally exports the primitives and hooks the built-in `ReservationDetail` is composed from, so a replacement component doesn't have to reinvent them: `DetailRow`, `EventPill`, `ReservationDetail`, `ReservationDetailProvider`, `StatusActionBar`, `StatusBadge`, `useReservationDetail`, `useReservationMutations`, and `useReservationStatusMachine`. `payload-reserve/rsc` additionally exports `CalendarViewServer` — the server wrapper that resolves `components.reservationDetail` out of the import map and hands the client calendar a pre-rendered element.
+`payload-reserve/client` additionally exports the primitives and hooks the built-in `ReservationDetail` is composed from, so a replacement component doesn't have to reinvent them: `DetailRow`, `EventPill`, `ReservationDetail`, `ReservationDetailProvider`, `StatusActionBar`, `StatusBadge`, `useReservationDetail`, `useReservationMutations`, and `useReservationStatusMachine`. It also now re-exports the supporting types and helpers that were previously only on the package root — `CalendarReservation`, `ReservationItem`, `ResourceOption`, `buildStatusLabels`, `buildStatusPresentation`, `BUILTIN_STATUSES`, and `StatusPresentation` — so a `'use client'` detail component doesn't need to import the server plugin barrel just to name a type. `payload-reserve/rsc` additionally exports `CalendarViewServer` — the server wrapper that resolves `components.reservationDetail` out of the import map and hands the client calendar a pre-rendered element.
+
+**Renamed:** the package root's `Reservation` type is now `CalendarReservation` (type-only change, no runtime effect) — it is a deliberately loose, UI-shaped structural type, and exporting it as plain `Reservation` from the root was too easy to mistake for your app's own generated `payload-types` `Reservation`. `ReservationItem` keeps its name; it doesn't collide the same way, since Payload does not generate a type by that name.
+
+#### Other small disclosures (v3.2)
+
+- The fetch behind the detail drawer's status mutations (`useReservationMutations`, via `performReservationPatch`) now sends `credentials: 'include'`. It previously sent none, which defaults to `same-origin`. This is better behaviour for a cross-origin `serverURL`, but is a behaviour change worth knowing about.
+- `CalendarView`'s exported prop type changed from `React.FC<AdminViewServerProps>` to `React.FC<CalendarViewProps>`. Runtime-compatible if you just render the component; a type-level break if you imported and typed against it directly.
 
 ---
 

@@ -2,7 +2,7 @@
 import React from 'react'
 
 import type { StatusPresentation } from '../../../utilities/statusPresentation.js'
-import type { Reservation } from '../../shared/types.js'
+import type { CalendarReservation } from '../../shared/types.js'
 
 import styles from './EventPill.module.css'
 
@@ -14,7 +14,7 @@ export type EventPillProps = {
   onSelect: (id: string) => void
   /** Status colours; applied inline so custom statuses are styled identically to built-ins. */
   presentation?: StatusPresentation
-  reservation: Reservation
+  reservation: CalendarReservation
   tooltip?: string
 }
 
