@@ -6,6 +6,7 @@ import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } fr
 
 import type { PluginT } from '../../translations/index.js'
 import type { SlotInfo } from '../../utilities/computeSlotStates.js'
+import type { Reservation, ResourceOption } from '../shared/types.js'
 
 import {
   dayKeySequence,
@@ -17,7 +18,6 @@ import {
 } from '../../utilities/calendarGrid.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { externalPillLabel } from '../../utilities/externalPillLabel.js'
-import { statusToI18nKey } from '../../utilities/i18nUtils.js'
 import { reservationMatchesResource, sameId } from '../../utilities/reservationResourceFilter.js'
 import {
   addDaysToDayKey,
@@ -26,56 +26,14 @@ import {
 } from '../../utilities/timezoneUtils.js'
 import { useTenantFilter } from '../../utilities/useTenantFilter.js'
 import { useReservationMutations } from '../hooks/useReservationMutations.js'
+import { useReservationStatusMachine } from '../hooks/useReservationStatusMachine.js'
+import eventPillStyles from '../primitives/EventPill/EventPill.module.css'
+import { EventPill } from '../primitives/EventPill/index.js'
 import styles from './CalendarView.module.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
 import { useResourceAvailability } from './useResourceAvailability.js'
 
 type ViewMode = 'day' | 'lanes' | 'month' | 'pending' | 'week'
-
-type ReservationItem = {
-  endTime?: string
-  guestCount?: number
-  resource?: { id?: string; name?: string } | string
-  service?: { name?: string } | string
-  startTime?: string
-}
-
-type Reservation = {
-  customer?: { firstName?: string; lastName?: string; name?: string } | string
-  endTime?: string
-  id: string
-  items?: ReservationItem[]
-  resource?: { id?: string; name?: string } | string
-  service?: { name?: string } | string
-  startTime: string
-  status: string
-}
-
-type ResourceOption = {
-  id: string
-  name: string
-}
-
-// Built-in status → CSS class map (for known statuses; custom statuses use inline style)
-const STATUS_CLASS_MAP: Record<string, string> = {
-  cancelled: styles.statusCancelled,
-  completed: styles.statusCompleted,
-  confirmed: styles.statusConfirmed,
-  'no-show': styles.statusNoShow,
-  pending: styles.statusPending,
-}
-
-// Built-in default colors for known statuses
-const BUILTIN_STATUS_COLORS: Record<string, string> = {
-  cancelled: '#e5e7eb',
-  completed: '#d1fae5',
-  confirmed: '#dbeafe',
-  'no-show': '#fee2e2',
-  pending: '#fef3c7',
-}
-
-// Palette for auto-assigning colors to custom statuses
-const CUSTOM_STATUS_PALETTE = ['#fde68a', '#c7d2fe', '#a7f3d0', '#fca5a5', '#fdba74']
 
 // Safe ceiling for list fetches; when totalDocs exceeds this we surface a
 // "showing N of M" notice rather than silently truncating (review D9).
@@ -174,53 +132,15 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   // The initial/pending status (what "pending" view shows)
   const defaultStatus = statusMachine?.defaultStatus ?? 'pending'
 
-  // Build STATUS_COLORS dynamically: built-ins first, then auto-assign palette for custom statuses
-  const STATUS_COLORS = useMemo<Record<string, string>>(() => {
-    const colors = { ...BUILTIN_STATUS_COLORS }
-    const statuses = statusMachine?.statuses ?? []
-    statuses.forEach((s, i) => {
-      if (!colors[s]) {
-        colors[s] = CUSTOM_STATUS_PALETTE[i % CUSTOM_STATUS_PALETTE.length]
-      }
-    })
-    return colors
-  }, [statusMachine])
-
-  // Derive confirm/cancel target statuses from config transitions
-  // "confirm" = first non-terminal transition from defaultStatus
-  // "cancel"  = first terminal transition from defaultStatus (or fallback: 'cancelled')
-  const { cancelStatus, confirmStatus } = useMemo(() => {
-    const terminalStatuses = statusMachine?.terminalStatuses ?? ['completed', 'cancelled', 'no-show']
-    const transitions = statusMachine?.transitions ?? {}
-    const defaultTransitions: string[] = transitions[defaultStatus] ?? []
-
-    const nonTerminal = defaultTransitions.find((s) => !terminalStatuses.includes(s))
-    const terminal = defaultTransitions.find((s) => terminalStatuses.includes(s))
-
-    return {
-      cancelStatus: terminal ?? 'cancelled',
-      confirmStatus: nonTerminal ?? 'confirmed',
-    }
-  }, [statusMachine, defaultStatus])
-
-  const STATUS_LABELS = useMemo<Record<string, string>>(() => {
-    const statuses = statusMachine?.statuses ?? [
-      'pending',
-      'confirmed',
-      'completed',
-      'cancelled',
-      'no-show',
-    ]
-    const labels: Record<string, string> = {}
-    for (const s of statuses) {
-      // Attempt to look up a translation key, e.g. reservation:statusPending
-      const key = statusToI18nKey(s)
-      const translated = t(key)
-      // If translation returns the key itself, it's missing — fall back to capitalized status name
-      labels[s] = translated !== key ? translated : s.charAt(0).toUpperCase() + s.slice(1)
-    }
-    return labels
-  }, [statusMachine, t])
+  // Labels, colours, and confirm/cancel targets, all derived from the resolved
+  // status machine — shared with every other status-aware admin component.
+  const {
+    cancelStatus,
+    confirmStatus,
+    labels: STATUS_LABELS,
+    presentation: STATUS_PRESENTATION,
+    statuses: allStatuses,
+  } = useReservationStatusMachine()
 
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('month')
@@ -569,24 +489,8 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     confirmStatus,
   ])
 
-  const handleEventClick = useCallback(
-    (e: React.MouseEvent, id: string) => {
-      e.stopPropagation()
-      requestDrawer(id)
-    },
-    [requestDrawer],
-  )
-
-  const handleEventKeyDown = useCallback(
-    (e: React.KeyboardEvent, id: string) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        e.stopPropagation()
-        requestDrawer(id)
-      }
-    },
-    [requestDrawer],
-  )
+  // Placeholder — Task 11 replaces this body with the real detail-drawer open.
+  const openDetail = (id: string) => requestDrawer(id)
 
   const handleCreateNew = useCallback(() => {
     requestDrawer(null)
@@ -716,24 +620,17 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   }
 
   const renderEventItem = (r: Reservation, compact: boolean) => {
-    // Use CSS class for built-in statuses; also apply inline background for custom statuses
-    const cssClass = STATUS_CLASS_MAP[r.status] ?? ''
-    const color = STATUS_COLORS[r.status]
-    // Only apply inline style when there's no CSS class (custom statuses) or as a supplement
-    const inlineStyle = cssClass ? undefined : { background: color }
     const hasItems = Array.isArray(r.items) && r.items.length > 0
     return (
-      <div
-        className={`${styles.eventItem} ${cssClass} ${hasItems && !compact ? styles.eventItemExpanded : ''}`}
+      <EventPill
+        compact={compact}
         key={r.id}
-        onClick={(e) => handleEventClick(e, r.id)}
-        onKeyDown={(e) => handleEventKeyDown(e, r.id)}
-        role="button"
-        style={inlineStyle}
-        tabIndex={0}
-        title={getEventTooltip(r)}
+        label={getEventLabel(r, compact)}
+        onSelect={openDetail}
+        presentation={STATUS_PRESENTATION[r.status]}
+        reservation={r}
+        tooltip={getEventTooltip(r)}
       >
-        {getEventLabel(r, compact)}
         {hasItems && (
           <div className={styles.itemBadges}>
             {r.items!.map((it, i) => {
@@ -746,18 +643,21 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
             })}
           </div>
         )}
-      </div>
+      </EventPill>
     )
   }
 
   // Dynamic legend: iterates all statuses from the status machine config
   const renderStatusLegend = () => {
-    const statuses = statusMachine?.statuses ?? Object.keys(BUILTIN_STATUS_COLORS)
+    const statuses = allStatuses
     return (
       <div className={styles.statusLegend}>
         {statuses.map((key) => (
           <div className={styles.legendItem} key={key}>
-            <span className={styles.legendDot} style={{ background: STATUS_COLORS[key] }} />
+            <span
+              className={styles.legendDot}
+              style={{ background: STATUS_PRESENTATION[key]?.background }}
+            />
             {STATUS_LABELS[key] ?? key}
           </div>
         ))}
@@ -840,7 +740,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
               {dayReservations.map((r) => renderEventItem(r, true))}
               {dayExternal.map((ev, j) => (
                 <div
-                  className={`${styles.eventItem} ${styles.eventItemExternal}`}
+                  className={`${eventPillStyles.eventItem} ${styles.eventItemExternal}`}
                   key={`ext-${ev.start}-${j}`}
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => e.stopPropagation()}

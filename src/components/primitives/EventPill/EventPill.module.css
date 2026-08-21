@@ -1,0 +1,19 @@
+.eventItem {
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 0.625rem;
+  margin-bottom: 1px;
+  overflow: hidden;
+  padding: 2px 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eventItem:hover {
+  opacity: 0.8;
+}
+
+.eventItemExpanded {
+  overflow: visible;
+  white-space: normal;
+}

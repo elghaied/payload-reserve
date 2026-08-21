@@ -157,21 +157,6 @@
   margin-bottom: 2px;
 }
 
-.eventItem {
-  font-size: 0.625rem;
-  padding: 2px 4px;
-  margin-bottom: 1px;
-  border-radius: 2px;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.eventItem:hover {
-  opacity: 0.8;
-}
-
 .eventItemExternal {
   background: repeating-linear-gradient(
     45deg,
@@ -186,31 +171,6 @@
 
 .eventItemExternal:hover {
   opacity: 1;
-}
-
-.statusPending {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.statusConfirmed {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.statusCompleted {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.statusCancelled {
-  background: #e5e7eb;
-  color: #6b7280;
-}
-
-.statusNoShow {
-  background: #fee2e2;
-  color: #991b1b;
 }
 
 .weekView {
@@ -615,11 +575,6 @@
 }
 
 /* Multi-resource item badges inside event blocks */
-.eventItemExpanded {
-  overflow: visible;
-  white-space: normal;
-}
-
 .itemBadges {
   display: flex;
   flex-wrap: wrap;

@@ -11,6 +11,8 @@ export type { ReservationStatusMachine } from '../components/hooks/useReservatio
 export { useReservationStatusMachine } from '../components/hooks/useReservationStatusMachine.js'
 export { DetailRow } from '../components/primitives/DetailRow/index.js'
 export type { DetailRowProps } from '../components/primitives/DetailRow/index.js'
+export { EventPill } from '../components/primitives/EventPill/index.js'
+export type { EventPillProps } from '../components/primitives/EventPill/index.js'
 export { StatusActionBar } from '../components/primitives/StatusActionBar/index.js'
 export type { StatusActionBarProps } from '../components/primitives/StatusActionBar/index.js'
 export { StatusBadge } from '../components/primitives/StatusBadge/index.js'
