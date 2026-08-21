@@ -137,6 +137,7 @@ export function resolveConfig(
     cancellationNoticePeriod:
       pluginOptions.cancellationNoticePeriod ?? DEFAULT_CANCELLATION_NOTICE_PERIOD,
     collectionOverrides: pluginOptions.collectionOverrides ?? {},
+    components: pluginOptions.components ?? {},
     debug: pluginOptions.debug ?? false,
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,

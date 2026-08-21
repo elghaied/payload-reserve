@@ -180,6 +180,33 @@ export type GetExternalBusy = (args: {
   start: Date
 }) => Promise<ExternalBusyInterval[]>
 
+// --- Component slots (admin UI customization) ---
+
+/** A component slot: a Payload component path, or `false` to opt out. */
+export type ReservationComponentSlot = false | string
+
+/**
+ * Per-slot overrides for the plugin's admin components.
+ *
+ * A **string** is your own Payload component path (e.g.
+ * `'my-app/components#MyCalendar'`). **`false`** opts out. **Unset** uses the
+ * plugin's own component.
+ *
+ * `false` is asymmetric: for five slots it falls back to Payload's default
+ * (the default list view, a plain relationship field, a plain date field, or
+ * simply not registering the widget/view). For `reservationDetail` there is no
+ * Payload default, so `false` restores v3.1.1 behaviour — clicking a calendar
+ * event opens the document drawer directly, with no detail step.
+ */
+export type ReservationComponentOverrides = {
+  availabilityOverview?: ReservationComponentSlot
+  availabilityTimeField?: ReservationComponentSlot
+  calendarView?: ReservationComponentSlot
+  customerField?: ReservationComponentSlot
+  dashboardWidget?: ReservationComponentSlot
+  reservationDetail?: ReservationComponentSlot
+}
+
 export type ReservationPluginConfig = {
   /** Override access control per collection */
   access?: {
@@ -203,6 +230,8 @@ export type ReservationPluginConfig = {
     schedules?: CollectionOverride
     services?: CollectionOverride
   }
+  /** Per-slot overrides for the plugin's admin components (opt-in customization) */
+  components?: ReservationComponentOverrides
   /** Emit info-level `reserve_debug` traces for slot generation and conflict detection (default false) */
   debug?: boolean
   /** Default buffer time in minutes between reservations */
@@ -291,6 +320,7 @@ export type ResolvedReservationPluginConfig = {
     schedules?: CollectionOverride
     services?: CollectionOverride
   }
+  components: ReservationComponentOverrides
   debug: boolean
   defaultBufferTime: number
   disabled: boolean
