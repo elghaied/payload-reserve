@@ -2,5 +2,7 @@ export { AvailabilityOverview } from '../components/AvailabilityOverview/index.j
 export { AvailabilityTimeField } from '../components/AvailabilityTimeField/index.js'
 export { CalendarView } from '../components/CalendarView/index.js'
 export { CustomerField } from '../components/CustomerField/index.js'
+export type { ReservationStatusMachine } from '../components/hooks/useReservationStatusMachine.js'
+export { useReservationStatusMachine } from '../components/hooks/useReservationStatusMachine.js'
 export { StatusBadge } from '../components/primitives/StatusBadge/index.js'
 export type { StatusBadgeProps } from '../components/primitives/StatusBadge/index.js'
