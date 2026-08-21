@@ -1,7 +1,12 @@
 'use client'
-import type { AdminViewServerProps } from 'payload'
-
-import { useConfig, useDocumentDrawer, useTranslation } from '@payloadcms/ui'
+import {
+  Drawer,
+  useConfig,
+  useDocumentDrawer,
+  useDrawerSlug,
+  useModal,
+  useTranslation,
+} from '@payloadcms/ui'
 import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
@@ -29,6 +34,8 @@ import { useReservationMutations } from '../hooks/useReservationMutations.js'
 import { useReservationStatusMachine } from '../hooks/useReservationStatusMachine.js'
 import eventPillStyles from '../primitives/EventPill/EventPill.module.css'
 import { EventPill } from '../primitives/EventPill/index.js'
+import { ReservationDetailProvider } from '../ReservationDetail/context.js'
+import { ReservationDetail } from '../ReservationDetail/index.js'
 import styles from './CalendarView.module.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
 import { useResourceAvailability } from './useResourceAvailability.js'
@@ -69,7 +76,20 @@ function computeHourWindow(
   return { endHour: Math.min(endHour, 24), startHour: Math.max(startHour, 0) }
 }
 
-export const CalendarView: React.FC<AdminViewServerProps> = () => {
+export type CalendarViewProps = {
+  /** True when `components.reservationDetail` is `false` — restores v3.1.1 behaviour. */
+  detailDisabled?: boolean
+  /**
+   * A pre-rendered reservation-detail element, supplied by CalendarViewServer when
+   * `components.reservationDetail` names a consumer component. When absent, the
+   * plugin's own ReservationDetail renders instead; when
+   * `components.reservationDetail` is `false`, CalendarViewServer passes
+   * `detailDisabled` and clicks go straight to the document drawer.
+   */
+  detailSlot?: React.ReactNode
+}
+
+export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, detailSlot }) => {
   const { config } = useConfig()
   const { t: _t } = useTranslation()
   const t = _t as PluginT
@@ -153,6 +173,7 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const pendingSeq = useRef(0)
   const [drawerDocId, setDrawerDocId] = useState<null | string>(null)
   const [initialData, setInitialData] = useState<Record<string, unknown> | undefined>(undefined)
+  const [detailId, setDetailId] = useState<null | string>(null)
 
   // Resource filter state
   const [resources, setResources] = useState<ResourceOption[]>([])
@@ -197,6 +218,38 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     // the modal context value, and re-firing on that would reopen a closed drawer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequest])
+
+  const detailDrawerSlug = useDrawerSlug('reservation-detail')
+  const { closeModal, isModalOpen, openModal } = useModal()
+  const detailModalOpen = isModalOpen(detailDrawerSlug)
+
+  useEffect(() => {
+    if (detailId) {
+      openModal(detailDrawerSlug)
+    } else {
+      closeModal(detailDrawerSlug)
+    }
+    // Keyed on detailId alone: openModal/closeModal identities track modal
+    // context and re-firing on them would reopen a drawer the user just closed —
+    // the same hazard documented on the document drawer's openRequest effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailId, detailDrawerSlug])
+
+  const detailWasOpen = useRef(false)
+
+  useEffect(() => {
+    if (detailModalOpen) {
+      detailWasOpen.current = true
+      return
+    }
+    // Only clear once the modal has actually been open. Without this guard the
+    // effect fires on the render between `setDetailId(id)` and `openModal(...)`,
+    // when the modal is still closed, and immediately cancels the open.
+    if (detailWasOpen.current) {
+      detailWasOpen.current = false
+      setDetailId(null)
+    }
+  }, [detailModalOpen])
 
   // Fetch active resources for filter dropdown
   useEffect(() => {
@@ -341,6 +394,32 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
       void fetchPendingReservations()
     }
   }, [viewMode, fetchPendingReservations])
+
+  // The drawer holds an id, not a document: the doc is resolved live from the
+  // arrays the calendar already fetched, so a mutation + refetch updates the
+  // drawer with no second cache to keep in sync.
+  const detailDoc = useMemo(
+    () =>
+      detailId
+        ? (reservations.find((r) => r.id === detailId) ??
+          pendingReservations.find((r) => r.id === detailId) ??
+          null)
+        : null,
+    [detailId, pendingReservations, reservations],
+  )
+
+  const closeDetail = useCallback(() => setDetailId(null), [])
+
+  const refreshDetail = useCallback(() => {
+    void fetchReservations()
+    void fetchPendingReservations()
+    void fetchPendingCount()
+  }, [fetchPendingCount, fetchPendingReservations, fetchReservations])
+
+  const detailContextValue = useMemo(
+    () => ({ close: closeDetail, doc: detailDoc, refresh: refreshDetail }),
+    [closeDetail, detailDoc, refreshDetail],
+  )
 
   // Client-side resource filtering. Delegated to a pure, unit-tested helper:
   // ids MUST be compared string-normalized — Postgres serves numeric ids over
@@ -489,8 +568,25 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
     confirmStatus,
   ])
 
-  // Placeholder — Task 11 replaces this body with the real detail-drawer open.
-  const openDetail = (id: string) => requestDrawer(id)
+  const openDetail = useCallback(
+    (id: string) => {
+      if (detailDisabled) {
+        requestDrawer(id)
+        return
+      }
+      setDetailId(id)
+    },
+    [detailDisabled, requestDrawer],
+  )
+
+  // Edit swaps: close the detail, then open the existing document drawer.
+  const handleDetailEdit = useCallback(
+    (id: string) => {
+      setDetailId(null)
+      requestDrawer(id)
+    },
+    [requestDrawer],
+  )
 
   const handleCreateNew = useCallback(() => {
     requestDrawer(null)
@@ -518,13 +614,6 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
   const handleLaneBook = useCallback(
     (resourceId: string, startIso: string) => {
       requestDrawer(null, { resource: resourceId, startTime: startIso })
-    },
-    [requestDrawer],
-  )
-
-  const openDocDrawer = useCallback(
-    (id: string) => {
-      requestDrawer(id)
     },
     [requestDrawer],
   )
@@ -1147,11 +1236,11 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
                   <td className={styles.pendingTd}>
                     <span
                       className={styles.pendingCustomerLink}
-                      onClick={() => openDocDrawer(r.id)}
+                      onClick={() => openDetail(r.id)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
-                          openDocDrawer(r.id)
+                          openDetail(r.id)
                         }
                       }}
                       role="button"
@@ -1348,6 +1437,18 @@ export const CalendarView: React.FC<AdminViewServerProps> = () => {
         </>
       )}
       {viewMode === 'pending' && renderPendingView()}
+      {detailDoc && (
+        <Drawer Header={null} slug={detailDrawerSlug} title={t('reservation:detailTitle')}>
+          {/* Stable hook for e2e — the drawer's own markup comes from
+              @faceless-ui/modal and is not a native <dialog>, so tests must not
+              key off Payload's internal class names. */}
+          <div className={styles.detailDrawerBody} data-reservation-detail="true">
+            <ReservationDetailProvider value={detailContextValue}>
+              {detailSlot ?? <ReservationDetail onEdit={handleDetailEdit} />}
+            </ReservationDetailProvider>
+          </div>
+        </Drawer>
+      )}
       <DocumentDrawer initialData={initialData} onSave={handleDrawerSave} />
     </div>
   )

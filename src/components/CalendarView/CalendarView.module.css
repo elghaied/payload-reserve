@@ -592,3 +592,7 @@
   font-size: 9px;
   padding: 1px 4px;
 }
+
+.detailDrawerBody {
+  padding: 4px 0 8px;
+}
