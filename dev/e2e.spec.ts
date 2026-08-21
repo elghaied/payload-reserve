@@ -520,14 +520,23 @@ test('AvailabilityOverview can navigate back to this week', async ({ page }) => 
 })
 
 // ---------------------------------------------------------------------------
-// CalendarView document drawer
+// CalendarView document + reservation detail drawers
 //
-// The drawer is opened indirectly: a click sets `drawerDocId` state, and an
-// effect calls `openDrawer()` on the resulting render (the id is baked into the
-// modal slug, so opening synchronously would target the previous document).
-// If a click sets the state to what it already holds, React bails out of the
-// re-render and the effect never runs — the click is silently swallowed.
-// These tests pin the paths where that happens.
+// The document drawer is opened indirectly: a click sets `drawerDocId` state,
+// and an effect calls `openDrawer()` on the resulting render (the id is baked
+// into the modal slug, so opening synchronously would target the previous
+// document). If a click sets the state to what it already holds, React bails
+// out of the re-render and the effect never runs — the click is silently
+// swallowed. The "Create New" test below pins that path.
+//
+// A calendar event click and a pending row's customer link instead open the
+// reservation DETAIL drawer (a plain `<Drawer>`, not Payload's DocumentDrawer).
+// It has no `onClose` prop, so closing it via its own close button doesn't by
+// itself clear the calendar's `detailId` state — CalendarView mirrors the
+// modal's own open/closed state back into `detailId` (ref-guarded, so the
+// mirroring effect can't fire on the render before the modal has actually
+// opened and cancel its own open). The two "reopens..." tests below pin that
+// close → reopen path for the detail drawer instead.
 // ---------------------------------------------------------------------------
 
 // Open the reservations calendar and wait until its fetches have settled, so a
@@ -550,23 +559,27 @@ test('CalendarView opens the create drawer from Create New on a freshly loaded c
   await expect(page.locator('.doc-drawer')).toBeVisible({ timeout: 10_000 })
 })
 
-test('CalendarView reopens the same reservation after its drawer is closed', async ({ page }) => {
+// Scoped by `data-reservation-detail` (our own marker), not `.doc-drawer` — this
+// isn't Payload's DocumentDrawer. Closed via `.drawer__close`, the base `<Drawer>`
+// component's always-present close button (unaffected by the custom `Header` we
+// pass, which only suppresses Payload's own title/close header block).
+test('CalendarView reopens the reservation detail drawer after it is closed', async ({ page }) => {
   await openSettledCalendar(page)
 
   const event = page.locator('[title*="Customer:"]').first()
-  const drawer = page.locator('.doc-drawer')
+  const drawer = page.locator('.drawer', { has: page.locator('[data-reservation-detail="true"]') })
 
   await event.click()
   await expect(drawer).toBeVisible({ timeout: 10_000 })
 
-  await page.locator('.doc-drawer__header-close').click()
+  await drawer.locator('.drawer__close').click()
   await expect(drawer).toBeHidden({ timeout: 10_000 })
 
   await event.click()
   await expect(drawer).toBeVisible({ timeout: 10_000 })
 })
 
-test('CalendarView reopens the same pending reservation after its drawer is closed', async ({
+test('CalendarView reopens the pending reservation detail drawer after it is closed', async ({
   page,
 }) => {
   await openSettledCalendar(page)
@@ -575,12 +588,12 @@ test('CalendarView reopens the same pending reservation after its drawer is clos
   await page.waitForTimeout(1_000)
 
   const customerLink = page.locator('td [role="button"]').first()
-  const drawer = page.locator('.doc-drawer')
+  const drawer = page.locator('.drawer', { has: page.locator('[data-reservation-detail="true"]') })
 
   await customerLink.click()
   await expect(drawer).toBeVisible({ timeout: 10_000 })
 
-  await page.locator('.doc-drawer__header-close').click()
+  await drawer.locator('.drawer__close').click()
   await expect(drawer).toBeHidden({ timeout: 10_000 })
 
   await customerLink.click()

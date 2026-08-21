@@ -1437,8 +1437,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
         </>
       )}
       {viewMode === 'pending' && renderPendingView()}
-      {detailDoc && (
-        <Drawer Header={null} slug={detailDrawerSlug} title={t('reservation:detailTitle')}>
+      {/* Gated on `detailId`, not `detailDoc`: `doc` can legitimately go null while
+          the modal is still open (e.g. confirming a pending row whose startTime
+          falls outside the calendar's fetched range — refresh() no longer finds it
+          in either list). Unmounting the Drawer itself in that case would leave the
+          underlying modal open with no close affordance — an invisible, unclickable
+          overlay. Keeping the Drawer mounted means its own close button survives;
+          the body just shows whatever the null-doc case renders (ReservationDetail
+          renders nothing for it; the context type documents `doc: null` for any
+          detailSlot to do the same) until the next click or Escape. */}
+      {detailId && (
+        <Drawer
+          Header={<h2 className={styles.detailDrawerTitle}>{t('reservation:detailTitle')}</h2>}
+          slug={detailDrawerSlug}
+        >
           {/* Stable hook for e2e — the drawer's own markup comes from
               @faceless-ui/modal and is not a native <dialog>, so tests must not
               key off Payload's internal class names. */}

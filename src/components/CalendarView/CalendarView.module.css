@@ -596,3 +596,18 @@
 .detailDrawerBody {
   padding: 4px 0 8px;
 }
+
+/* Visually-hidden accessible name for the detail Drawer. ReservationDetail (or a
+   consumer's detailSlot) already renders its own visible heading — this exists
+   only so the dialog has a real title in the accessibility tree instead of
+   Payload's slug-based fallback, without drawing a second, duplicate-looking
+   header bar above it. */
+.detailDrawerTitle {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
