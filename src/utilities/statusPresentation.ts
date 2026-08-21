@@ -48,6 +48,20 @@ export function buildStatusPresentation(statuses: string[]): Record<string, Stat
 }
 
 /**
+ * Title-cases a raw status for display when no translation exists, e.g.
+ * `awaiting-deposit` -> `Awaiting Deposit`. Splits on hyphens and underscores
+ * so each word gets its own capital letter, rather than capitalising only the
+ * first character of the whole string (which rendered as `Awaiting-deposit`).
+ */
+function titleCaseStatus(status: string): string {
+  return status
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+/**
  * `t` is widened to the minimal shape this function actually needs, rather than
  * the plugin's internal `PluginT` — `PluginT` is exported from no entry point,
  * so a consumer calling this from `payload-reserve/client` couldn't name it.
@@ -61,8 +75,7 @@ export function buildStatusLabels(
     const key = statusToI18nKey(status)
     const translated = t(key)
     // A missing translation returns the key itself — fall back to the raw status.
-    labels[status] =
-      translated !== key ? translated : status.charAt(0).toUpperCase() + status.slice(1)
+    labels[status] = translated !== key ? translated : titleCaseStatus(status)
   }
   return labels
 }

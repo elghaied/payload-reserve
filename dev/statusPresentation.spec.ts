@@ -46,4 +46,31 @@ describe('buildStatusLabels', () => {
   it('capitalises the raw status when the translation key is missing', () => {
     expect(buildStatusLabels(['voided'], t).voided).toBe('Voided')
   })
+
+  it('title-cases each hyphen-separated word instead of capitalising only the first letter', () => {
+    expect(buildStatusLabels(['awaiting-deposit'], t)['awaiting-deposit']).toBe('Awaiting Deposit')
+  })
+
+  it('title-cases each underscore-separated word', () => {
+    expect(buildStatusLabels(['awaiting_deposit'], t)['awaiting_deposit']).toBe('Awaiting Deposit')
+  })
+
+  it('uses the real translation for every built-in status, so the fallback never fires for them', () => {
+    const realT = ((key: string) => {
+      const map: Record<string, string> = {
+        'reservation:statusCancelled': 'Cancelled',
+        'reservation:statusCompleted': 'Completed',
+        'reservation:statusConfirmed': 'Confirmed',
+        'reservation:statusNoShow': 'No Show',
+        'reservation:statusPending': 'Pending',
+      }
+      return map[key] ?? key
+    }) as never
+    const labels = buildStatusLabels(BUILTIN_STATUSES, realT)
+    expect(labels.pending).toBe('Pending')
+    expect(labels.confirmed).toBe('Confirmed')
+    expect(labels.completed).toBe('Completed')
+    expect(labels.cancelled).toBe('Cancelled')
+    expect(labels['no-show']).toBe('No Show')
+  })
 })

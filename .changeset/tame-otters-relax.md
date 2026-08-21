@@ -94,3 +94,24 @@ are unaffected — their exact background/foreground pairs were carried over ver
 - `CalendarView`'s exported prop type changed from `React.FC<AdminViewServerProps>` to
   `React.FC<CalendarViewProps>`. Runtime-compatible — nothing changes if you just render the
   component — but a type-level break for anyone who imported and typed against it directly.
+
+### Fixes from post-merge review
+
+- **Hyphenated/underscored custom statuses now render correctly.** A custom status like
+  `awaiting-deposit` used to fall back to `Awaiting-deposit` (only the first character
+  capitalised) when no translation was configured for it. It now title-cases each
+  hyphen- or underscore-separated word instead: `Awaiting Deposit`. Built-in statuses
+  (`pending`, `confirmed`, `completed`, `cancelled`, `no-show`) always resolve through a
+  real translation, so this fallback never applied to them and they render unchanged.
+- **Fixed a rare stale-paint bug in the reservation detail drawer:** closing a reservation
+  while a status-change mutation was still in flight, then reopening the *same*
+  reservation before that mutation resolved, could paint the earlier request's result — a
+  success/error banner, a disabled button — into the reopened drawer. The guard now tracks
+  a monotonically increasing request generation rather than comparing reservation ids,
+  which couldn't distinguish "a different reservation is now open" from "the same
+  reservation was closed and reopened."
+- `StatusActionBar` gained an optional `noActionsFallback` prop (`React.ReactNode`, default
+  `null`) — rendered in place of the bar when the current status has no outgoing
+  transitions, so a caller wanting a "no actions available" message doesn't have to
+  re-derive that check itself. Fully backward compatible: omitting it preserves the
+  existing render-nothing behaviour exactly.
