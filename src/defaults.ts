@@ -134,6 +134,7 @@ export function resolveConfig(
     access: pluginOptions.access ?? {},
     adminGroup: pluginOptions.adminGroup ?? DEFAULT_ADMIN_GROUP,
     allowGuestBooking: pluginOptions.allowGuestBooking ?? DEFAULT_ALLOW_GUEST_BOOKING,
+    calendar: pluginOptions.calendar ?? {},
     cancellationNoticePeriod:
       pluginOptions.cancellationNoticePeriod ?? DEFAULT_CANCELLATION_NOTICE_PERIOD,
     collectionOverrides: pluginOptions.collectionOverrides ?? {},

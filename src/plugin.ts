@@ -526,6 +526,7 @@ export const payloadReserve =
     config.admin.custom.reservationStatusMachine = resolved.statusMachine
     config.admin.custom.reservationTenant = resolved.multiTenant
     config.admin.custom.reservationTimezone = resolved.timezone
+    config.admin.custom.reservationCalendar = resolved.calendar
 
     // The detail component is resolved at render time by CalendarViewServer, so
     // it lives in admin.custom rather than being written into Payload config as a

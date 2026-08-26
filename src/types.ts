@@ -1,5 +1,7 @@
 import type { CollectionConfig, Field, PayloadRequest } from 'payload'
 
+import type { StatusPresentation } from './utilities/statusPresentation.js'
+
 // --- Duration & Capacity models ---
 
 export type DurationType = 'fixed' | 'flexible' | 'full-day'
@@ -207,6 +209,23 @@ export type ReservationComponentOverrides = {
   reservationDetail?: ReservationComponentSlot
 }
 
+/** Calendar view tabs a consumer may hide. `pending` is a VIEW here, not the status. */
+export type ReservationCalendarViewMode = 'day' | 'lanes' | 'month' | 'pending' | 'week'
+
+export type ReservationCalendarConfig = {
+  /**
+   * View tabs to hide from the calendar toolbar. Hiding `pending` hides the TAB
+   * only — the `pending` status keeps its colour on events and its legend entry.
+   */
+  hiddenViews?: ReservationCalendarViewMode[]
+  /**
+   * Per-status colour overrides. Values are plain CSS colour strings and are
+   * applied inline, so `var(--token)` works and the consumer can keep
+   * light/dark in its own stylesheet.
+   */
+  statusPresentation?: Partial<Record<string, StatusPresentation>>
+}
+
 export type ReservationPluginConfig = {
   /** Override access control per collection */
   access?: {
@@ -218,6 +237,8 @@ export type ReservationPluginConfig = {
   }
   /** Admin group name for all reservation collections */
   adminGroup?: string
+  /** Calendar presentation: hidden view tabs and per-status colour overrides */
+  calendar?: ReservationCalendarConfig
   /** Allow bookings without a customer account by default (per-service override available) */
   allowGuestBooking?: boolean
   /** Hours of notice required before cancellation */
@@ -312,6 +333,7 @@ export type ResolvedReservationPluginConfig = {
   }
   adminGroup: string
   allowGuestBooking: boolean
+  calendar: ReservationCalendarConfig
   cancellationNoticePeriod: number
   collectionOverrides: {
     customers?: CollectionOverride
