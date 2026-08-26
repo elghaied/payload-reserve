@@ -32,17 +32,42 @@ const CUSTOM_STATUS_PALETTE: StatusPresentation[] = [
   { background: '#fdba74', foreground: '#7c2d12' },
 ]
 
-export function buildStatusPresentation(statuses: string[]): Record<string, StatusPresentation> {
+/**
+ * Resolve the colour pair for every status in the machine.
+ *
+ * `overrides` lets a consumer restyle specific statuses without forking the
+ * calendar. Values are plain strings and land in an inline `style`, so a
+ * consumer may pass a CSS variable reference (`var(--x)`) and keep light/dark
+ * in its own token layer — the plugin stays colour-agnostic.
+ *
+ * An overridden custom status still advances the palette cursor exactly as
+ * it would unoverridden — only the resulting colour is swapped for the
+ * override. If overriding a status instead skipped the cursor advance, every
+ * custom status declared after it would silently shift onto a different
+ * palette colour depending on whether an earlier status happened to be
+ * overridden.
+ */
+export function buildStatusPresentation(
+  statuses: string[],
+  overrides?: Partial<Record<string, StatusPresentation>>,
+): Record<string, StatusPresentation> {
   const result: Record<string, StatusPresentation> = {}
   let customIndex = 0
   for (const status of statuses) {
+    const override = overrides?.[status]
     const builtin = BUILTIN_STATUS_PRESENTATION[status]
     if (builtin) {
-      result[status] = builtin
+      result[status] = override ?? builtin
       continue
     }
-    result[status] = CUSTOM_STATUS_PALETTE[customIndex % CUSTOM_STATUS_PALETTE.length]
+    // Every status the plugin doesn't recognise consumes the next palette
+    // slot, whether or not it ends up overridden — the cursor must advance
+    // identically with or without the override, or overriding one custom
+    // status would shift the colours of every custom status declared after
+    // it.
+    const paletteColor = CUSTOM_STATUS_PALETTE[customIndex % CUSTOM_STATUS_PALETTE.length]
     customIndex += 1
+    result[status] = override ?? paletteColor
   }
   return result
 }
