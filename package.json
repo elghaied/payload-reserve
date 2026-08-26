@@ -1,6 +1,6 @@
 {
   "name": "payload-reserve",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "A Payload CMS 3.x plugin for reservation and booking management with conflict detection, status workflows, and calendar UI",
   "keywords": [
     "payload",

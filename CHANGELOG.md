@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.1.0] - 2026-08-27
+
+Two optional calendar options: per-status colour overrides, and view tabs a host can hide.
+Both are additive and omit-safe — a consumer that passes neither gets byte-identical
+rendering to 4.0.0. No collection schema change, no migration, no import-map regeneration.
+
+### Added
+
+- **`calendar.statusPresentation` — restyle any reservation status without forking the calendar.**
+
+  Status colours were hardcoded in `BUILTIN_STATUS_PRESENTATION` and applied as an inline
+  `style` on the event pill. Inline styles beat any stylesheet rule short of `!important`, so
+  a host could not restyle them at all — the only escape was replacing the whole
+  `calendarView` component and inheriting responsibility for availability, lanes, the pending
+  queue, drag-and-drop and timezone handling.
+
+  `buildStatusPresentation` now takes an optional override map, merged over the built-ins.
+  Partial overrides work: a status you do not name keeps its built-in pair, and unknown
+  statuses still draw from `CUSTOM_STATUS_PALETTE`. An override naming a status the machine
+  does not have is ignored rather than injected.
+
+  `background` and `foreground` are plain `string`s and land in an inline style, so a
+  **CSS variable reference works**: pass `var(--my-confirmed-bg)` and keep light/dark in your
+  own stylesheet. The plugin stays colour-agnostic and never needs to know your theme.
+
+  ```ts
+  calendar: {
+    statusPresentation: {
+      cancelled: { background: 'var(--app-cancelled-bg)', foreground: 'var(--app-cancelled-fg)' },
+    },
+  }
+  ```
+
+  One detail worth knowing if you use custom statuses: an overridden custom status still
+  consumes its palette slot. That is deliberate — if it did not, adding a single override
+  would shift the colour of every custom status declared after it.
+
+- **`calendar.hiddenViews` — hide view tabs your users do not need.**
+
+  ```ts
+  calendar: { hiddenViews: ['lanes', 'pending'] }
+  ```
+
+  **`pending` here is a view tab, not a status.** Hiding the tab leaves the `pending` status
+  entirely intact — it keeps its colour on events and its entry in the status legend, which
+  matters because `pending` is the status machine's `defaultStatus` and every new booking
+  lands in it.
+
+  Two guards ship with it. The toolbar never empties: hiding every view leaves `month`
+  standing, so there is always a way to navigate. And the active view is resolved against
+  what is actually visible, so a host that hides `month` does not end up with a toolbar
+  where nothing is highlighted.
+
+  Hiding the `pending` tab also retires its count badge, which is the only place the
+  calendar surfaces "bookings awaiting confirmation". If that count matters to your users,
+  surface it elsewhere before hiding the tab.
+
+### Upgrading
+
+- **Nothing is required.** Both options are optional and default to absent; omitting them
+  reproduces 4.0.0 exactly. No schema change, no migration, and unlike 4.0.0 no import-map
+  regeneration — no component path moved.
+
 ## [4.0.0] - 2026-08-21
 
 A new reservation detail drawer, and a `components` plugin option for replacing any of six
