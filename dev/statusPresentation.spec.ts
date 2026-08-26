@@ -35,6 +35,56 @@ describe('buildStatusPresentation', () => {
   it('returns an empty map for no statuses', () => {
     expect(buildStatusPresentation([])).toEqual({})
   })
+
+  it('applies a partial override and leaves other statuses on their built-ins', () => {
+    const p = buildStatusPresentation(BUILTIN_STATUSES, {
+      cancelled: { background: '#dc2626', foreground: '#ffffff' },
+    })
+    expect(p.cancelled).toEqual({ background: '#dc2626', foreground: '#ffffff' })
+    // untouched statuses keep the exact built-in pair
+    expect(p.pending).toEqual({ background: '#fef3c7', foreground: '#92400e' })
+    expect(p.confirmed).toEqual({ background: '#dbeafe', foreground: '#1e40af' })
+  })
+
+  it('accepts CSS variable references, not just hex', () => {
+    // Load-bearing: consumers pass var() so the plugin stays colour-agnostic
+    // and light/dark lives in the consumer's token layer.
+    const p = buildStatusPresentation(['confirmed'], {
+      confirmed: { background: 'var(--x-bg)', foreground: 'var(--x-fg)' },
+    })
+    expect(p.confirmed).toEqual({ background: 'var(--x-bg)', foreground: 'var(--x-fg)' })
+  })
+
+  it('ignores an override for a status the machine does not have', () => {
+    const p = buildStatusPresentation(['pending'], {
+      'not-a-status': { background: '#000000', foreground: '#ffffff' },
+    })
+    expect(p['not-a-status']).toBeUndefined()
+    expect(Object.keys(p)).toEqual(['pending'])
+  })
+
+  it('lets an override win over the custom palette too', () => {
+    const p = buildStatusPresentation(['pending', 'awaiting-deposit'], {
+      'awaiting-deposit': { background: '#111111', foreground: '#eeeeee' },
+    })
+    expect(p['awaiting-deposit']).toEqual({ background: '#111111', foreground: '#eeeeee' })
+  })
+
+  it('does not consume a palette slot for an overridden custom status', () => {
+    // The override must not shift the palette cursor, or adding an override
+    // would silently recolour every custom status after it.
+    const withOverride = buildStatusPresentation(['a', 'b'], {
+      a: { background: '#111111', foreground: '#eeeeee' },
+    })
+    const without = buildStatusPresentation(['a', 'b'])
+    expect(withOverride.b).toEqual(without.b)
+  })
+
+  it('omitting overrides reproduces the current output exactly', () => {
+    expect(buildStatusPresentation(BUILTIN_STATUSES, {})).toEqual(
+      buildStatusPresentation(BUILTIN_STATUSES),
+    )
+  })
 })
 
 describe('buildStatusLabels', () => {

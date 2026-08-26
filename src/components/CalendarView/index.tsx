@@ -10,6 +10,7 @@ import {
 import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
+import type { ReservationCalendarConfig, ReservationCalendarViewMode } from '../../types.js'
 import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 import type { CalendarReservation, ResourceOption } from '../shared/types.js'
 
@@ -21,6 +22,7 @@ import {
   monthGridStartDayKey,
   startOfWeekDayKey,
 } from '../../utilities/calendarGrid.js'
+import { resolveActiveView, visibleCalendarViews } from '../../utilities/calendarViews.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { externalPillLabel } from '../../utilities/externalPillLabel.js'
 import { reservationMatchesResource, sameId } from '../../utilities/reservationResourceFilter.js'
@@ -40,7 +42,7 @@ import styles from './CalendarView.module.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
 import { useResourceAvailability } from './useResourceAvailability.js'
 
-type ViewMode = 'day' | 'lanes' | 'month' | 'pending' | 'week'
+type ViewMode = ReservationCalendarViewMode
 
 // Safe ceiling for list fetches; when totalDocs exceeds this we surface a
 // "showing N of M" notice rather than silently truncating (review D9).
@@ -152,6 +154,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   // The initial/pending status (what "pending" view shows)
   const defaultStatus = statusMachine?.defaultStatus ?? 'pending'
 
+  // `hiddenViews` hides the TAB only — it never touches a status. `defaultStatus`
+  // above IS the pending status; don't conflate the two when editing this block.
+  const calendarConfig = config.admin?.custom?.reservationCalendar as
+    | ReservationCalendarConfig
+    | undefined
+  const hiddenViews = calendarConfig?.hiddenViews
+  const visibleViews = visibleCalendarViews(
+    ['month', 'week', 'day', 'lanes', 'pending'],
+    hiddenViews,
+  )
+
   // Labels, colours, and confirm/cancel targets, all derived from the resolved
   // status machine — shared with every other status-aware admin component.
   const {
@@ -163,7 +176,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   } = useReservationStatusMachine()
 
   const [currentDate, setCurrentDate] = useState(() => new Date())
-  const [viewMode, setViewMode] = useState<ViewMode>('month')
+  const [viewModeRaw, setViewMode] = useState<ViewMode>('month')
+  const viewMode = resolveActiveView(viewModeRaw, visibleViews)
   const [reservations, setReservations] = useState<CalendarReservation[]>([])
   const [loading, setLoading] = useState(true)
   // { shown, total } when a fetch hit its cap, else null — drives a non-silent notice (D9)
@@ -1398,7 +1412,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
             { key: 'day' as ViewMode, label: t('reservation:calendarDay') },
             { key: 'lanes' as ViewMode, label: t('reservation:calendarLanes') },
             { key: 'pending' as ViewMode, label: t('reservation:calendarPending') },
-          ]).map(({ key, label }) => (
+          ]
+            .filter(({ key }) => visibleViews.includes(key))
+          ).map(({ key, label }) => (
             <button
               className={`${styles.viewToggleButton} ${viewMode === key ? styles.viewToggleButtonActive : ''}`}
               key={key}
