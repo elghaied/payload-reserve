@@ -26,14 +26,30 @@ describe('visibleCalendarViews', () => {
 
 describe('resolveActiveView', () => {
   it('keeps the active view when it is visible', () => {
-    expect(resolveActiveView('week', ['lanes'])).toBe('week')
+    expect(resolveActiveView('week', ['month', 'week', 'day', 'pending'])).toBe('week')
   })
 
-  it('falls back to month when the active view is hidden', () => {
-    expect(resolveActiveView('pending', ['lanes', 'pending'])).toBe('month')
+  it('falls back to the first visible view when the active view is hidden', () => {
+    expect(resolveActiveView('pending', ['month', 'week', 'day'])).toBe('month')
   })
 
   it('keeps the active view when nothing is hidden', () => {
-    expect(resolveActiveView('lanes', undefined)).toBe('lanes')
+    expect(resolveActiveView('lanes', [...ALL])).toBe('lanes')
+  })
+
+  it('regression: falls back to the first visible view, not a hardcoded "month", when month itself is hidden', () => {
+    // hiddenViews: ['month'] is exactly the case the old hardcoded-'month'
+    // fallback got wrong: 'month' is itself hidden, so it must never be the
+    // resolved answer.
+    const visible = visibleCalendarViews([...ALL], ['month'])
+    expect(visible).toEqual(['week', 'day', 'lanes', 'pending'])
+    expect(resolveActiveView('month', visible)).toBe('week')
+    expect(resolveActiveView('month', visible)).not.toBe('month')
+  })
+
+  it('regression: hiding month and week falls back to the first remaining view', () => {
+    const visible = visibleCalendarViews([...ALL], ['month', 'week'])
+    expect(visible).toEqual(['day', 'lanes', 'pending'])
+    expect(resolveActiveView('month', visible)).toBe('day')
   })
 })

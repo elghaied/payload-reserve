@@ -17,13 +17,16 @@ export function visibleCalendarViews(
 }
 
 /**
- * Guard against landing on a hidden tab. Unreachable today (the calendar
- * initialises to `month`), but a persisted preference or a changed default
- * would otherwise strand the user on an invisible view.
+ * Guard against landing on a hidden tab. Resolves against the already-computed
+ * `visible` list rather than a hardcoded `'month'` fallback, because `month`
+ * itself may be hidden (e.g. `hiddenViews: ['month']`) — in that case falling
+ * back to a hidden view would leave the toolbar with nothing highlighted.
+ * `visible[0]` is always defined because `visibleCalendarViews` never returns
+ * an empty list.
  */
 export function resolveActiveView(
   active: ReservationCalendarViewMode,
-  hidden: ReservationCalendarViewMode[] | undefined,
+  visible: ReservationCalendarViewMode[],
 ): ReservationCalendarViewMode {
-  return hidden?.includes(active) ? 'month' : active
+  return visible.includes(active) ? active : visible[0]
 }

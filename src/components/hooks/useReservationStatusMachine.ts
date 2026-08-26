@@ -3,6 +3,7 @@ import { useConfig, useTranslation } from '@payloadcms/ui'
 import { useMemo } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
+import type { ReservationCalendarConfig } from '../../types.js'
 import type { PartialStatusMachine } from '../../utilities/statusMachineFallback.js'
 import type { StatusPresentation } from '../../utilities/statusPresentation.js'
 
@@ -40,9 +41,7 @@ export function useReservationStatusMachine(): ReservationStatusMachine {
     ?.reservationStatusMachine as PartialStatusMachine | undefined
 
   const calendar = (config.admin?.custom as Record<string, unknown> | undefined)
-    ?.reservationCalendar as
-    | { statusPresentation?: Partial<Record<string, StatusPresentation>> }
-    | undefined
+    ?.reservationCalendar as ReservationCalendarConfig | undefined
 
   return useMemo(() => {
     const statuses = machine?.statuses ?? BUILTIN_STATUSES

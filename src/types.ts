@@ -237,10 +237,10 @@ export type ReservationPluginConfig = {
   }
   /** Admin group name for all reservation collections */
   adminGroup?: string
-  /** Calendar presentation: hidden view tabs and per-status colour overrides */
-  calendar?: ReservationCalendarConfig
   /** Allow bookings without a customer account by default (per-service override available) */
   allowGuestBooking?: boolean
+  /** Calendar presentation: hidden view tabs and per-status colour overrides */
+  calendar?: ReservationCalendarConfig
   /** Hours of notice required before cancellation */
   cancellationNoticePeriod?: number
   /** Per-collection overrides applied to the generated collections (issue #4) */

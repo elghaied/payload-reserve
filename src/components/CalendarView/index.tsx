@@ -10,7 +10,7 @@ import {
 import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
-import type { ReservationCalendarViewMode } from '../../types.js'
+import type { ReservationCalendarConfig, ReservationCalendarViewMode } from '../../types.js'
 import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 import type { CalendarReservation, ResourceOption } from '../shared/types.js'
 
@@ -42,7 +42,7 @@ import styles from './CalendarView.module.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
 import { useResourceAvailability } from './useResourceAvailability.js'
 
-type ViewMode = 'day' | 'lanes' | 'month' | 'pending' | 'week'
+type ViewMode = ReservationCalendarViewMode
 
 // Safe ceiling for list fetches; when totalDocs exceeds this we surface a
 // "showing N of M" notice rather than silently truncating (review D9).
@@ -154,8 +154,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   // The initial/pending status (what "pending" view shows)
   const defaultStatus = statusMachine?.defaultStatus ?? 'pending'
 
+  // `hiddenViews` hides the TAB only — it never touches a status. `defaultStatus`
+  // above IS the pending status; don't conflate the two when editing this block.
   const calendarConfig = config.admin?.custom?.reservationCalendar as
-    | { hiddenViews?: ReservationCalendarViewMode[] }
+    | ReservationCalendarConfig
     | undefined
   const hiddenViews = calendarConfig?.hiddenViews
   const visibleViews = visibleCalendarViews(
@@ -175,7 +177,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
 
   const [currentDate, setCurrentDate] = useState(() => new Date())
   const [viewModeRaw, setViewMode] = useState<ViewMode>('month')
-  const viewMode = resolveActiveView(viewModeRaw as ReservationCalendarViewMode, hiddenViews) as ViewMode
+  const viewMode = resolveActiveView(viewModeRaw, visibleViews)
   const [reservations, setReservations] = useState<CalendarReservation[]>([])
   const [loading, setLoading] = useState(true)
   // { shown, total } when a fetch hit its cap, else null — drives a non-silent notice (D9)
@@ -1411,7 +1413,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
             { key: 'lanes' as ViewMode, label: t('reservation:calendarLanes') },
             { key: 'pending' as ViewMode, label: t('reservation:calendarPending') },
           ]
-            .filter(({ key }) => visibleViews.includes(key as ReservationCalendarViewMode))
+            .filter(({ key }) => visibleViews.includes(key))
           ).map(({ key, label }) => (
             <button
               className={`${styles.viewToggleButton} ${viewMode === key ? styles.viewToggleButtonActive : ''}`}
