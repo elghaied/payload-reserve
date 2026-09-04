@@ -6,6 +6,28 @@ const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
 
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
+/**
+ * Day key (`YYYY-MM-DD`) of a date-only field — `Schedule.exceptions[].date` /
+ * `endDate` and `manualSlots[].date`.
+ *
+ * These fields name a calendar day, not an instant, but Payload stores a `date`
+ * field as an instant. Every writer encodes the intended day in the instant's
+ * UTC calendar date: the admin `dayOnly` picker stores noon UTC (`@payloadcms/ui`'s
+ * DatePicker sets `12 - tzOffset` hours precisely so the UTC date survives the
+ * browser's zone), and an API/seed-written bare `'2025-12-25'` — the form the
+ * README shows — parses to midnight UTC. So the day is the UTC calendar date of
+ * the stored value, and it must NOT be re-keyed in the business timezone: doing
+ * that turned `'2025-12-25'` into December 24 for every zone west of UTC (and
+ * the picker's noon UTC into the 26th at UTC+13). A bare day key is returned
+ * as-is. An unparseable value yields `''`, which matches no day.
+ */
+export function dateFieldToDayKey(value: Date | string): string {
+  if (typeof value === 'string' && DAY_KEY_RE.test(value)) {return value}
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) {return ''}
+  return d.toISOString().slice(0, 10)
+}
+
 const dayKeyFormatters = new Map<string, Intl.DateTimeFormat>()
 const wallClockFormatters = new Map<string, Intl.DateTimeFormat>()
 

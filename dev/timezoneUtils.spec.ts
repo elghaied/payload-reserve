@@ -4,6 +4,7 @@ import { resolveConfig } from '../src/defaults.js'
 import {
   addDaysToDayKey,
   combineDayKeyAndTime,
+  dateFieldToDayKey,
   endOfDayInTimezone,
   getDayKeyInTimezone,
   getDayOfWeekFromDayKey,
@@ -207,5 +208,22 @@ describe('isValidDayKey', () => {
     expect(isValidDayKey('2026-13-45')).toBe(false)
     expect(isValidDayKey('2026-02-30')).toBe(false)
     expect(isValidDayKey('garbage')).toBe(false)
+  })
+})
+
+describe('dateFieldToDayKey', () => {
+  it('returns a bare day key unchanged', () => {
+    expect(dateFieldToDayKey('2025-12-25')).toBe('2025-12-25')
+  })
+
+  it('keys an ISO instant by its UTC calendar date, not the business zone', () => {
+    expect(dateFieldToDayKey('2025-12-25T00:00:00.000Z')).toBe('2025-12-25')
+    expect(dateFieldToDayKey('2025-12-25T12:00:00.000Z')).toBe('2025-12-25')
+    expect(dateFieldToDayKey('2025-12-25T23:59:59.999Z')).toBe('2025-12-25')
+    expect(dateFieldToDayKey(new Date('2025-12-25T00:00:00.000Z'))).toBe('2025-12-25')
+  })
+
+  it('yields an empty key for an unparseable value so it matches no day', () => {
+    expect(dateFieldToDayKey('not a date')).toBe('')
   })
 })

@@ -6,12 +6,15 @@ import { extractId } from '../../utilities/resolveReservationItems.js'
 import { isPrivilegedUser } from '../../utilities/userRoles.js'
 
 /**
- * Prevents a non-privileged authenticated user from creating a reservation on
- * behalf of another customer (mass assignment). The `/api/reserve/book` endpoint
- * already enforces this, but a logged-in customer could reach the same write
- * through Payload's default collection REST API — this guard closes that route
- * (review B3 parallel path). Staff/admin may still book for anyone (walk-ins);
- * guest bookings (no `customer`) are untouched.
+ * Prevents a non-privileged authenticated user from creating — or, since the
+ * standalone access defaults let a customer update their own row, re-assigning —
+ * a reservation on behalf of another customer (mass assignment). The
+ * `/api/reserve/book` endpoint already enforces this on create, but a logged-in
+ * customer could reach the same write through Payload's default collection REST
+ * API — this guard closes that route (review B3 parallel path). On update it
+ * stops a customer handing their own reservation to someone else's account.
+ * Staff/admin may still book for anyone (walk-ins); guest bookings (no
+ * `customer`) are untouched.
  */
 export const enforceCustomerOwnership =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
@@ -19,7 +22,7 @@ export const enforceCustomerOwnership =
     if (context?.skipReservationHooks) {
       return data
     }
-    if (operation !== 'create' || !req.user) {
+    if ((operation !== 'create' && operation !== 'update') || !req.user) {
       return data
     }
     if (isPrivilegedUser(req.user, config)) {

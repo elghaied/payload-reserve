@@ -17,6 +17,7 @@ import { getEffectiveTenantTimezone } from '../utilities/tenantTimezone.js'
 import {
   addDaysToDayKey,
   combineDayKeyAndTime,
+  dateFieldToDayKey,
   getDayKeyInTimezone,
 } from '../utilities/timezoneUtils.js'
 import { isPrivilegedUser } from '../utilities/userRoles.js'
@@ -201,9 +202,9 @@ export async function buildResourceAvailability(params: {
     for (const sched of schedules as Array<Record<string, unknown>>) {
       const exceptions = (sched.exceptions as RawException[] | undefined) ?? []
       for (const exc of exceptions) {
-        const excStart = getDayKeyInTimezone(new Date(exc.date), timeZone)
-        const excEnd = exc.endDate ? getDayKeyInTimezone(new Date(exc.endDate), timeZone) : excStart
-        if (date >= excStart && date <= excEnd) {
+        const excStart = dateFieldToDayKey(exc.date)
+        const excEnd = exc.endDate ? dateFieldToDayKey(exc.endDate) : excStart
+        if (excStart !== '' && date >= excStart && date <= excEnd) {
           dayException = exc
           break
         }

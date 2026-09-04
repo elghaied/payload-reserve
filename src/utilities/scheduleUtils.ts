@@ -2,6 +2,7 @@ import type { DayOfWeek } from '../types.js'
 
 import {
   combineDayKeyAndTime,
+  dateFieldToDayKey,
   getDayKeyInTimezone,
   getDayOfWeekFromDayKey,
 } from './timezoneUtils.js'
@@ -58,6 +59,8 @@ export function combineDateAndTime(date: Date, time: string): Date {
  * Check if a calendar day is an exception day in the schedule.
  * Supports range exceptions via optional endDate (inclusive on both ends).
  * `date` may be a Date instant (keyed in `timeZone`) or a YYYY-MM-DD day key.
+ * The exception's own `date`/`endDate` are date-only fields and resolve by
+ * their UTC calendar date (see `dateFieldToDayKey`), never in `timeZone`.
  */
 export function isExceptionDate(
   date: Date | string,
@@ -66,9 +69,9 @@ export function isExceptionDate(
 ): boolean {
   const target = typeof date === 'string' ? date : getDayKeyInTimezone(date, timeZone)
   return exceptions.some((exc) => {
-    const start = getDayKeyInTimezone(new Date(exc.date), timeZone)
-    const end = exc.endDate ? getDayKeyInTimezone(new Date(exc.endDate), timeZone) : start
-    return target >= start && target <= end
+    const start = dateFieldToDayKey(exc.date)
+    const end = exc.endDate ? dateFieldToDayKey(exc.endDate) : start
+    return start !== '' && target >= start && target <= end
   })
 }
 
@@ -130,7 +133,7 @@ export function resolveScheduleForDate(
   } else if (schedule.scheduleType === 'manual') {
     const slots = schedule.manualSlots ?? []
     for (const slot of slots) {
-      const slotDayKey = getDayKeyInTimezone(new Date(slot.date), timeZone)
+      const slotDayKey = dateFieldToDayKey(slot.date)
       if (slotDayKey === dayKey) {
         ranges.push({
           end: combineDayKeyAndTime(dayKey, slot.endTime, timeZone),

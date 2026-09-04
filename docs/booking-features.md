@@ -183,7 +183,9 @@ A resource's schedules can declare `exceptions` — days the resource is unavail
 
 Exception `date`–`endDate` ranges are honored inclusively — every calendar day from `date` to `endDate` (both ends included) is blocked.
 
-All day and time resolution — matching a date to a schedule, expanding `HH:mm` slots, and evaluating exceptions — runs in the business `timezone` (the plugin-level `timezone` option), so wall-clock schedules behave correctly regardless of server timezone.
+All day and time resolution — matching a date to a schedule and expanding `HH:mm` slots — runs in the business `timezone` (the plugin-level `timezone` option), so wall-clock schedules behave correctly regardless of server timezone.
+
+**Date-only fields are calendar days, keyed by their UTC date.** `exceptions[].date`, `exceptions[].endDate` and `manualSlots[].date` are Payload `date` fields, so they are stored as instants, but they name a day, not a moment. The day is the UTC calendar date of the stored value: the admin day picker stores noon UTC, and an API- or seed-written `'2025-12-25'` stores midnight UTC — both mean December 25 in every business timezone. (Before 4.1.1 these were re-keyed in the business zone, which turned `'2025-12-25'` into December 24 for any zone west of UTC.) If you write these fields from code, write a bare `'YYYY-MM-DD'` or any instant on that UTC date.
 
 See [Collections → Schedules](./collections.md#schedules) for the exception field shape.
 

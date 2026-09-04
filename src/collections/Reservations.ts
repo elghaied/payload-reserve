@@ -21,7 +21,21 @@ import { validateGuestBooking } from '../hooks/reservations/validateGuestBooking
 import { validateStatusTransition } from '../hooks/reservations/validateStatusTransition.js'
 import { resolveComponentSlot } from '../utilities/componentSlots.js'
 import { statusToI18nKey } from '../utilities/i18nUtils.js'
-import { composeAccess, makeReservationOwnerAccess } from '../utilities/ownerAccess.js'
+import {
+  composeAccess,
+  makeReservationOwnerAccess,
+  makeStandaloneReservationAccess,
+} from '../utilities/ownerAccess.js'
+
+/**
+ * `min: 1` alone accepts `1.5`; a head count has to be a whole number. Mirrors the
+ * integer check `/api/reserve/hold` already does on its own input. `null`/`undefined`
+ * are left to `required`/`defaultValue`.
+ */
+const validateWholeGuestCount = (value: null | number | undefined): string | true => {
+  if (value === null || value === undefined) {return true}
+  return Number.isInteger(value) || 'guestCount must be a whole number'
+}
 
 function createPluginHooksBeforeCreate(
   hooks: ReservationPluginHooks,
@@ -62,8 +76,15 @@ export function createReservationsCollection(
 ): CollectionConfig {
   const { statusMachine } = config
   const rom = config.resourceOwnerMode
-  const access =
-    composeAccess(rom ? makeReservationOwnerAccess(rom) : {}, config.access.reservations)
+  // Owner mode brings its own rules. Standalone mode (no userCollection) gets
+  // customer-scoped defaults — see makeStandaloneReservationAccess for why
+  // userCollection mode cannot safely get them and stays on Payload's default.
+  const baseAccess = rom
+    ? makeReservationOwnerAccess(rom)
+    : config.userCollection
+      ? {}
+      : makeStandaloneReservationAccess(config)
+  const access = composeAccess(baseAccess, config.access.reservations)
 
   const listComponent = resolveComponentSlot(
     config.components.calendarView,
@@ -213,6 +234,7 @@ export function createReservationsCollection(
         defaultValue: 1,
         label: ({ t }) => (t as PluginT)('reservation:fieldGuestCount'),
         min: 1,
+        validate: validateWholeGuestCount,
       },
       {
         name: 'notes',
@@ -256,6 +278,7 @@ export function createReservationsCollection(
             type: 'number',
             label: ({ t }) => (t as PluginT)('reservation:fieldGuestCount'),
             min: 1,
+            validate: validateWholeGuestCount,
           },
         ],
         label: ({ t }) => (t as PluginT)('reservation:fieldItems'),

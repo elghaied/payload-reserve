@@ -3,6 +3,9 @@ import type { CollectionConfig, CollectionSlug } from 'payload'
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { makeStandaloneCustomerAccess } from '../utilities/ownerAccess.js'
+import { isPrivilegedUser } from '../utilities/userRoles.js'
+
 export function createCustomersCollection(
   config: ResolvedReservationPluginConfig,
 ): CollectionConfig {
@@ -10,6 +13,7 @@ export function createCustomersCollection(
     slug: config.slugs.customers,
     access: {
       admin: () => false,
+      ...makeStandaloneCustomerAccess(config),
       ...config.access.customers,
     },
     admin: {
@@ -41,6 +45,15 @@ export function createCustomersCollection(
       {
         name: 'notes',
         type: 'textarea',
+        // Internal staff notes. Collection `read` lets a customer see their own
+        // document, so without this the "visible only to admins" promise in
+        // docs/collections.md was false: the customer got their own notes back
+        // from /api/<customers>/me. Standalone only — under userCollection the
+        // host owns the field and isPrivilegedUser is role-based there.
+        access: {
+          read: ({ req }) => isPrivilegedUser(req.user, config),
+          update: ({ req }) => isPrivilegedUser(req.user, config),
+        },
         label: ({ t }) => (t as PluginT)('reservation:fieldNotes'),
       },
       {

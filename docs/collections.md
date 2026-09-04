@@ -134,6 +134,8 @@ Either a standalone auth collection (default) or fields injected into your exist
 
 A dedicated auth collection with `auth: true` for customer JWT login. Has `access.admin: () => false` to block customers from the admin panel.
 
+**Default access (since 4.1.1):** a logged-in customer can `read` and `update` only their own document; `delete` is staff/admin only; `create` is Payload's default (any authenticated user — set `access.customers.create: () => true` to open self-registration). "Staff/admin" means any user of a *different* auth collection. Before 4.1.1 the collection sat on Payload's default `Boolean(user)` for every operation, so any customer could list every other customer's email/phone/notes and — because `update` covers `password` — take over another customer's account through `PATCH /api/customers/:id`. Override per operation via the `access.customers` plugin option; a rule you supply replaces only that operation.
+
 ### User Collection Mode (`userCollection` set)
 
 The plugin injects `name`, `phone`, `notes`, and a `bookings` join field into your existing auth collection — each only if a field with that name isn't already present. No new collection is created. The resolved `slugs.customers` points at the user collection so all downstream code uses the correct slug. Note: the injected `name` is **not** required here, so existing users without a name can still be updated.
@@ -149,7 +151,7 @@ Field deduplication prevents double-injection — the plugin checks each field's
 | `lastName` | Text | Last name (standalone mode only) |
 | `name` | Text | Customer name (max 200 chars; required in standalone mode, optional when injected into a user collection). Injected into the user collection so `admin.useAsTitle: 'name'` works out of the box |
 | `phone` | Text | Phone number (max 50 chars) |
-| `notes` | Textarea | Internal notes visible only to admins |
+| `notes` | Textarea | Internal staff notes. In standalone mode the field carries its own `read`/`update` access restricted to staff/admin, so the customer never sees it — not even on their own document via `/api/customers/me`. In `userCollection` mode the injected field has no field-level access; your collection's rules decide who sees it |
 | `bookings` | Join | Virtual field — all reservations for this customer |
 
 ---
@@ -177,6 +179,18 @@ The core booking records. Each reservation links a service performed by a resour
 | `idempotencyKey` | Text | No | Unique key to prevent duplicate submissions (sidebar, read-only) |
 
 A reservation must have **either** a `customer` **or** a `guest` — not both, not neither (enforced by the `validateGuestBooking` hook, gated by `allowGuestBooking`). See [Booking Features → Multi-Resource Bookings](./booking-features.md#multi-resource-bookings) for the `items` array and [Guest Bookings](../README.md#guest-bookings) for account-less bookings.
+
+`guestCount` (top-level and per `items[]` entry) must be a whole number — `1.5` is rejected with `guestCount must be a whole number`, the same rule `/api/reserve/hold` applies to its own input.
+
+### Access
+
+| Mode | `create` | `read` | `update` | `delete` |
+|------|----------|--------|----------|----------|
+| Standalone (default, since 4.1.1) | Payload default: any authenticated user (the `enforceCustomerOwnership` hook pins `customer` to the caller) | Staff/admin: all. Customer: own rows only (`customer equals req.user.id`). Guest bookings have no `customer`, so no customer can reach them | Same as `read`; a customer cannot re-assign `customer` to someone else | Staff/admin only. Customers cancel via `/api/reserve/cancel` |
+| `resourceOwnerMode` | Admin only | Admin: all. Owner: reservations on their own resources | Admin only | Admin only |
+| `userCollection` (no `resourceOwnerMode`) | Payload default | Payload default (`Boolean(user)`) — **every** user reads, updates and deletes every reservation unless you supply `access.reservations`; see [Configuration → Access control for customers](./configuration.md#access-control-for-customers) | Payload default | Payload default |
+
+"Staff/admin" in standalone mode is any user of an auth collection other than the customers one. Any rule you pass in `access.reservations` replaces the default for that operation only.
 
 ---
 

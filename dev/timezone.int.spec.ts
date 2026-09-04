@@ -192,9 +192,13 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
   })
 })
 
-describe('exception instants are interpreted in the business timezone (documented semantics)', () => {
-  // A schedule with a tue recurring slot so the exception's effect on Tuesday is observable.
-  // The exception instant 2026-06-17T00:00Z is June 16, 20:00 in New York (Tuesday).
+describe('date-only schedule fields resolve by their UTC calendar date, in every business zone', () => {
+  // Exception dates name a calendar day but are stored as instants. Both the
+  // admin `dayOnly` picker (noon UTC) and an API/seed-written `'YYYY-MM-DD'`
+  // (midnight UTC) encode the day in the instant's UTC date — re-keying that in
+  // the business zone shifted `'2025-12-25'` to the 24th for every zone west of
+  // UTC (external report against 4.1.0). The tue slot makes a wrong-day shift
+  // observable.
   const schedule = {
     exceptions: [{ date: '2026-06-17T00:00:00.000Z' }],
     recurringSlots: [
@@ -204,18 +208,38 @@ describe('exception instants are interpreted in the business timezone (documente
     scheduleType: 'recurring' as const,
   }
 
-  test('UTC-midnight instant keys to the prior day in negative-offset zones', () => {
-    // 2026-06-17T00:00Z is June 16, 20:00 in New York — so the exception
-    // blocks Tuesday June 16, NOT Wednesday June 17. Interim semantics until
-    // the admin picker normalizes what it stores (task #9 territory).
-    expect(resolveScheduleForDate(schedule, '2026-06-16', 'America/New_York')).toHaveLength(0)
+  test('UTC-midnight instant blocks the same calendar day west of UTC', () => {
+    expect(resolveScheduleForDate(schedule, '2026-06-17', 'America/New_York')).toHaveLength(0)
     expect(
-      resolveScheduleForDate(schedule, '2026-06-17', 'America/New_York').length,
+      resolveScheduleForDate(schedule, '2026-06-16', 'America/New_York').length,
     ).toBeGreaterThan(0)
   })
 
-  test('UTC-midnight instant stays on the same day in non-negative-offset zones', () => {
+  test('UTC-midnight instant blocks the same calendar day east of UTC', () => {
     expect(resolveScheduleForDate(schedule, '2026-06-17', 'Europe/Paris')).toHaveLength(0)
     expect(resolveScheduleForDate(schedule, '2026-06-17', 'UTC')).toHaveLength(0)
+    expect(resolveScheduleForDate(schedule, '2026-06-17', 'Pacific/Auckland')).toHaveLength(0)
+  })
+
+  test("a bare 'YYYY-MM-DD' exception (the README form) blocks that day in America/New_York", () => {
+    const bare = { ...schedule, exceptions: [{ date: '2026-06-17' }] }
+    expect(resolveScheduleForDate(bare, '2026-06-17', 'America/New_York')).toHaveLength(0)
+    expect(resolveScheduleForDate(bare, '2026-06-16', 'America/New_York').length).toBeGreaterThan(0)
+  })
+
+  test("the admin picker's noon-UTC instant stays on its day at UTC+13", () => {
+    const noon = { ...schedule, exceptions: [{ date: '2026-06-17T12:00:00.000Z' }] }
+    expect(resolveScheduleForDate(noon, '2026-06-17', 'Pacific/Auckland')).toHaveLength(0)
+    // 2026-06-18 is a Thursday: no slot either way, so assert the 16th (tue) instead
+    expect(resolveScheduleForDate(noon, '2026-06-16', 'Pacific/Auckland').length).toBeGreaterThan(0)
+  })
+
+  test("a bare 'YYYY-MM-DD' manual slot lands on that day west of UTC", () => {
+    const manual = {
+      manualSlots: [{ date: '2026-06-17', endTime: '17:00', startTime: '09:00' }],
+      scheduleType: 'manual' as const,
+    }
+    expect(resolveScheduleForDate(manual, '2026-06-17', 'America/New_York')).toHaveLength(1)
+    expect(resolveScheduleForDate(manual, '2026-06-16', 'America/New_York')).toHaveLength(0)
   })
 })

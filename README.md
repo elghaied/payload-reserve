@@ -287,7 +287,7 @@ The first entry of `resourceTypes` becomes the default value for the `Resource.r
 
 ### Business Timezone
 
-Set a plugin-level `timezone` (IANA name, default `'UTC'`) to govern all schedule resolution — what `HH:mm` schedule times mean, which calendar day a `date=YYYY-MM-DD` query maps to, exception-day matching, and full-day booking boundaries:
+Set a plugin-level `timezone` (IANA name, default `'UTC'`) to govern all schedule resolution — what `HH:mm` schedule times mean, which calendar day a `date=YYYY-MM-DD` query maps to, and full-day booking boundaries:
 
 ```typescript
 payloadReserve({
@@ -296,6 +296,8 @@ payloadReserve({
 ```
 
 Without this, day resolution mixes server-local and UTC semantics — on non-UTC servers the slots API can resolve the wrong calendar day. With `timezone` set, all server-side day math runs via the built-in `Intl` API (no extra dependency). `'UTC'` on a UTC server is identical to the previous behaviour. The configured timezone is exposed to admin components via `config.admin.custom.reservationTimezone`.
+
+**Date-only schedule fields are not re-keyed in this zone.** `exceptions[].date`/`endDate` and `manualSlots[].date` name a calendar day; the day is the UTC calendar date of the stored value, which is what both the admin day picker (noon UTC) and a bare `'2025-12-25'` written through the API encode. Before 4.1.1 they were re-keyed in the business zone, so `'2025-12-25'` closed December 24 and left the 25th bookable for any zone west of UTC — see [Booking Features → Exceptions and Time Off](./docs/booking-features.md#exceptions-and-time-off).
 
 #### Per-tenant timezones (`multiTenant`)
 
@@ -538,6 +540,21 @@ payloadReserve({
 ---
 
 ## Access Control & Booking Correctness
+
+### Standalone mode scopes customers to their own records (4.1.1)
+
+**Before 4.1.1, the Quick Start config was exploitable by any customer with a login.** Reservations and the generated `customers` auth collection sat on Payload's built-in default access — `Boolean(user)` for read, update and delete — so through the stock `/api/reservations` and `/api/customers` REST API a customer could read, rewrite and delete every other customer's reservation, list every customer's email/phone/notes, and `PATCH` another customer's `password` and log in as them. Only `create` was guarded. Reported privately by an external researcher; fixed and covered by `dev/standaloneAccess.int.spec.ts`.
+
+Standalone mode (no `userCollection`) now ships these defaults, with nothing to configure:
+
+| Collection | Customer | Staff/admin (any other auth collection) |
+|------------|----------|------------------------------------------|
+| Reservations | read/update **own rows only** (`customer equals req.user.id`; guest bookings are unreachable); no delete; cannot re-assign `customer` | everything |
+| Customers | read/update **own document only**; `notes` is staff-only at field level; no delete | everything |
+
+`create` is unchanged on both (Payload's default, with `enforceCustomerOwnership` pinning `customer` to the caller), so `access.customers.create: () => true` still opens self-registration without reopening reads. Any rule you pass in `access.reservations`/`access.customers` replaces the default for that operation only.
+
+**`userCollection` mode is not changed** — staff and customers share one collection there and the plugin cannot tell them apart without a role, so Reservations stays on Payload's default and the plugin warns at boot when nothing narrows `read`. If customers log in to that collection, supply `access.reservations` yourself; the pattern is in [Configuration → Access control for customers](./docs/configuration.md#access-control-for-customers). `resourceOwnerMode` already brings its own rules and is unaffected.
 
 ### Endpoints enforce collection access control
 

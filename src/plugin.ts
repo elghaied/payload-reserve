@@ -449,6 +449,26 @@ export const payloadReserve =
           )
         }
 
+        // D6: userCollection mode keeps Payload's default access on Reservations
+        // (`Boolean(user)` for read/update/delete) because staff and customers
+        // share one collection there and, without configured roles, the plugin
+        // cannot tell them apart — locking reads to `customer equals self` would
+        // blank the admin calendar for every host without roles. Standalone mode
+        // gets customer-scoped defaults (makeStandaloneReservationAccess); a
+        // userCollection host that lets customers log in has to supply its own
+        // `access.reservations`, or every user can read, rewrite and delete every
+        // other user's reservation through /api/<reservations>. Warn when nothing
+        // narrows `read` — a host whose users are all staff can ignore it.
+        if (
+          resolved.userCollection &&
+          !resolved.resourceOwnerMode &&
+          !resolved.access.reservations?.read
+        ) {
+          payload.logger.warn(
+            `payload-reserve: "userCollection" is set but no "access.reservations" rule narrows reads, so every user of "${resolved.slugs.customers}" can read, update and delete every reservation through the collection REST API (Payload's default is any authenticated user). Fine if only staff can log in; if customers can, supply "access.reservations" that scopes non-staff users to "customer equals req.user.id" — see docs/configuration.md, "Access control for customers".`,
+          )
+        }
+
         // D5: a custom detail component whose calendar slot is set to ANYTHING —
         // a replacement string, or `false`. CalendarViewServer is what renders the
         // detail slot; a string calendarView means the replacement doesn't call it

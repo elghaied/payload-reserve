@@ -6,7 +6,11 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
 
-import { getDayKeyInTimezone, getDayOfWeekFromDayKey } from '../../utilities/timezoneUtils.js'
+import {
+  dateFieldToDayKey,
+  getDayKeyInTimezone,
+  getDayOfWeekFromDayKey,
+} from '../../utilities/timezoneUtils.js'
 import { useTenantFilter } from '../../utilities/useTenantFilter.js'
 import styles from './AvailabilityOverview.module.css'
 
@@ -237,11 +241,12 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
 
     for (const schedule of resourceSchedules) {
       // Check for exceptions — match the full [date, endDate] range inclusively
-      // (review D4), keyed in the business timezone, like the server does.
+      // (review D4). Exception dates are date-only fields: their day is the UTC
+      // calendar date of the stored value, like the server resolves it.
       const exception = schedule.exceptions?.find((e) => {
-        const start = getDayKeyInTimezone(new Date(e.date), reservationTimezone)
-        const end = e.endDate ? getDayKeyInTimezone(new Date(e.endDate), reservationTimezone) : start
-        return dateStr >= start && dateStr <= end
+        const start = dateFieldToDayKey(e.date)
+        const end = e.endDate ? dateFieldToDayKey(e.endDate) : start
+        return start !== '' && dateStr >= start && dateStr <= end
       })
 
       if (exception) {
@@ -263,7 +268,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
         }
       } else if (schedule.scheduleType === 'manual') {
         for (const slot of schedule.manualSlots ?? []) {
-          const slotDate = getDayKeyInTimezone(new Date(slot.date), reservationTimezone)
+          const slotDate = dateFieldToDayKey(slot.date)
           if (slotDate === dateStr) {
             slots.push({
               type: 'available',

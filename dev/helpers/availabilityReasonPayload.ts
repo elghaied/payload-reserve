@@ -17,11 +17,13 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
  * no dev-app seed data — dedicated so `getAvailableSlots`'s EmptyReason tests can
  * set up inactive services/resources without colliding with other spec files'
  * cached Payload instances. */
-export async function buildAvailabilityReasonPayload(): Promise<{
+export async function buildAvailabilityReasonPayload(
+  dbName = 'availabilityreasonmemory',
+): Promise<{
   payload: Payload
   stop: () => Promise<void>
 }> {
-  const db = await testDbUri('availabilityreasonmemory')
+  const db = await testDbUri(dbName)
 
   const config = await buildConfig({
     admin: { importMap: { baseDir: path.resolve(dirname, '..') } },

@@ -19,9 +19,10 @@ payloadReserve({
   disabled: false,
 
   // IANA timezone governing all schedule resolution: what HH:mm schedule times
-  // mean, which calendar day a date=YYYY-MM-DD query maps to, exception-day
-  // matching, and full-day boundaries. UTC servers behave as before; non-UTC
-  // servers now resolve the correct day. Validated at init (invalid name throws).
+  // mean, which calendar day a date=YYYY-MM-DD query maps to, and full-day
+  // boundaries. Date-only schedule fields (exceptions[].date/endDate,
+  // manualSlots[].date) are calendar days keyed by their UTC date and are NOT
+  // re-keyed in this zone. Validated at init (invalid name throws).
   timezone: 'UTC',
 
   // Admin group label for all reservation collections
@@ -47,7 +48,11 @@ payloadReserve({
     media: 'media',
   },
 
-  // Override access control per collection
+  // Override access control per collection. Each rule replaces the plugin's
+  // default for THAT operation only. In standalone mode the defaults already
+  // scope customers to their own reservations and their own customer document
+  // (see "Access control for customers" below), so opening `create` on
+  // customers for self-registration, as here, does not open read/update/delete.
   access: {
     services: {
       read: () => true,
@@ -181,13 +186,14 @@ payloadReserve({
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `disabled` | `boolean` | `false` | Disable plugin behavior. Collections still register (schema stays stable), but collection hooks are stripped and endpoints/admin/provisioning are skipped; an invalid sub-config no longer throws at boot |
-| `timezone` | `string` | `'UTC'` | IANA timezone governing schedule resolution, day boundaries, exception matching, and full-day windows. Invalid name throws at init |
+| `timezone` | `string` | `'UTC'` | IANA timezone governing schedule resolution, day boundaries, and full-day windows. Date-only schedule fields (`exceptions[].date`/`endDate`, `manualSlots[].date`) name a calendar day by their UTC date, independent of this option. Invalid name throws at init |
 | `adminGroup` | `string` | `'Reservations'` | Admin panel group label |
 | `defaultBufferTime` | `number` | `0` | Default buffer between bookings (minutes) |
 | `enforceActive` | `boolean` | `true` | Reject creating a reservation against an inactive service or resource (or an `items[]` entry referencing one), and reject an update that newly references an inactive one or reschedules onto one; exclude inactive services/resources from availability. Any change to `startTime`, `endTime`, `service`, `resource`, `items`, or `guestCount` re-checks every reference. Edits that touch none of those — confirming, cancelling, editing notes — are always allowed, so an existing booking never becomes stranded when its service or resource is deactivated later. Set `false` to restore the previous behaviour, where `active` was advisory only and had no effect on booking or availability |
 | `debug` | `boolean` | `false` | Emit info-level `reserve_debug` traces (one Pino event, a `stage` field, a per-call `traceId`) for slot generation and conflict detection — every `getAvailableSlots`/`checkAvailability` empty-return reason, per-stage candidate counts, endpoint request/response, write-path conflict decisions, and previously-swallowed `bufferFor`/`getExternalBusy` errors. Emits at `info` (not `debug`) so lines survive Pino's default production level. No output when false |
 | `cancellationNoticePeriod` | `number` | `24` | Minimum hours notice for cancellation |
-| `userCollection` | `string` | `undefined` | Existing auth collection slug to extend |
+| `userCollection` | `string` | `undefined` | Existing auth collection slug to extend. Leaves Reservations on Payload's default access — supply `access.reservations` if customers log in there (see [Access control for customers](#access-control-for-customers)) |
+| `access` | `Record<collection, CollectionConfig['access']>` | `{}` | Per-collection, per-operation access overrides. A rule you supply replaces the plugin's default for that operation only |
 | `slugs.services` | `string` | `'services'` | Services collection slug |
 | `slugs.resources` | `string` | `'resources'` | Resources collection slug |
 | `slugs.schedules` | `string` | `'schedules'` | Schedules collection slug |
@@ -225,6 +231,51 @@ payloadReserve({
 | `components` | `ReservationComponentOverrides` | `{}` | Per-slot overrides for six admin components (`calendarView`, `customerField`, `availabilityTimeField`, `dashboardWidget`, `availabilityOverview`, `reservationDetail`). Each slot is a Payload component path string, `false` to opt out, or unset for the plugin's own component. `false` is asymmetric — it falls back to a genuine Payload default for five slots, but restores only the pre-feature *click* behaviour for `reservationDetail`, which has no Payload default. Setting any slot to a string requires running `payload generate:importmap` afterward. See [Admin UI → Customising the admin components](./admin-ui.md#customising-the-admin-components) |
 
 > **Vocabularies:** `resourceTypes` (default `['staff', 'equipment', 'room']`) and `leaveTypes` (default `['vacation', 'sick', 'personal', 'closure', 'other']`) customize the option lists for `Resource.resourceType` and `Schedule.exceptions[].type`. See [Staff Scheduling](../README.md#staff-scheduling).
+
+## Access control for customers
+
+Payload's built-in default for a collection with no access rules is `Boolean(user)` on every operation: any authenticated user, from any auth collection, may read, update and delete every document. For a booking system where customers hold logins, that default is a vulnerability, and until 4.1.1 the plugin shipped it (reported privately by an external researcher — see the 4.1.1 changelog).
+
+### Standalone mode (default) — scoped out of the box
+
+With no `userCollection`, "staff/admin" is any user of an auth collection other than the generated customers one, so the plugin can scope customers exactly:
+
+| Collection | `read` | `update` | `delete` | `create` |
+|------------|--------|----------|----------|----------|
+| Reservations | staff: all; customer: `customer equals req.user.id` | same as read; `customer` cannot be re-assigned by a customer | staff only | Payload default (any authenticated user); `enforceCustomerOwnership` pins `customer` to the caller |
+| Customers | staff: all; customer: own document only | same as read; the `notes` field is additionally staff-only at field level | staff only | Payload default — set `create: () => true` to allow self-registration |
+
+Nothing to configure. Anything you pass in `access.reservations` / `access.customers` replaces the default for that operation only, so `customers: { create: () => true }` opens registration without reopening reads.
+
+### `userCollection` mode — you supply the rule
+
+When staff and customers share one auth collection, the plugin cannot tell them apart without a role, so Reservations stays on Payload's default and the plugin logs a warning at boot whenever `userCollection` is set with no `access.reservations.read` and no `resourceOwnerMode`. If **only staff** can log in to that collection, ignore the warning. If **customers** can, scope them yourself — the pattern the plugin uses in standalone mode, keyed on your role field:
+
+```typescript
+import type { Access } from 'payload'
+
+const isStaff = (user: { role?: string } | null | undefined) =>
+  user?.role === 'admin' || user?.role === 'staff'
+
+const ownOrStaff: Access = ({ req: { user } }) => {
+  if (!user) return false
+  if (isStaff(user)) return true
+  return { customer: { equals: user.id } }
+}
+
+payloadReserve({
+  userCollection: 'users',
+  access: {
+    reservations: {
+      read: ownOrStaff,
+      update: ownOrStaff,
+      delete: ({ req: { user } }) => isStaff(user),
+    },
+  },
+})
+```
+
+Your `users` collection's own `access` governs who can read or update other users (and their passwords) — the plugin never changes it. `resourceOwnerMode` brings its own reservation rules (admin-only mutations, owners read their resources' reservations) and does not need this.
 
 ## Internationalization
 

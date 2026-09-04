@@ -44,7 +44,7 @@ By default, with no options set, the plugin creates:
 - `services` — what can be booked (treatments, room types, service offerings)
 - `resources` — who/what performs the service (staff, rooms, equipment)
 - `schedules` — when resources are available (recurring weekly patterns + manual dates)
-- `customers` — a standalone auth collection for customers to log in
+- `customers` — a standalone auth collection for customers to log in (a customer can read and update only their own document and their own reservations; staff see everything — see [Configuration → Access control for customers](./configuration.md#access-control-for-customers))
 - `reservations` — the core booking records
 
 **3 admin UI components:**
