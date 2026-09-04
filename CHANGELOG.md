@@ -5,6 +5,97 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.1.2] - 2026-09-04
+
+Security release: the full audit that followed the 4.1.1 disclosure. **Every install should
+upgrade** — most items below are reachable by a customer login or an anonymous caller on the
+default configuration. No collection schema change, no migration, no import-map regeneration.
+Two new plugin options, both with safe defaults.
+
+### Security
+
+- **Customers could edit Services, Resources and Schedules.** Same class as the 4.1.1 finding, one
+  collection over: with no `resourceOwnerMode` or consumer override all three sat on Payload's
+  default access, so any customer login could deactivate a resource, set its `quantity` to 1,
+  rewrite a service's buffers, delete a schedule, or post a ten-year exception onto any resource.
+  Standalone mode now makes `create`/`update`/`delete` on all three staff-only (`read` unchanged);
+  `userCollection` mode warns at boot until you supply the rule (docs/configuration.md,
+  "Access control for customers").
+- **A customer could confirm, complete or no-show their own booking.** The update path only ran
+  the transition map. A non-staff user may now only move a booking to the cancel status, so the
+  host's `beforeBookingConfirm`/`afterBookingConfirm` hooks can no longer be fired by a customer.
+- **The cancellation notice period was bypassable in one request.** It read the incoming
+  `startTime`, and skipped entirely once a booking had started, so `{ startTime: yesterday,
+  status: 'cancelled' }` cancelled a booking two hours out and the refund hook saw the fake start.
+  It now reads the stored start; a customer also cannot reschedule inside the window (the
+  two-step bypass) or cancel after the start. Staff/admin are exempt (they could not cancel an
+  abusive booking inside the window before). Userless Local API calls keep the previous rule.
+- **Flexible-duration windows were unbounded.** One booking with an `endTime` in 2099 blocked a
+  resource forever, and the unauthenticated `/reserve/hold` accepted the same input with no
+  bound and no inversion check, renewable every TTL. Bookings and holds now require
+  `duration ≤ window ≤ maxFlexibleDuration` (new option, default 1440 minutes; the service
+  `duration` was always documented as the minimum but never enforced).
+- **Public actors can no longer book in the past or outside the schedule** (`enforceSchedule`,
+  new option, default `true`). An anonymous `/reserve/book`/`/reserve/hold` caller or any
+  authenticated customer, on any path, must start in the future and — for a resource with an
+  active schedule — inside it. Staff and userless Local API calls are exempt, so seeds, imports
+  and walk-ins are untouched; a resource with no schedule is unconstrained. Before this the
+  availability endpoints were advisory only.
+- **`/reserve/book` and `/reserve/cancel` leaked field-protected data.** They write with access
+  overridden and Payload populates relationships under the same override, skipping field-level
+  read access: the response carried the customer's staff-only `notes` (undoing the 4.1.1 field
+  lock) and, under `resourceOwnerMode`, the resource owner's whole user record. Both now respond
+  at depth 0 (relationships as ids).
+- **Per-service guest gating was bypassable through `items[]`** — only the top-level service was
+  checked. Every service the booking touches is now gated.
+- **A customer could orphan their reservation** (`customer: null`) or attach `guest` data to it.
+  `enforceCustomerOwnership` pins a cleared `customer` back to the caller; the customer-XOR-guest
+  rule now also runs on update.
+- **`resourceOwnerMode`: any user could create a Schedule on anyone's resource** (a years-long
+  exception on any schedule blocks the whole resource), and an owner could hand their resource to
+  any id. A schedule may only name a resource the caller owns; `owner` is admin-only to change.
+- **`disabled: true` left the REST write surface open with every validation stripped.** Non-staff
+  users now get no create/update/delete on the plugin collections while disabled.
+- **The docs recommended `reservations.create: () => true`**, with which an anonymous
+  `POST /api/reservations` could name any customer. Example removed; the plugin warns at boot
+  when that rule admits a userless request.
+
+### Fixed
+
+- Required-resource pools could be dodged by listing the pool in `items[]` at an unrelated time
+  (presence is now keyed on the parent window), and were never added when a booking's service
+  changed on update.
+- A booking with exactly one `items[]` entry gave that item the parent service's duration on both
+  the write and read path; the item now keeps its own service's window and the top-level end
+  covers it.
+- Malformed or empty bodies on `/reserve/book`, `/reserve/cancel`, `/reserve/hold` and
+  `/reserve/hold/release` are `400`s, not `500`s; an unknown or malformed reservation id on
+  `/reserve/cancel` is a `404` (was a 500 on Postgres/SQLite).
+- `resources=` on `/reserve/availability` and `/reserve/slots` is capped at 20 ids, each validated,
+  and unioned with `resource` instead of replacing it.
+- Holds stamped a staff user's id into the `customer` relationship (a FK violation on SQL); only a
+  customers-collection user is stamped now.
+- Deleting a Resource or Service with an expired hold row hit the raw SQL constraint error the
+  delete guard exists to prevent; expired holds are swept first, live ones block with a message.
+- A host collection named `reserve` silently 404'd every plugin endpoint; it is refused at boot.
+- `composeAccess` treated an explicit `undefined` override as "no rule", reopening what the base
+  closed.
+- Admin UI: the slot picker, the resource-availability shading and the customer search each
+  could show a previous request's response after a fast switch (the picker could then save a slot
+  from the wrong day); three fetch URLs interpolated params without encoding; the dashboard widget
+  rendered the raw status value instead of its label.
+- `resourceOwnerMode.adminRoles` docs claimed a fallback that does not exist; with no admin roles
+  the mode fails closed, and the docs and type comment now say so.
+
+### Added
+
+- `enforceSchedule?: boolean` (default `true`) and `maxFlexibleDuration?: number` (default
+  `1440`) plugin options — see above.
+- `POST /reserve/hold` refusal reasons `invalid_window` (`400`, with `detail`) and
+  `outside_schedule` (`409`).
+- Boot diagnostics for `userCollection` mode (catalog writes open) and for an
+  `access.reservations.create` rule that admits anonymous callers.
+
 ## [4.1.1] - 2026-09-04
 
 Security release. **Every install on the default (standalone) configuration should upgrade.**
