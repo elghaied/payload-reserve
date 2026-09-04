@@ -5,6 +5,7 @@ import { ValidationError } from 'payload'
 import type { DurationType, ResolvedReservationPluginConfig } from '../../types.js'
 
 import { computeEndTime } from '../../services/AvailabilityService.js'
+import { flexibleWindowProblem } from '../../utilities/flexibleWindow.js'
 import {
   mergeReservationData,
   schedulingFieldsChanged,
@@ -82,12 +83,17 @@ export const calculateEndTime =
             ],
           })
         }
-        // An inverted window would be invisible to overlap queries — reject it
-        // (computeEndTime performs no validation for flexible durations).
-        if (new Date(merged.endTime as string) <= startDate) {
-          throw new ValidationError({
-            errors: [{ message: 'endTime must be after startTime', path: 'endTime' }],
-          })
+        // An inverted window would be invisible to overlap queries; an
+        // unbounded one blocks the resource forever; one shorter than the
+        // service duration breaks the documented minimum.
+        const problem = flexibleWindowProblem({
+          config,
+          end: new Date(merged.endTime as string),
+          service,
+          start: startDate,
+        })
+        if (problem) {
+          throw new ValidationError({ errors: [{ message: problem, path: 'endTime' }] })
         }
       } else {
         const result = computeEndTime({
@@ -97,6 +103,77 @@ export const calculateEndTime =
           timeZone: config.timezone,
         })
         data.endTime = result.endTime.toISOString()
+      }
+
+      // A single real items[] entry used to get no endTime of its own: this
+      // branch only bounded the top-level window, and resolveReservationItems
+      // then backfilled the item from it — so a 60-minute item service on a
+      // second resource occupied that resource for the parent's 30 minutes, on
+      // both the write and the read path. Materialise the item's true window
+      // and widen the top-level end to cover it.
+      if (realItemCount === 1 && Array.isArray(data.items) && data.items.length === 1) {
+        const item = data.items[0] as Record<string, unknown>
+        const itemStartRaw =
+          (item.startTime as string | undefined) ?? (merged.startTime as string | undefined)
+        const itemServiceId = extractId(item.service) ?? serviceId
+        if (itemStartRaw && itemServiceId !== undefined) {
+          const itemService =
+            String(itemServiceId) === String(serviceId)
+              ? service
+              : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (req.payload.findByID as any)({
+                  id: itemServiceId,
+                  collection: config.slugs.services,
+                  depth: 0,
+                  disableErrors: true,
+                  joins: false,
+                  req,
+                }).catch(() => null)
+          const itemStart = new Date(itemStartRaw)
+          if (itemService && (itemService.duration || itemService.durationType === 'full-day')) {
+            const itemType = ((itemService.durationType as string) ?? 'fixed') as DurationType
+            if (itemType === 'flexible') {
+              const inherited =
+                (item.endTime as string | undefined) ??
+                (data.endTime as string | undefined) ??
+                (merged.endTime as string | undefined)
+              if (!inherited) {
+                throw new ValidationError({
+                  errors: [
+                    {
+                      message: 'endTime is required for flexible duration services',
+                      path: 'items.0.endTime',
+                    },
+                  ],
+                })
+              }
+              const problem = flexibleWindowProblem({
+                config,
+                end: new Date(inherited),
+                service: itemService,
+                start: itemStart,
+              })
+              if (problem) {
+                throw new ValidationError({
+                  errors: [{ message: problem, path: 'items.0.endTime' }],
+                })
+              }
+              item.endTime = inherited
+            } else {
+              item.endTime = computeEndTime({
+                durationType: itemType,
+                serviceDuration: (itemService.duration as number) ?? 0,
+                startTime: itemStart,
+                timeZone: config.timezone,
+              }).endTime.toISOString()
+            }
+            const topEnd =
+              (data.endTime as string | undefined) ?? (merged.endTime as string | undefined)
+            if (!topEnd || new Date(item.endTime as string) > new Date(topEnd)) {
+              data.endTime = item.endTime
+            }
+          }
+        }
       }
     } else {
       // Multi-resource: recompute only when the patch carries items[]. In
@@ -162,14 +239,17 @@ export const calculateEndTime =
             })
           }
 
-          // An inverted window is invisible to overlap queries — the single-
-          // resource branch has rejected one since the inverted-window fix, and
-          // an item inheriting a parent end can invert against its own start.
-          if (new Date(inherited) <= new Date(item.startTime as string)) {
+          // Inverted, unbounded, or shorter than the service minimum — the
+          // same rule the single-resource branch applies.
+          const problem = flexibleWindowProblem({
+            config,
+            end: new Date(inherited),
+            service,
+            start: new Date(item.startTime as string),
+          })
+          if (problem) {
             throw new ValidationError({
-              errors: [
-                { message: 'endTime must be after startTime', path: `items.${i}.endTime` },
-              ],
+              errors: [{ message: problem, path: `items.${i}.endTime` }],
             })
           }
 

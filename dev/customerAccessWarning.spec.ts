@@ -65,3 +65,24 @@ describe('D6: customers can read every reservation in userCollection mode', () =
     expect(await warningsFor({})).not.toMatch(D6)
   })
 })
+
+describe('D6b/D7: catalog writes and anonymous create', () => {
+  it('warns when userCollection leaves services/resources/schedules writable by every user', async () => {
+    const msgs = await warningsFor({ userCollection: 'users' })
+    expect(msgs).toMatch(/services, resources, schedules have no create\/update\/delete rule/)
+  })
+
+  it('stays silent once the catalog writes are restricted', async () => {
+    const staffOnly = { create: () => false, delete: () => false, update: () => false }
+    const msgs = await warningsFor({
+      access: { reservations: { read: () => true }, resources: staffOnly, schedules: staffOnly, services: staffOnly },
+      userCollection: 'users',
+    })
+    expect(msgs).not.toMatch(/have no create\/update\/delete rule/)
+  })
+
+  it('warns when access.reservations.create admits anonymous callers', async () => {
+    expect(await warningsFor({ access: { reservations: { create: () => true } } })).toMatch(/allows anonymous callers/)
+    expect(await warningsFor({ access: { reservations: { create: ({ req }) => Boolean(req.user) } } })).not.toMatch(/allows anonymous callers/)
+  })
+})

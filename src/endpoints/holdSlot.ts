@@ -16,6 +16,8 @@ import {
  * a single 409 carrying an internal message.
  */
 const REFUSAL_STATUS: Record<HoldRefusalReason, number> = {
+  invalid_window: 400,
+  outside_schedule: 409,
   resource_not_found: 404,
   service_inactive: 409,
   service_not_found: 404,
@@ -34,7 +36,15 @@ const REFUSAL_STATUS: Record<HoldRefusalReason, number> = {
 export function createHoldSlotEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
     handler: async (req) => {
-      const body = (await req.json?.()) as Record<string, unknown>
+      let body: Record<string, unknown>
+      try {
+        body = (await req.json?.()) as Record<string, unknown>
+      } catch {
+        return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return Response.json({ error: 'A JSON object body is required' }, { status: 400 })
+      }
 
       const resource = body.resource as number | string | undefined
       const service = body.service as number | string | undefined
@@ -117,7 +127,10 @@ export function createHoldSlotEndpoint(config: ResolvedReservationPluginConfig):
       }
 
       if (!result.ok) {
-        return Response.json({ error: result.reason }, { status: REFUSAL_STATUS[result.reason] })
+        return Response.json(
+          { error: result.reason, ...(result.detail ? { detail: result.detail } : {}) },
+          { status: REFUSAL_STATUS[result.reason] },
+        )
       }
 
       return Response.json(

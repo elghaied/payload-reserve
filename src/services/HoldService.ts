@@ -4,7 +4,9 @@ import { ValidationError } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { flexibleWindowProblem } from '../utilities/flexibleWindow.js'
 import { isTransientWriteConflict } from '../utilities/retryOnWriteConflict.js'
+import { isWithinSchedule } from '../utilities/scheduleWindow.js'
 import { computeEndTime } from './AvailabilityService.js'
 
 /**
@@ -20,14 +22,16 @@ import { computeEndTime } from './AvailabilityService.js'
  * plausible-looking 409 the caller cannot act on.
  */
 export type HoldRefusalReason =
+  | 'invalid_window'
+  | 'outside_schedule'
   | 'resource_not_found'
   | 'service_inactive'
   | 'service_not_found'
   | 'slot_taken'
 
 export type TakeHoldResult =
+  | { detail?: string; ok: false; reason: HoldRefusalReason }
   | { hold: { expiresAt: string; id: number | string; token: string }; ok: true }
-  | { ok: false; reason: HoldRefusalReason }
 
 /**
  * Claim a slot for `config.slotHolds.ttlMinutes` while the caller completes an
@@ -101,6 +105,38 @@ export async function takeHold(params: {
     timeZone: config.timezone,
   })
 
+  // This endpoint needs no authentication, so the window is policed here the
+  // way validateBookingWindow/calculateEndTime police a booking: not in the
+  // past, bounded (a decades-long flexible `endTime` used to block the
+  // resource for the TTL, renewable forever), inside the schedule.
+  if (startTime.getTime() < Date.now()) {
+    return { detail: 'startTime cannot be in the past', ok: false, reason: 'invalid_window' }
+  }
+  if (service.durationType === 'flexible') {
+    const problem = flexibleWindowProblem({
+      config,
+      end: endTime,
+      service: service as { duration?: null | number },
+      start: startTime,
+    })
+    if (problem) {
+      return { detail: problem, ok: false, reason: 'invalid_window' }
+    }
+  }
+  if (config.enforceSchedule) {
+    const inside = await isWithinSchedule({
+      config,
+      end: endTime,
+      fullDay: service.durationType === 'full-day',
+      req,
+      resourceId,
+      start: startTime,
+    })
+    if (!inside) {
+      return { ok: false, reason: 'outside_schedule' }
+    }
+  }
+
   // Expired-row sweep. Purely hygienic — every read already filters on
   // expiresAt — so it must never fail the hold.
   try {
@@ -142,7 +178,11 @@ export async function takeHold(params: {
     created = await (payload.create as any)({
       collection: config.slugs.holds,
       data: {
-        customer: req.user?.id,
+        // Only a customers-collection user belongs in this relationship; a
+        // staff id from another collection is a dangling reference on Mongo
+        // and a foreign-key violation (a 500) on Postgres/SQLite.
+        customer:
+          req.user && req.user.collection === config.slugs.customers ? req.user.id : undefined,
         endTime: endTime.toISOString(),
         expiresAt,
         guestCount,

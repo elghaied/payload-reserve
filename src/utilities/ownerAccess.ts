@@ -15,7 +15,14 @@ export function composeAccess(
   base: CollectionAccess,
   override: CollectionConfig['access'],
 ): CollectionAccess {
-  return { ...base, ...(override ?? {}) }
+  // An explicit `undefined` in the override (`read: cond ? fn : undefined`)
+  // must not clobber the base rule: a spread would set `read: undefined`,
+  // which Payload treats as "no rule" and falls back to `Boolean(user)` —
+  // silently reopening what the base closed.
+  const defined = Object.fromEntries(
+    Object.entries(override ?? {}).filter(([, v]) => v !== undefined),
+  ) as CollectionAccess
+  return { ...base, ...defined }
 }
 
 /**
@@ -27,6 +34,15 @@ export function composeAccess(
  * Reads the configured `roleField` (not a hardcoded `user.role`) so apps using a
  * `roles: string[]` field — or any custom role field — aren't silently demoted.
  */
+/** Public wrapper over `isAdmin` for hooks that need owner-mode admin detection. */
+export function isOwnerModeAdmin(
+  user: null | Record<string, unknown> | undefined,
+  rom: ResolvedResourceOwnerModeConfig,
+): boolean {
+  if (!user) {return false}
+  return isAdmin(user, rom.adminRoles, rom.roleField)
+}
+
 function isAdmin(user: Record<string, unknown>, adminRoles: string[], roleField: string): boolean {
   if (!adminRoles.length) {return false}
   const role = user[roleField] as string | string[] | undefined
@@ -205,5 +221,49 @@ export function makeStandaloneCustomerAccess(
     delete: privilegedOnly,
     read: selfOrPrivileged,
     update: selfOrPrivileged,
+  }
+}
+
+/**
+ * Default access for Services, Resources and Schedules in standalone mode (no
+ * `userCollection`, no `resourceOwnerMode`). Same finding class as the 4.1.1
+ * Reservations/Customers fix, one collection over: on Payload's default a
+ * customer login could deactivate a resource, set its quantity to 1, rewrite a
+ * service's buffers, delete a schedule or post a ten-year exception onto any
+ * resource through `/api/<slug>`.
+ *
+ * `read` is deliberately left alone (Payload's default, any authenticated user,
+ * and consumers commonly open it to `() => true` for public availability);
+ * only the writes are staff/admin-only.
+ */
+export function makeStandaloneCatalogAccess(
+  config: ResolvedReservationPluginConfig,
+): CollectionAccess {
+  const privilegedOnly: Access = ({ req }: { req: PayloadRequest }) =>
+    isPrivilegedUser(req.user, config)
+  return {
+    create: privilegedOnly,
+    delete: privilegedOnly,
+    update: privilegedOnly,
+  }
+}
+
+/**
+ * Write access applied to every plugin collection while `disabled: true`. The
+ * kill switch strips every safety hook (conflict detection, status machine,
+ * ownership pinning) but the collections stay registered so the schema is
+ * stable — which left their REST write surface open to customers with none of
+ * the validation. Staff keep writing; non-privileged users cannot write at all
+ * until the plugin is re-enabled.
+ */
+export function makeDisabledWriteAccess(
+  config: ResolvedReservationPluginConfig,
+): CollectionAccess {
+  const privilegedOnly: Access = ({ req }: { req: PayloadRequest }) =>
+    isPrivilegedUser(req.user, config)
+  return {
+    create: privilegedOnly,
+    delete: privilegedOnly,
+    update: privilegedOnly,
   }
 }

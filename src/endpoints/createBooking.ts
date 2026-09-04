@@ -2,6 +2,7 @@ import type { Endpoint } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { flattenRelations } from '../utilities/flattenRelations.js'
 import {
   isTransientWriteConflict,
   retryOnWriteConflict,
@@ -12,7 +13,15 @@ import { isPrivilegedUser } from '../utilities/userRoles.js'
 export function createBookingEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
     handler: async (req) => {
-      const data = (await req.json?.()) as Record<string, unknown>
+      let data: Record<string, unknown>
+      try {
+        data = (await req.json?.()) as Record<string, unknown>
+      } catch {
+        return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+      }
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        return Response.json({ error: 'A JSON object body is required' }, { status: 400 })
+      }
 
       // Cancellation tokens are server-generated secrets — never accept one
       // from the request body.
@@ -86,7 +95,10 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (req.payload.create as any)({
               collection: config.slugs.reservations,
-              context: holdToken ? { holdToken } : undefined,
+              // publicBooking: this endpoint is the public surface, so the
+              // policy hooks (past/schedule window) apply to every caller of
+              // it that is not staff — validateBookingWindow reads the flag.
+              context: { publicBooking: !privileged, ...(holdToken ? { holdToken } : {}) },
               data,
               overrideAccess: true,
               req,
@@ -133,7 +145,21 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
 
       // Never expose the cancellation token in the HTTP response — it is delivered
       // to the guest by the host project via the afterBookingCreate hook.
-      const { cancellationToken: _cancellationToken, ...safeReservation } = reservation
+      //
+      // Re-read at depth 0 first: the create ran with access overridden, and
+      // Payload populates relationships under the same override, skipping
+      // field-level read access — the raw doc carried the customer's staff-only
+      // `notes` and, under resourceOwnerMode, the resource owner's user record.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const flat = (await (req.payload.findByID as any)({
+        id: reservation.id,
+        collection: config.slugs.reservations,
+        depth: 0,
+        disableErrors: true,
+        req,
+      }).catch(() => null)) as null | Record<string, unknown>
+      const { cancellationToken: _cancellationToken, ...safeReservation } =
+        flat ?? flattenRelations(reservation)
 
       return Response.json(safeReservation, { status: 201 })
     },

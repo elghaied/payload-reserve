@@ -49,6 +49,21 @@ export const validateStatusTransition =
       const previousStatus = originalDoc?.status as string | undefined
 
       if (previousStatus && previousStatus !== newStatus) {
+        // The create branch limits a non-staff caller to the default status,
+        // but this branch only ran the transition map — so a customer allowed
+        // to update their own row (4.1.1) could PATCH `status: confirmed` and
+        // fire the host's payment/confirmation hooks as the actor. A non-staff
+        // user may only ever move a booking to the cancel status.
+        if (
+          req.user &&
+          !isPrivilegedUser(req.user, config) &&
+          newStatus !== statusMachine.cancelStatus
+        ) {
+          throw new ValidationError({
+            errors: [{ message: 'Only staff can change a reservation status', path: 'status' }],
+          })
+        }
+
         const result = validateTransition(previousStatus, newStatus, statusMachine)
 
         if (!result.valid) {

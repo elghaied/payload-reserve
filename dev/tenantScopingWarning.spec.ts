@@ -145,10 +145,10 @@ describe('tenant-scoping diagnostic (D2)', () => {
     }
     const { messages, payload } = fakePayload([...generated, scopedPosts])
     await config.onInit?.(payload)
-    // D6 (customer access in userCollection mode) legitimately fires for this
-    // config and is covered in customerAccessWarning.spec.ts; this assertion is
-    // about D2 only.
-    expect(messages.filter((m) => !m.includes('access.reservations'))).toEqual([])
+    // D6/D6b (customer access in userCollection mode) legitimately fire for
+    // this config and are covered in customerAccessWarning.spec.ts; this
+    // assertion is about D2 only.
+    expect(messages.filter((m) => !m.includes('through the collection REST API'))).toEqual([])
   })
 
   // A consumer who scopes ONLY the reservation collections and forgets them all

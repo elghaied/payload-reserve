@@ -15,6 +15,7 @@ import { enforceCustomerOwnership } from '../hooks/reservations/enforceCustomerO
 import { expandRequiredResources } from '../hooks/reservations/expandRequiredResources.js'
 import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
 import { validateActive } from '../hooks/reservations/validateActive.js'
+import { validateBookingWindow } from '../hooks/reservations/validateBookingWindow.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
 import { validateGuestBooking } from '../hooks/reservations/validateGuestBooking.js'
@@ -26,6 +27,7 @@ import {
   makeReservationOwnerAccess,
   makeStandaloneReservationAccess,
 } from '../utilities/ownerAccess.js'
+import { isPrivilegedUser } from '../utilities/userRoles.js'
 
 /**
  * `min: 1` alone accepts `1.5`; a head count has to be a whole number. Mirrors the
@@ -173,8 +175,7 @@ export function createReservationsCollection(
           // Server-generated secret: never settable via the API (the
           // validateGuestBooking hook stamps it), readable only by staff/admin.
           create: () => false,
-          read: ({ req }) =>
-            Boolean(req.user) && req.user!.collection !== config.slugs.customers,
+          read: ({ req }) => isPrivilegedUser(req.user, config),
           update: () => false,
         },
         admin: {
@@ -307,6 +308,10 @@ export function createReservationsCollection(
         // checked too; before validateConflicts so rejection is cheap.
         validateActive(config),
         calculateEndTime(config),
+        // After calculateEndTime (needs the bounded window), before the lock
+        // (a policy rejection should not take the lock): public actors may not
+        // book in the past or outside the resource's schedule.
+        validateBookingWindow(config),
         // Must precede validateConflicts: it manufactures the write contention
         // that makes the conflict check meaningful under concurrency.
         acquireBookingLock(config),

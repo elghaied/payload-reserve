@@ -375,3 +375,47 @@ describe('Slot holds', () => {
     ).rejects.toThrow(/not allowed to perform this action/i)
   })
 })
+
+describe('4.1.2 hold hardening', () => {
+  test('a hold cannot start in the past, exceed maxFlexibleDuration, or invert', async () => {
+    const flex = await payload.create({
+      collection: col('services'),
+      data: { name: 'Hold Flex', active: true, duration: 30, durationType: 'flexible' },
+    })
+    const resource = await payload.create({
+      collection: col('resources'),
+      data: { name: 'Hold Flex R', active: true, quantity: 1, services: [flex.id] },
+    })
+    const base = { config: resolved, req: reqFor(), resourceId: resource.id, serviceId: flex.id }
+    const past = await takeHold({ ...base, startTime: new Date(Date.now() - 3_600_000) })
+    expect(past).toMatchObject({ ok: false, reason: 'invalid_window' })
+    const start = new Date('2034-01-01T10:00:00Z')
+    const huge = await takeHold({ ...base, endTime: new Date('2099-01-01T00:00:00Z'), startTime: start })
+    expect(huge).toMatchObject({ ok: false, reason: 'invalid_window' })
+    const inverted = await takeHold({ ...base, endTime: new Date(start.getTime() - 60_000), startTime: start })
+    expect(inverted).toMatchObject({ ok: false, reason: 'invalid_window' })
+    const fine = await takeHold({ ...base, endTime: new Date(start.getTime() + 5_400_000), startTime: start })
+    expect(fine.ok).toBe(true)
+  })
+
+  test('deleting a resource sweeps expired holds but is blocked by a live one', async () => {
+    const { resource, service } = await seed('delguard')
+    const live = await takeHold({
+      config: resolved,
+      req: reqFor(),
+      resourceId: resource.id,
+      serviceId: service.id,
+      startTime: new Date('2034-02-01T10:00:00Z'),
+    })
+    expect(live.ok).toBe(true)
+    if (!live.ok) {return}
+    await expect(payload.delete({ id: resource.id, collection: col('resources') })).rejects.toThrow(/active hold/)
+    await payload.update({
+      id: live.hold.id,
+      collection: col(resolved.slugs.holds),
+      data: { expiresAt: new Date(Date.now() - 1_000).toISOString() },
+    })
+    const deleted = await payload.delete({ id: resource.id, collection: col('resources') })
+    expect(deleted.id).toBeTruthy()
+  })
+})

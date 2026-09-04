@@ -7,21 +7,34 @@ import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { resolveGuestBookingAllowed } from '../../utilities/guestBooking.js'
+import { mergeReservationData } from '../../utilities/reservationChanges.js'
+import { extractId } from '../../utilities/resolveReservationItems.js'
+import { isPrivilegedUser } from '../../utilities/userRoles.js'
 
 type GuestData = { email?: string; name?: string; phone?: string }
 
 export const validateGuestBooking =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
-  async ({ context, data, operation, req }) => {
+  async ({ context, data, operation, originalDoc, req }) => {
     if (context?.skipReservationHooks) {
       return data
     }
-    if (operation !== 'create') {
+    if (operation !== 'create' && operation !== 'update') {
       return data
     }
 
-    const customer = data?.customer
-    const guest = data?.guest as GuestData | undefined
+    // On update the customer-XOR-guest rule runs on the MERGED document: a
+    // customer allowed to edit their own row could otherwise attach `guest`
+    // data and turn an attributed booking into a customer-plus-guest hybrid.
+    const source =
+      operation === 'update'
+        ? mergeReservationData(
+            data as Record<string, unknown>,
+            originalDoc as Record<string, unknown> | undefined,
+          )
+        : (data as Record<string, unknown>)
+    const customer = source.customer
+    const guest = source.guest as GuestData | undefined
     const hasCustomer = customer != null && customer !== ''
     const hasGuest =
       guest != null && (Boolean(guest.name) || Boolean(guest.email) || Boolean(guest.phone))
@@ -48,7 +61,7 @@ export const validateGuestBooking =
       })
     }
 
-    if (hasCustomer) {
+    if (hasCustomer || operation === 'update') {
       return data
     }
 
@@ -71,28 +84,31 @@ export const validateGuestBooking =
       })
     }
 
-    // Gate by service — admins (non-customer collection users) bypass.
-    const isAdmin = req.user != null && req.user.collection !== config.slugs.customers
-    if (!isAdmin) {
-      const serviceId =
-        typeof data.service === 'object'
-          ? (data.service as { id?: string } | null)?.id
-          : data.service
-      // `service` is a required field on the collection, so Payload's field
-      // validation (which runs before this beforeChange hook) guarantees it is
-      // present for any booking that reaches here. The guard is purely defensive.
-      if (serviceId) {
+    // Gate by service — staff/admin bypass. Every service the booking touches
+    // is gated, not just the top-level one: an `items[]` line on a
+    // guest-disabled service used to slip past because only `data.service`
+    // was checked.
+    if (!isPrivilegedUser(req.user, config)) {
+      const serviceIds = new Set<string>()
+      const top = extractId(data.service)
+      if (top !== undefined) {serviceIds.add(String(top))}
+      for (const it of Array.isArray(data.items) ? (data.items as Array<Record<string, unknown>>) : []) {
+        const s = extractId(it.service)
+        if (s !== undefined) {serviceIds.add(String(s))}
+      }
+      for (const serviceId of serviceIds) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const service = await (req.payload.findByID as any)({
           id: serviceId,
           collection: config.slugs.services,
           depth: 0,
+          disableErrors: true,
           // Skip the resources join — internal logic never reads it, and without this
           // every service read becomes an aggregation with a $lookup.
           joins: false,
           req,
-        })
-        if (!resolveGuestBookingAllowed(service, config.allowGuestBooking)) {
+        }).catch(() => null)
+        if (service && !resolveGuestBookingAllowed(service, config.allowGuestBooking)) {
           throw new ValidationError({
             errors: [
               {

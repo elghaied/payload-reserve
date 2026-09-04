@@ -26,7 +26,7 @@ Returns available time slots for a resource and service on a given date. Slots a
 | `service` | Yes | — | Service ID |
 | `date` | Yes | — | Date in `YYYY-MM-DD` format. A `YYYY-MM-DD` value is interpreted as that calendar day in the business `timezone`. |
 | `guestCount` | No | `1` | Number of guests (used for `per-guest` capacity filtering). Clamped to a minimum of 1. A non-numeric value is rejected with `400`. |
-| `resources` | No | — | Comma-separated resource IDs to require for the slot (multi-resource bookings). Overrides the single `resource` as the caller set. |
+| `resources` | No | — | Comma-separated resource IDs to require for the slot (multi-resource bookings). Unioned with `resource` as the caller set; at most 20 ids, each must exist (`404` otherwise, `400` over the cap). |
 
 The resolved resource set is the union of the caller resource(s) and the service's `requiredResources` — a slot is only returned if **all** required resources are free.
 
@@ -85,7 +85,7 @@ Returns available slots with the echoed `date`/`guestCount`. Same resolution log
 | `service` | Yes | — | Service ID |
 | `date` | Yes | — | Date in `YYYY-MM-DD` format. A `YYYY-MM-DD` value is interpreted as that calendar day in the business `timezone`. |
 | `guestCount` | No | `1` | Number of guests (used for `per-guest` capacity mode). Clamped to a minimum of 1. A non-numeric value is rejected with `400`. |
-| `resources` | No | — | Comma-separated resource IDs to require for the slot. Overrides `resource` as the caller set; unioned with the service's `requiredResources`. |
+| `resources` | No | — | Comma-separated resource IDs to require for the slot. Unioned with `resource` as the caller set and with the service's `requiredResources`; at most 20 ids, each must exist. |
 
 **Example request:**
 
@@ -237,7 +237,9 @@ Creates a new reservation. All Payload collection hooks (guest validation, requi
 }
 ```
 
-**Response:** `201` with the created reservation document, or `400`/`409` if validation fails. An anonymous caller that supplies a `customer` gets `403 { "error": "Anonymous bookings cannot set a customer" }`. The `cancellationToken` field is **stripped** from the response — it is never echoed over HTTP, and is delivered to the guest by the host project via the `afterBookingCreate` hook.
+**Response:** `201` with the created reservation document **at depth 0** (relationships as ids — since 4.1.2; the populated document leaked the customer's staff-only `notes` and, under `resourceOwnerMode`, the resource owner's user record), or `400`/`409` if validation fails. A body that is not a JSON object is `400`. An anonymous caller that supplies a `customer` gets `403 { "error": "Anonymous bookings cannot set a customer" }`. The `cancellationToken` field is **stripped** from the response — it is never echoed over HTTP, and is delivered to the guest by the host project via the `afterBookingCreate` hook.
+
+This endpoint is the public booking surface: for every caller that is not staff it also enforces `enforceSchedule` (no past start; inside the resource's schedule when it has one) and the per-service guest gate on every service the booking touches, `items[]` included.
 
 **Example fetch:**
 
@@ -277,10 +279,11 @@ Cancels a reservation. Works in two modes:
 
 `token` is only needed for guest (unauthenticated) cancellation; authenticated owners/admins omit it.
 
-**Response:** `200` with the updated reservation document (with `cancellationToken` stripped). The reservation's status is set to the configured `statusMachine.cancelStatus` (default `'cancelled'`), not a hardcoded value — so custom status vocabularies cancel correctly.
+**Response:** `200` with the updated reservation document at depth 0 (relationships as ids, `cancellationToken` stripped). The reservation's status is set to the configured `statusMachine.cancelStatus` (default `'cancelled'`), not a hardcoded value — so custom status vocabularies cancel correctly.
 
 **Errors:**
-- `400 { "message": "reservationId is required" }` when `reservationId` is missing.
+- `400 { "message": "reservationId is required" }` when `reservationId` is missing; `400 { "message": "Invalid JSON body" }` for an unparseable body.
+- `404 { "message": "Reservation not found" }` for an unknown or malformed id (previously a 500 on Postgres/SQLite).
 - `403 { "message": "Forbidden" }` when an authenticated user is neither the owner nor privileged, or when a guest supplies a missing/invalid `token`.
 
 There is no `401` response — guest cancellation is supported. The `validateCancellation` hook enforces the minimum notice period configured in `cancellationNoticePeriod`.

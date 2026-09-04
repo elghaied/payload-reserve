@@ -3,6 +3,7 @@ import type { Where, WidgetServerProps } from 'payload'
 import type { PluginT } from '../../translations/index.js'
 import type { StatusMachineConfig } from '../../types.js'
 
+import { buildStatusLabels } from '../../utilities/statusPresentation.js'
 import { collectionHasTenantField, readCookie, tenantWhereClause } from '../../utilities/tenantFilter.js'
 import { getEffectiveTenantTimezone } from '../../utilities/tenantTimezone.js'
 import {
@@ -43,6 +44,7 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
     payload.config.admin?.custom?.reservationStatusMachine
   const blockingStatuses: string[] = statusMachine?.blockingStatuses ?? []
   const terminalStatuses: string[] = statusMachine?.terminalStatuses ?? []
+  const statusLabels = buildStatusLabels(statusMachine?.statuses ?? [], t as (key: string) => string)
 
   // "Today" is the business timezone's calendar day, not the server's — and in
   // multiTenant mode that's the SELECTED tenant's zone (tenant → global → UTC).
@@ -113,7 +115,8 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
             })}
           </p>
           <p>
-            {t('reservation:dashboardStatus')} {nextAppointment.status as string}
+            {t('reservation:dashboardStatus')}{' '}
+            {statusLabels[nextAppointment.status as string] ?? (nextAppointment.status as string)}
           </p>
         </div>
       ) : (

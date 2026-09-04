@@ -12,8 +12,13 @@ import { releaseHold } from '../services/HoldService.js'
 export function createReleaseSlotEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
     handler: async (req) => {
-      const body = (await req.json?.()) as Record<string, unknown>
-      const token = body.token as string | undefined
+      let body: Record<string, unknown>
+      try {
+        body = (await req.json?.()) as Record<string, unknown>
+      } catch {
+        return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+      }
+      const token = body && typeof body === 'object' ? (body.token as string | undefined) : undefined
 
       if (!token) {
         return Response.json({ error: 'token is required' }, { status: 400 })

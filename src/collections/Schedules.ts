@@ -5,7 +5,13 @@ import { ValidationError } from 'payload'
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
-import { composeAccess, makeScheduleOwnerAccess } from '../utilities/ownerAccess.js'
+import {
+  composeAccess,
+  isOwnerModeAdmin,
+  makeScheduleOwnerAccess,
+  makeStandaloneCatalogAccess,
+} from '../utilities/ownerAccess.js'
+import { extractId } from '../utilities/resolveReservationItems.js'
 import { buildSelectOptions } from '../utilities/selectOptions.js'
 import { dateFieldToDayKey } from '../utilities/timezoneUtils.js'
 
@@ -21,7 +27,14 @@ export function createSchedulesCollection(
 ): CollectionConfig {
   const rom = config.resourceOwnerMode
   const access =
-    composeAccess(rom ? makeScheduleOwnerAccess(rom) : {}, config.access.schedules)
+    composeAccess(
+      rom
+        ? makeScheduleOwnerAccess(rom)
+        : config.userCollection
+          ? {}
+          : makeStandaloneCatalogAccess(config),
+      config.access.schedules,
+    )
 
   return {
     slug: config.slugs.schedules,
@@ -188,6 +201,38 @@ export function createSchedulesCollection(
       },
     ],
     hooks: {
+      beforeChange: [
+        // Owner mode: `create` is any authenticated user (owners must be able to
+        // add schedules), but nothing checked WHICH resource — any user could
+        // post a schedule, with a years-long exception, onto another owner's
+        // resource, and an exception on ANY schedule blocks the whole resource.
+        async ({ context, data, operation, originalDoc, req }) => {
+          if (!rom || context?.skipReservationHooks || !req.user) {return data}
+          if (isOwnerModeAdmin(req.user as Record<string, unknown>, rom)) {return data}
+          const resourceId = extractId(data?.resource ?? originalDoc?.resource)
+          if (resourceId === undefined) {return data}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const resource = await (req.payload.findByID as any)({
+            id: resourceId,
+            collection: config.slugs.resources,
+            depth: 0,
+            disableErrors: true,
+            req,
+          }).catch(() => null)
+          const owner = resource ? extractId(resource[rom.ownerField]) : undefined
+          if (owner === undefined || String(owner) !== String(req.user.id)) {
+            throw new ValidationError({
+              errors: [
+                {
+                  message: `You can only ${operation === 'create' ? 'create' : 'edit'} schedules for resources you own`,
+                  path: 'resource',
+                },
+              ],
+            })
+          }
+          return data
+        },
+      ],
       beforeValidate: [
         ({ data }) => {
           // Only compare well-formed HH:mm values — otherwise a malformed time

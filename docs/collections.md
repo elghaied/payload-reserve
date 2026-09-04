@@ -124,6 +124,18 @@ await payload.create({
 
 ---
 
+## Access to Services, Resources and Schedules
+
+| Mode | `read` | `create` / `update` / `delete` |
+|------|--------|--------------------------------|
+| Standalone (default, since 4.1.2) | Payload default: any authenticated user. Open with `read: () => true` for public availability pages | Staff/admin only (any user of an auth collection other than the customers one) |
+| `resourceOwnerMode` | Owners: their own resources and the schedules on them; admins: all | Owners: their own; a Schedule may only name a resource the caller owns (checked on create and on a `resource` change); only an admin may re-assign a resource's `owner` |
+| `userCollection` (no `resourceOwnerMode`) | Payload default | Payload default — **every** user may write them unless you supply `access.<collection>`; the plugin warns at boot |
+
+Any rule you pass in `access.services` / `access.resources` / `access.schedules` replaces the default for that operation only.
+
+---
+
 ## Customers
 
 **Slug:** `customers` (or your `userCollection` slug)
@@ -182,11 +194,13 @@ A reservation must have **either** a `customer` **or** a `guest` — not both, n
 
 `guestCount` (top-level and per `items[]` entry) must be a whole number — `1.5` is rejected with `guestCount must be a whole number`, the same rule `/api/reserve/hold` applies to its own input.
 
+A `flexible`-duration window must be at least the service `duration` and at most `maxFlexibleDuration` minutes (default 1440). Public actors (anonymous endpoint callers and customers) may not book in the past or, when the resource has a schedule, outside it — see `enforceSchedule`.
+
 ### Access
 
 | Mode | `create` | `read` | `update` | `delete` |
 |------|----------|--------|----------|----------|
-| Standalone (default, since 4.1.1) | Payload default: any authenticated user (the `enforceCustomerOwnership` hook pins `customer` to the caller) | Staff/admin: all. Customer: own rows only (`customer equals req.user.id`). Guest bookings have no `customer`, so no customer can reach them | Same as `read`; a customer cannot re-assign `customer` to someone else | Staff/admin only. Customers cancel via `/api/reserve/cancel` |
+| Standalone (default, since 4.1.1) | Payload default: any authenticated user (the `enforceCustomerOwnership` hook pins `customer` to the caller) | Staff/admin: all. Customer: own rows only (`customer equals req.user.id`). Guest bookings have no `customer`, so no customer can reach them | Same as `read`; a customer cannot re-assign or clear `customer`, attach `guest` data, or set `status` to anything but the cancel status, and may not reschedule or cancel inside the notice period (4.1.2) | Staff/admin only. Customers cancel via `/api/reserve/cancel` |
 | `resourceOwnerMode` | Admin only | Admin: all. Owner: reservations on their own resources | Admin only | Admin only |
 | `userCollection` (no `resourceOwnerMode`) | Payload default | Payload default (`Boolean(user)`) — **every** user reads, updates and deletes every reservation unless you supply `access.reservations`; see [Configuration → Access control for customers](./configuration.md#access-control-for-customers) | Payload default | Payload default |
 

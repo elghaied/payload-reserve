@@ -19,7 +19,7 @@ The standard appointment mode. The service duration is fixed and always applied.
 
 ### Flexible
 
-`endTime` is provided by the caller in the booking request. The service `duration` field acts as the minimum; if the provided `endTime` results in less than `duration` minutes the booking is rejected. An inverted window — `endTime` at or before `startTime` — is rejected on both create and update. In the admin UI the reservation `endTime` field is editable (not read-only) precisely so flexible bookings can set it; for `fixed`/`full-day` services it is auto-computed and overwritten on save.
+`endTime` is provided by the caller in the booking request. The service `duration` field is the minimum — a window shorter than `duration` minutes is rejected (`endTime must be at least N minutes after startTime`; documented since the field shipped, enforced since 4.1.2) — and the plugin option `maxFlexibleDuration` (default 1440 minutes) is the maximum (`Flexible bookings cannot exceed N minutes`). An inverted window — `endTime` at or before `startTime` — is rejected on both create and update. The same bounds apply to a `flexible` hold taken through `/api/reserve/hold`. Before the ceiling existed, one request could occupy a resource until 2099. In the admin UI the reservation `endTime` field is editable (not read-only) precisely so flexible bookings can set it; for `fixed`/`full-day` services it is auto-computed and overwritten on save.
 
 Used for open-ended services where the customer specifies how long they need — workspace rentals, recording studios, vehicle bays.
 
@@ -182,6 +182,8 @@ await payload.create({
 A resource's schedules can declare `exceptions` — days the resource is unavailable (vacation, sick leave, closures). An exception recorded on **any** of a resource's schedules makes the **whole** resource unavailable that day, not just the schedule it was recorded on. So a part-time resource with separate morning and afternoon schedules is fully off-limits if either schedule has an exception for that date.
 
 Exception `date`–`endDate` ranges are honored inclusively — every calendar day from `date` to `endDate` (both ends included) is blocked.
+
+**The write path enforces schedules for public actors (4.1.2, `enforceSchedule`, default on).** An anonymous `/reserve/book` or `/reserve/hold` call, or any authenticated customer on any path, may not book in the past, and — for a resource that has at least one active schedule — every item's window must fall inside that day's schedule ranges and not on an exception day (`The requested time is outside the resource's schedule`; holds answer `409 outside_schedule`). Staff, and Local API calls with no user, are exempt so walk-ins, imports and seeds are unaffected. A resource with no schedule is unconstrained. Before this the availability endpoints were advisory only.
 
 All day and time resolution — matching a date to a schedule and expanding `HH:mm` slots — runs in the business `timezone` (the plugin-level `timezone` option), so wall-clock schedules behave correctly regardless of server timezone.
 

@@ -31,8 +31,21 @@ payloadReserve({
   // Minutes of buffer between reservations when a service has none defined
   defaultBufferTime: 0,
 
-  // Minimum hours of notice required before a cancellation is allowed
+  // Minimum hours of notice required before a customer may cancel — or
+  // reschedule — a booking, measured against the STORED start time. Staff are
+  // exempt. Userless Local API calls keep the legacy rule (blocked inside the
+  // window, free once the booking has started).
   cancellationNoticePeriod: 24,
+
+  // Public bookings (anonymous /reserve/book, /reserve/hold, or any customer)
+  // must start in the future and, for a resource that has a schedule, inside
+  // it. Staff and userless Local API calls are exempt.
+  enforceSchedule: true,
+
+  // Ceiling, in minutes, on a flexible-duration booking or hold window (the
+  // service `duration` is the floor). One request could otherwise occupy a
+  // resource for decades.
+  maxFlexibleDuration: 1440,
 
   // Extend an existing auth collection instead of creating a standalone Customers collection.
   // The named collection must exist in your Payload config before the plugin runs.
@@ -54,16 +67,19 @@ payloadReserve({
   // (see "Access control for customers" below), so opening `create` on
   // customers for self-registration, as here, does not open read/update/delete.
   access: {
-    services: {
-      read: () => true,
-      create: ({ req }) => !!req.user,
-      update: ({ req }) => !!req.user,
-      delete: ({ req }) => !!req.user,
-    },
+    // Public availability pages usually need anonymous reads of the catalog.
+    // Writes are already staff-only in standalone mode; do NOT reopen them
+    // with `({ req }) => !!req.user` — that is any customer.
+    services: { read: () => true },
     resources: { read: () => true },
     schedules: { read: () => true },
-    reservations: { create: () => true },
+    // Self-registration. `create` is the only operation this opens; reads,
+    // updates and deletes stay scoped to the customer's own document.
     customers: { create: () => true },
+    // Do NOT open `reservations.create` to anonymous callers: an unauthenticated
+    // POST /api/reservations could then name any customer. Public booking goes
+    // through POST /api/reserve/book, which refuses that (and the plugin warns
+    // at boot if this rule admits a userless request).
   },
 
   // Configurable status machine
@@ -185,13 +201,15 @@ payloadReserve({
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `disabled` | `boolean` | `false` | Disable plugin behavior. Collections still register (schema stays stable), but collection hooks are stripped and endpoints/admin/provisioning are skipped; an invalid sub-config no longer throws at boot |
+| `disabled` | `boolean` | `false` | Disable plugin behavior. Collections still register (schema stays stable), but collection hooks are stripped and endpoints/admin/provisioning are skipped; an invalid sub-config no longer throws at boot. Because the hooks are what validate customer writes, non-staff users get **no** create/update/delete on the plugin collections while disabled (customers keep their self-scoped profile access) |
 | `timezone` | `string` | `'UTC'` | IANA timezone governing schedule resolution, day boundaries, and full-day windows. Date-only schedule fields (`exceptions[].date`/`endDate`, `manualSlots[].date`) name a calendar day by their UTC date, independent of this option. Invalid name throws at init |
 | `adminGroup` | `string` | `'Reservations'` | Admin panel group label |
 | `defaultBufferTime` | `number` | `0` | Default buffer between bookings (minutes) |
 | `enforceActive` | `boolean` | `true` | Reject creating a reservation against an inactive service or resource (or an `items[]` entry referencing one), and reject an update that newly references an inactive one or reschedules onto one; exclude inactive services/resources from availability. Any change to `startTime`, `endTime`, `service`, `resource`, `items`, or `guestCount` re-checks every reference. Edits that touch none of those — confirming, cancelling, editing notes — are always allowed, so an existing booking never becomes stranded when its service or resource is deactivated later. Set `false` to restore the previous behaviour, where `active` was advisory only and had no effect on booking or availability |
 | `debug` | `boolean` | `false` | Emit info-level `reserve_debug` traces (one Pino event, a `stage` field, a per-call `traceId`) for slot generation and conflict detection — every `getAvailableSlots`/`checkAvailability` empty-return reason, per-stage candidate counts, endpoint request/response, write-path conflict decisions, and previously-swallowed `bufferFor`/`getExternalBusy` errors. Emits at `info` (not `debug`) so lines survive Pino's default production level. No output when false |
-| `cancellationNoticePeriod` | `number` | `24` | Minimum hours notice for cancellation |
+| `cancellationNoticePeriod` | `number` | `24` | Minimum hours notice before a customer may cancel or reschedule, measured against the stored start time. Staff/admin are exempt. A customer also cannot cancel a booking that has already started. Userless Local API calls keep the legacy rule (blocked inside the window, free once started) |
+| `enforceSchedule` | `boolean` | `true` | Public actors — anonymous `/reserve/book` and `/reserve/hold` callers and authenticated customers, on any path — may not book in the past, and for a resource that has at least one active schedule the whole window must fall inside it (and not on an exception day). Staff and userless Local API calls are exempt, so seeds, imports and walk-ins are untouched. A resource with no schedule is unconstrained |
+| `maxFlexibleDuration` | `number` | `1440` | Ceiling in minutes on a `flexible` booking or hold window; the service `duration` is the floor (now enforced). Must be positive |
 | `userCollection` | `string` | `undefined` | Existing auth collection slug to extend. Leaves Reservations on Payload's default access — supply `access.reservations` if customers log in there (see [Access control for customers](#access-control-for-customers)) |
 | `access` | `Record<collection, CollectionConfig['access']>` | `{}` | Per-collection, per-operation access overrides. A rule you supply replaces the plugin's default for that operation only |
 | `slugs.services` | `string` | `'services'` | Services collection slug |
@@ -215,7 +233,7 @@ payloadReserve({
 | `resourceTypes` | `string[]` | `['staff', 'equipment', 'room']` | Option list for `Resource.resourceType`; first entry is the field default. Empty array throws |
 | `leaveTypes` | `string[]` | `['vacation', 'sick', 'personal', 'closure', 'other']` | Option list for `Schedule.exceptions[].type`. Empty array throws |
 | `resourceOwnerMode` | `ResourceOwnerModeConfig` | `undefined` | Opt-in resource-owner multi-tenancy (see sub-options below) |
-| `resourceOwnerMode.adminRoles` | `string[]` | `[]` | Roles that bypass ownership scoping; falls back to admin-collection check |
+| `resourceOwnerMode.adminRoles` | `string[]` | `[]` | Roles that bypass ownership scoping. **Fails closed:** with no admin roles nobody is an admin, so reservation create/update/delete are refused for everyone — set it |
 | `resourceOwnerMode.roleField` | `string` | `staffProvisioning.roleField` ?? `'role'` | User field consulted for admin detection (supports `roles: string[]` fields) |
 | `resourceOwnerMode.ownedServices` | `boolean` | `false` | Also add an owner field to Services |
 | `resourceOwnerMode.ownerField` | `string` | `'owner'` | Owner relationship field name on Resources |
@@ -242,14 +260,17 @@ With no `userCollection`, "staff/admin" is any user of an auth collection other 
 
 | Collection | `read` | `update` | `delete` | `create` |
 |------------|--------|----------|----------|----------|
-| Reservations | staff: all; customer: `customer equals req.user.id` | same as read; `customer` cannot be re-assigned by a customer | staff only | Payload default (any authenticated user); `enforceCustomerOwnership` pins `customer` to the caller |
+| Reservations | staff: all; customer: `customer equals req.user.id` | same as read; a customer cannot re-assign or clear `customer`, attach `guest` data, or change `status` to anything but the cancel status | staff only | Payload default (any authenticated user); `enforceCustomerOwnership` pins `customer` to the caller |
 | Customers | staff: all; customer: own document only | same as read; the `notes` field is additionally staff-only at field level | staff only | Payload default — set `create: () => true` to allow self-registration |
+| Services, Resources, Schedules (4.1.2) | Payload default (any authenticated user; open it with `read: () => true` for public availability pages) | staff only | staff only | staff only |
+
+Until 4.1.2 the three catalog collections sat on Payload's default for writes too, so a customer login could deactivate a resource, set its quantity to 1, rewrite a service's buffers, delete a schedule or post a years-long exception onto any resource.
 
 Nothing to configure. Anything you pass in `access.reservations` / `access.customers` replaces the default for that operation only, so `customers: { create: () => true }` opens registration without reopening reads.
 
 ### `userCollection` mode — you supply the rule
 
-When staff and customers share one auth collection, the plugin cannot tell them apart without a role, so Reservations stays on Payload's default and the plugin logs a warning at boot whenever `userCollection` is set with no `access.reservations.read` and no `resourceOwnerMode`. If **only staff** can log in to that collection, ignore the warning. If **customers** can, scope them yourself — the pattern the plugin uses in standalone mode, keyed on your role field:
+When staff and customers share one auth collection, the plugin cannot tell them apart without a role, so Reservations — and the writes on Services, Resources and Schedules — stay on Payload's default, and the plugin logs a warning at boot for each whenever `userCollection` is set with no narrowing rule and no `resourceOwnerMode`. If **only staff** can log in to that collection, ignore the warnings. If **customers** can, scope them yourself — the pattern the plugin uses in standalone mode, keyed on your role field:
 
 ```typescript
 import type { Access } from 'payload'
@@ -263,17 +284,24 @@ const ownOrStaff: Access = ({ req: { user } }) => {
   return { customer: { equals: user.id } }
 }
 
+const staffOnly: Access = ({ req: { user } }) => isStaff(user)
+
 payloadReserve({
   userCollection: 'users',
   access: {
     reservations: {
       read: ownOrStaff,
       update: ownOrStaff,
-      delete: ({ req: { user } }) => isStaff(user),
+      delete: staffOnly,
     },
+    services: { create: staffOnly, update: staffOnly, delete: staffOnly },
+    resources: { create: staffOnly, update: staffOnly, delete: staffOnly },
+    schedules: { create: staffOnly, update: staffOnly, delete: staffOnly },
   },
 })
 ```
+
+Two more boot warnings live next to these: one when `access.reservations.create` admits a userless request (an anonymous `POST /api/reservations` could then name any customer — public booking belongs on `/api/reserve/book`, which refuses that), and one when `userCollection` leaves the catalog writes open.
 
 Your `users` collection's own `access` governs who can read or update other users (and their passwords) — the plugin never changes it. `resourceOwnerMode` brings its own reservation rules (admin-only mutations, owners read their resources' reservations) and does not need this.
 

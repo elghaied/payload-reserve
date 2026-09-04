@@ -35,6 +35,11 @@ export const enforceCustomerOwnership =
       if (String(customerId) !== String(req.user.id)) {
         data.customer = req.user.id
       }
+    } else if (operation === 'update' && data != null && 'customer' in data) {
+      // Clearing `customer` on their own row would orphan it: still blocking
+      // its slot, unreachable by them (access is `customer equals self`), and
+      // cancellable only by staff. A customer cannot detach themselves.
+      data.customer = req.user.id
     }
 
     return data

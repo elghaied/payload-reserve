@@ -41,7 +41,13 @@ export function preventDeleteWhenReferenced({
   label,
 }: {
   config: ResolvedReservationPluginConfig
-  extraChecks?: Array<{ collection: string; field: string; label: string }>
+  extraChecks?: Array<{
+    collection: string
+    /** Rows whose value here is in the past are swept before counting (slot holds). */
+    expiresField?: string
+    field: string
+    label: string
+  }>
   field: 'resource' | 'service'
   label: string
 }): CollectionBeforeDeleteHook {
@@ -61,6 +67,22 @@ export function preventDeleteWhenReferenced({
 
     const extras: Array<{ totalDocs: number }> = []
     for (const check of extraChecks) {
+      if (check.expiresField) {
+        // An expired hold is not a reference worth keeping the row for, but on
+        // Postgres/SQLite it still trips the NOT NULL / ON DELETE SET NULL
+        // contradiction this guard exists to pre-empt. Sweep it first.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (req.payload.delete as any)({
+          collection: check.collection,
+          req,
+          where: {
+            and: [
+              { [check.field]: { equals: id } },
+              { [check.expiresField]: { less_than: new Date().toISOString() } },
+            ],
+          },
+        })
+      }
       extras.push(
         (await countFn({
           collection: check.collection,

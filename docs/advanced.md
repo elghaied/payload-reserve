@@ -81,6 +81,8 @@ payloadReserve({
 
 Setting `disabled: true` keeps all collections **registered** so the database schema stays stable — it does not drop tables/collections. Only the behavior goes inert: hooks, endpoints, admin components, and staff provisioning are removed. This matters for migrations and DB tooling: a disabled install still owns the same schema, so toggling `disabled` does not require a migration.
 
+Because the stripped hooks are what validate customer writes (ownership pinning, conflict detection, the status machine), a disabled plugin also refuses `create`/`update`/`delete` on its collections for non-staff users until it is re-enabled; staff keep writing, and customers keep their self-scoped profile access. Before 4.1.2 a customer could post confirmed, overlapping rows on another customer's account while the kill switch was on.
+
 ---
 
 ## Reconciliation Job

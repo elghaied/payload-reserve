@@ -132,8 +132,8 @@ payloadReserve({
 
 | Collection | Behaviour |
 |------------|-----------|
-| Resources | Adds an `owner` relationship field (auto-populated on create); owners read/update/delete only their own records |
-| Schedules | Owners read/update/delete only schedules whose resource they own (join through `resource.owner`) |
+| Resources | Adds an `owner` relationship field (auto-populated on create, re-assignable by admins only); owners read/update/delete only their own records |
+| Schedules | Owners read/update/delete only schedules whose resource they own (join through `resource.owner`); a schedule may only be created on, or moved to, a resource the caller owns (4.1.2) |
 | Reservations | Owners can read reservations for their resources; mutations are admin-only |
 | Services | Unchanged by default; set `ownedServices: true` to apply the same owner pattern |
 
@@ -541,6 +541,19 @@ payloadReserve({
 
 ## Access Control & Booking Correctness
 
+### 4.1.2: the rest of the audit
+
+The 4.1.1 disclosure prompted a full audit; 4.1.2 closes everything it found. Reachable by a customer or anonymous caller on the default config, so upgrade:
+
+- **Services, Resources and Schedules** writes are staff-only in standalone mode (they sat on Payload's default, so a customer could deactivate a resource or delete a schedule).
+- A customer may no longer **self-confirm** their booking (`status` can only move to the cancel status), **back-date `startTime`** to dodge the cancellation notice period, reschedule or cancel inside it, cancel after the start, clear `customer`, or attach `guest` data. Staff are exempt from the notice period.
+- **Flexible windows are bounded** (`duration` ≤ window ≤ `maxFlexibleDuration`, default 24h) for bookings and holds. One request could otherwise occupy a resource until 2099.
+- **Public actors book inside the schedule and not in the past** (`enforceSchedule`, default on; staff and userless Local API calls exempt).
+- `/reserve/book` and `/reserve/cancel` respond at **depth 0** — the populated document leaked field-protected data. Malformed bodies are `400`, an unknown reservation id is `404`, `resources=` on the availability endpoints is capped at 20 validated ids.
+- Guest gating covers every service in `items[]`; required-resource pools cannot be dodged by listing them at another time and are added when a booking's service changes; a single `items[]` entry keeps its own service's duration.
+- `resourceOwnerMode`: a schedule may only name a resource the caller owns; only admins may re-assign `owner`.
+- `disabled: true` locks non-staff writes (the hooks it strips were the validation); a host collection named `reserve` is refused at boot instead of silently shadowing the endpoints; expired holds no longer block deleting a resource.
+
 ### Standalone mode scopes customers to their own records (4.1.1)
 
 **Before 4.1.1, the Quick Start config was exploitable by any customer with a login.** Reservations and the generated `customers` auth collection sat on Payload's built-in default access — `Boolean(user)` for read, update and delete — so through the stock `/api/reservations` and `/api/customers` REST API a customer could read, rewrite and delete every other customer's reservation, list every customer's email/phone/notes, and `PATCH` another customer's `password` and log in as them. Only `create` was guarded. Reported privately by an external researcher; fixed and covered by `dev/standaloneAccess.int.spec.ts`.
@@ -704,7 +717,7 @@ Disabled by default — when absent, no `reservation-holds` collection is create
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/api/reserve/hold` | `{ resource, service, startTime, endTime?, guestCount? }` | `201 { token, expiresAt }`; `409 { error: 'slot_taken' \| 'service_inactive' }` when the slot genuinely isn't available; `409 { error, retryable: true }` when lock contention outlived the retry budget; `404 { error: 'service_not_found' \| 'resource_not_found' }`; `400` for a missing or unparseable field |
+| POST | `/api/reserve/hold` | `{ resource, service, startTime, endTime?, guestCount? }` | `201 { token, expiresAt }`; `409 { error: 'slot_taken' \| 'service_inactive' \| 'outside_schedule' }` when the slot genuinely isn't available; `409 { error, retryable: true }` when lock contention outlived the retry budget; `404 { error: 'service_not_found' \| 'resource_not_found' }`; `400 { error: 'invalid_window', detail }` for a start in the past or a `flexible` window outside `[duration, maxFlexibleDuration]`; `400` for a missing or unparseable field |
 | POST | `/api/reserve/hold/release` | `{ token }` | `200 { released: 0 \| 1 }` — always `200`, even for an already-released or expired token (idempotent) |
 
 Pass the token straight through to `POST /api/reserve/book` as `holdToken` to convert a hold into a real booking — the hold is excluded from that request's own conflict check (so it doesn't block the very booking it was protecting) and the hold row is deleted on success, best-effort, so a delete failure never fails the booking itself.

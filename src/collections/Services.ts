@@ -4,7 +4,11 @@ import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { preventDeleteWhenReferenced } from '../hooks/shared/preventDeleteWhenReferenced.js'
-import { composeAccess, makeServiceOwnerAccess } from '../utilities/ownerAccess.js'
+import {
+  composeAccess,
+  makeServiceOwnerAccess,
+  makeStandaloneCatalogAccess,
+} from '../utilities/ownerAccess.js'
 
 export function createServicesCollection(config: ResolvedReservationPluginConfig): CollectionConfig {
   const rom = config.resourceOwnerMode
@@ -39,8 +43,12 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
       : null
 
   // Owner-mode base rules with any app overrides composed on top (per operation)
+  // Owner-mode (with ownedServices) brings its own rules; standalone mode gets
+  // staff-only writes (makeStandaloneCatalogAccess); userCollection mode stays
+  // on Payload's default and the boot diagnostic says so.
+  const catalogBase = config.userCollection ? {} : makeStandaloneCatalogAccess(config)
   const access = composeAccess(
-    rom && ownedServices ? makeServiceOwnerAccess(rom, ownerField) : {},
+    rom && ownedServices ? makeServiceOwnerAccess(rom, ownerField) : catalogBase,
     config.access.services,
   )
 
@@ -206,7 +214,23 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
       ...(ownerFieldDef ? [ownerFieldDef] : []),
     ],
     hooks: {
-      beforeDelete: [preventDeleteWhenReferenced({ config, field: 'service', label: 'service' })],
+      beforeDelete: [
+        preventDeleteWhenReferenced({
+          config,
+          extraChecks: config.slotHolds.enabled
+            ? [
+                {
+                  collection: config.slugs.holds,
+                  expiresField: 'expiresAt',
+                  field: 'service',
+                  label: 'active hold',
+                },
+              ]
+            : [],
+          field: 'service',
+          label: 'service',
+        }),
+      ],
     },
     labels: {
       plural: ({ t }) => (t as PluginT)('reservation:collectionServices'),

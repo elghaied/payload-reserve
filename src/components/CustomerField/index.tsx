@@ -38,6 +38,7 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
 
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<CustomerDoc[]>([])
+  const searchSeq = useRef(0)
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDoc | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -61,7 +62,9 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
 
     const fetchCustomer = async () => {
       try {
-        const res = await fetch(`${apiBase}/${customersCollection}/${value}`)
+        const res = await fetch(
+          `${apiBase}/${customersCollection}/${encodeURIComponent(String(value))}`,
+        )
         if (res.ok) {
           const doc = await res.json()
           setSelectedCustomer({
@@ -83,18 +86,21 @@ export const CustomerField: RelationshipFieldClientComponent = ({ field, path: p
   // Debounced search
   const doSearch = useCallback(
     async (query: string) => {
+      // Two debounced searches can resolve out of order ("ab" after "abc");
+      // only the latest request may write the dropdown.
+      const seq = ++searchSeq.current
       setLoading(true)
       try {
         const params = new URLSearchParams({ limit: '10', search: query })
         const res = await fetch(`${apiBase}/reservation-customer-search?${params.toString()}`)
         if (res.ok) {
           const data = await res.json()
-          setResults(data.docs)
+          if (seq === searchSeq.current) {setResults(data.docs)}
         }
       } catch {
-        setResults([])
+        if (seq === searchSeq.current) {setResults([])}
       } finally {
-        setLoading(false)
+        if (seq === searchSeq.current) {setLoading(false)}
       }
     },
     [apiBase],

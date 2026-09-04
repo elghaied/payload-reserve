@@ -4,7 +4,12 @@ import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { preventDeleteWhenReferenced } from '../hooks/shared/preventDeleteWhenReferenced.js'
-import { composeAccess, makeResourceOwnerAccess } from '../utilities/ownerAccess.js'
+import {
+  composeAccess,
+  isOwnerModeAdmin,
+  makeResourceOwnerAccess,
+  makeStandaloneCatalogAccess,
+} from '../utilities/ownerAccess.js'
 import { buildSelectOptions } from '../utilities/selectOptions.js'
 
 /**
@@ -45,6 +50,12 @@ export function createResourcesCollection(
     ? {
         name: ownerField,
         type: 'relationship',
+        // Only an owner-mode admin may re-assign a resource. Without this the
+        // beforeChange hook below returned the incoming value on update, so an
+        // owner could hand their resource to any id.
+        access: {
+          update: ({ req }) => isOwnerModeAdmin(req.user, rom),
+        },
         admin: {
           position: 'sidebar',
         },
@@ -61,7 +72,14 @@ export function createResourcesCollection(
 
   // Determine access: app override → owner-mode auto-wired → unrestricted
   const access =
-    composeAccess(rom ? makeResourceOwnerAccess(rom) : {}, config.access.resources)
+    composeAccess(
+      rom
+        ? makeResourceOwnerAccess(rom)
+        : config.userCollection
+          ? {}
+          : makeStandaloneCatalogAccess(config),
+      config.access.resources,
+    )
 
   return {
     slug: config.slugs.resources,
@@ -185,6 +203,16 @@ export function createResourcesCollection(
           // blocked too.
           extraChecks: [
             { collection: config.slugs.schedules, field: 'resource', label: 'schedule' },
+            ...(config.slotHolds.enabled
+              ? [
+                  {
+                    collection: config.slugs.holds,
+                    expiresField: 'expiresAt',
+                    field: 'resource',
+                    label: 'active hold',
+                  },
+                ]
+              : []),
           ],
           field: 'resource',
           label: 'resource',

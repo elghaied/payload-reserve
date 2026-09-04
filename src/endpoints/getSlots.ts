@@ -7,6 +7,8 @@ import { createReserveDebug } from '../utilities/reserveDebug.js'
 import { extractId, mergeResourceIds } from '../utilities/resolveRequiredResources.js'
 import { getDayKeyInTimezone, isValidDayKey } from '../utilities/timezoneUtils.js'
 
+const MAX_EXPLICIT_RESOURCES = 20
+
 export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig): Endpoint {
   return {
     handler: async (req) => {
@@ -54,7 +56,18 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
 
       // Resolve required resource set: caller resource(s) ∪ service.requiredResources
       const explicit = url.searchParams.get('resources')
-      const callerIds = explicit ? explicit.split(',').map((s) => s.trim()).filter(Boolean) : [resource]
+      const explicitIds = explicit
+        ? explicit.split(',').map((s) => s.trim()).filter(Boolean)
+        : []
+      // Uncapped, each id multiplied the per-slot DB work for an anonymous
+      // caller; and the validated `resource` was discarded when present.
+      if (explicitIds.length > MAX_EXPLICIT_RESOURCES) {
+        return Response.json(
+          { error: `resources accepts at most ${MAX_EXPLICIT_RESOURCES} ids` },
+          { status: 400 },
+        )
+      }
+      const callerIds = Array.from(new Set([resource, ...explicitIds]))
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const svcDoc = await (req.payload.findByID as any)({
@@ -81,6 +94,20 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
       }).catch(() => null)
       if (!resourceDoc) {
         return Response.json({ error: 'Resource not found' }, { status: 404 })
+      }
+      for (const extra of explicitIds) {
+        if (String(extra) === String(resource)) {continue}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const extraDoc = await (req.payload.findByID as any)({
+          id: extra,
+          collection: config.slugs.resources,
+          depth: 0,
+          disableErrors: true,
+          req,
+        }).catch(() => null)
+        if (!extraDoc) {
+          return Response.json({ error: 'Resource not found' }, { status: 404 })
+        }
       }
       const requiredIds = ((svcDoc?.requiredResources as unknown[]) ?? [])
         .map((r) => extractId(r))

@@ -52,21 +52,31 @@ export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: p
       setSlots([])
       return
     }
+    // A slow response for the previous day/resource must not land after the
+    // current one: the picker would then offer slots from the wrong day, and a
+    // click saves that instant. The cleanup flag drops any stale result.
+    let stale = false
     const load = async () => {
       setLoading(true)
       try {
-        const res = await fetch(
-          `${apiBase}/reserve/slots?resource=${resourceId}&service=${serviceId}&date=${day}`,
-        )
+        const params = new URLSearchParams({
+          date: day,
+          resource: String(resourceId),
+          service: String(serviceId),
+        })
+        const res = await fetch(`${apiBase}/reserve/slots?${params.toString()}`)
         const json = await res.json()
-        setSlots((json.slots ?? []) as Slot[])
+        if (!stale) {setSlots((json.slots ?? []) as Slot[])}
       } catch {
-        setSlots([])
+        if (!stale) {setSlots([])}
       } finally {
-        setLoading(false)
+        if (!stale) {setLoading(false)}
       }
     }
     void load()
+    return () => {
+      stale = true
+    }
   }, [serviceId, resourceId, day, apiBase])
 
   if (!serviceId || !resourceId) {

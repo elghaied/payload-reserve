@@ -23,20 +23,30 @@ export function useResourceAvailability(
       setData(null)
       return
     }
+    // Drop a stale response: switching resource A→B while A's request is in
+    // flight must not shade B's grid with A's windows.
+    let stale = false
     const load = async () => {
       setLoading(true)
       try {
-        const res = await fetch(
-          `${apiBase}/reserve/resource-availability?resource=${resourceId}&start=${startIso}&end=${endIso}`,
-        )
-        setData(res.ok ? ((await res.json()) as ResourceAvailability) : null)
+        const params = new URLSearchParams({
+          end: endIso,
+          resource: String(resourceId),
+          start: startIso,
+        })
+        const res = await fetch(`${apiBase}/reserve/resource-availability?${params.toString()}`)
+        const next = res.ok ? ((await res.json()) as ResourceAvailability) : null
+        if (!stale) {setData(next)}
       } catch {
-        setData(null)
+        if (!stale) {setData(null)}
       } finally {
-        setLoading(false)
+        if (!stale) {setLoading(false)}
       }
     }
     void load()
+    return () => {
+      stale = true
+    }
   }, [apiBase, resourceId, startIso, endIso])
 
   return { data, loading }

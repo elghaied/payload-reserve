@@ -93,7 +93,11 @@ export type ReservationPluginHooks = {
 // --- Resource owner mode ---
 
 export type ResourceOwnerModeConfig = {
-  /** Roles that can see all records (default: check req.user.collection === adminCollection) */
+  /**
+   * Roles that bypass ownership scoping (see all records, admin-only mutations).
+   * Default `[]`, which FAILS CLOSED: with no admin roles nobody is an admin,
+   * so reservation create/update/delete are refused for everyone. Set it.
+   */
   adminRoles?: string[]
   /** Whether Services also get an owner field (default: false — Services are platform-managed) */
   ownedServices?: boolean
@@ -265,6 +269,14 @@ export type ReservationPluginConfig = {
    * where `active` was advisory and only filtered in the admin UI.
    */
   enforceActive?: boolean
+  /**
+   * Reject a booking whose window falls outside the resource's schedule (or on an
+   * exception day), or that starts in the past, when it is made by a PUBLIC actor —
+   * an anonymous `/reserve/book` call or an authenticated customer, via the endpoint
+   * or the collection REST API. Staff and Local API calls with no user are exempt,
+   * so imports, seeds and walk-ins keep working. Default `true`.
+   */
+  enforceSchedule?: boolean
   /** @deprecated Use `collectionOverrides.reservations.fields` instead. Extra fields appended to Reservations. */
   extraReservationFields?: Field[]
   /** Resolve external busy intervals (calendar sync etc.) folded into availability + calendar display. */
@@ -273,6 +285,12 @@ export type ReservationPluginConfig = {
   hooks?: ReservationPluginHooks
   /** Configurable leave/exception type vocabulary (default: vacation/sick/personal/closure/other) */
   leaveTypes?: string[]
+  /**
+   * Upper bound, in minutes, on the window of a `flexible`-duration booking or
+   * slot hold (the service `duration` is the lower bound). Default 1440 (24h).
+   * Without a bound one request could occupy a resource for decades.
+   */
+  maxFlexibleDuration?: number
   /** Tenant scoping for the custom admin views (calendar, availability, dashboard). Applied only when the scoped collection has the tenant field AND the tenant cookie is set. */
   multiTenant?: {
     /** Cookie written by the tenant-selector (default 'payload-tenant'). */
@@ -347,6 +365,7 @@ export type ResolvedReservationPluginConfig = {
   defaultBufferTime: number
   disabled: boolean
   enforceActive: boolean
+  enforceSchedule: boolean
   extraReservationFields: Field[]
   getExternalBusy: GetExternalBusy | undefined
   /** Whether the media collection (`slugs.media`) exists — set by the plugin; gates the image upload fields. */
@@ -357,6 +376,7 @@ export type ResolvedReservationPluginConfig = {
   hooks: ReservationPluginHooks
   leaveTypes: string[]
   localized: boolean
+  maxFlexibleDuration: number
   multiTenant: {
     cookieName: string
     tenantField: string

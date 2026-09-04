@@ -109,6 +109,7 @@ export const DEFAULT_ADMIN_GROUP = 'Reservations'
 export const DEFAULT_ALLOW_GUEST_BOOKING = false
 export const DEFAULT_BUFFER_TIME = 0
 export const DEFAULT_CANCELLATION_NOTICE_PERIOD = 24
+export const DEFAULT_MAX_FLEXIBLE_DURATION = 1440
 
 export function resolveConfig(
   pluginOptions: ReservationPluginConfig,
@@ -143,6 +144,7 @@ export function resolveConfig(
     defaultBufferTime: pluginOptions.defaultBufferTime ?? DEFAULT_BUFFER_TIME,
     disabled: pluginOptions.disabled ?? false,
     enforceActive: pluginOptions.enforceActive ?? true,
+    enforceSchedule: pluginOptions.enforceSchedule ?? true,
     extraReservationFields: pluginOptions.extraReservationFields ?? [],
     getExternalBusy: pluginOptions.getExternalBusy,
     // Real value is set by the plugin once config.collections is known (C8)
@@ -153,6 +155,7 @@ export function resolveConfig(
     hooks: pluginOptions.hooks ?? {},
     leaveTypes: pluginOptions.leaveTypes ?? DEFAULT_LEAVE_TYPES,
     localized: false,
+    maxFlexibleDuration: pluginOptions.maxFlexibleDuration ?? DEFAULT_MAX_FLEXIBLE_DURATION,
     multiTenant: {
       cookieName: pluginOptions.multiTenant?.cookieName ?? 'payload-tenant',
       tenantField: pluginOptions.multiTenant?.tenantField ?? 'tenant',
@@ -204,6 +207,9 @@ export function resolveConfig(
   if (!disabled) {
     validateStatusMachine(resolved.statusMachine)
     validateTimezone(resolved.timezone)
+    if (!(resolved.maxFlexibleDuration > 0)) {
+      throw new Error('maxFlexibleDuration must be a positive number of minutes')
+    }
   }
 
   return resolved

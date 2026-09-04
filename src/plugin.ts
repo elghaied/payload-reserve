@@ -1,4 +1,4 @@
-import type { CollectionSlug, Config, Field } from 'payload'
+import type { CollectionSlug, Config, Field, PayloadRequest } from 'payload'
 
 import { flattenAllFields, getFieldByPath } from 'payload'
 import { deepMergeSimple } from 'payload/shared'
@@ -25,6 +25,7 @@ import { provisionStaffResource } from './hooks/users/provisionStaffResource.js'
 import { type PluginT, translations } from './translations/index.js'
 import { applyCollectionOverride } from './utilities/collectionOverrides.js'
 import { resolveComponentSlot } from './utilities/componentSlots.js'
+import { makeDisabledWriteAccess } from './utilities/ownerAccess.js'
 import { collectionHasTenantField } from './utilities/tenantFilter.js'
 import { supportsTransactions } from './utilities/transactionSupport.js'
 
@@ -237,6 +238,17 @@ export const payloadReserve =
         )
       }
     }
+    // Payload's router treats the first path segment as a collection slug when
+    // one matches, so a host collection named `reserve` (or
+    // `reservation-customer-search`) silently 404s every plugin endpoint.
+    for (const reserved of ['reserve', 'reservation-customer-search']) {
+      if (config.collections.some((col) => col.slug === reserved)) {
+        throw new Error(
+          `payload-reserve: a collection with slug "${reserved}" would shadow the plugin's ` +
+            `/api/${reserved}/* endpoints. Rename that collection.`,
+        )
+      }
+    }
 
     // Image upload fields are added only when the media collection actually
     // exists, so installs without one don't hit an opaque init error (C8).
@@ -289,10 +301,18 @@ export const payloadReserve =
     // C3: collections are registered (above) even when disabled so the DB schema
     // stays stable; behavior (hooks, endpoints, admin, provisioning) is inert.
     if (resolved.disabled) {
+      const lockedWrites = makeDisabledWriteAccess(resolved)
       for (const slug of slugsToRegister) {
         const col = config.collections.find((c) => c.slug === slug)
         if (col) {
           delete col.hooks
+          // Hooks are what validate customer writes; with them gone, only staff
+          // may write until the plugin is re-enabled. The customers collection
+          // keeps its own (self-scoped) rules so customers can still log in
+          // and edit their profile.
+          if (slug !== resolved.slugs.customers) {
+            col.access = { ...(col.access ?? {}), ...lockedWrites }
+          }
         }
       }
       return config
@@ -467,6 +487,48 @@ export const payloadReserve =
           payload.logger.warn(
             `payload-reserve: "userCollection" is set but no "access.reservations" rule narrows reads, so every user of "${resolved.slugs.customers}" can read, update and delete every reservation through the collection REST API (Payload's default is any authenticated user). Fine if only staff can log in; if customers can, supply "access.reservations" that scopes non-staff users to "customer equals req.user.id" — see docs/configuration.md, "Access control for customers".`,
           )
+        }
+        // D6b: same gap on the catalog collections. In standalone mode their
+        // writes are staff-only (makeStandaloneCatalogAccess); under
+        // userCollection the plugin cannot tell staff from customers, so a host
+        // whose customers log in there must close create/update/delete itself.
+        if (resolved.userCollection && !resolved.resourceOwnerMode) {
+          const openCatalog = (
+            [
+              ['services', resolved.access.services],
+              ['resources', resolved.access.resources],
+              ['schedules', resolved.access.schedules],
+            ] as const
+          )
+            .filter(([, a]) => !a?.update || !a?.delete || !a?.create)
+            .map(([name]) => name)
+          if (openCatalog.length > 0) {
+            payload.logger.warn(
+              `payload-reserve: "userCollection" is set but ${openCatalog.join(', ')} have no create/update/delete rule in "access", so every user of "${resolved.slugs.customers}" can create, edit and delete them (deactivate a resource, rewrite buffers, post a years-long exception) through the collection REST API. Fine if only staff can log in; otherwise restrict those operations to staff — see docs/configuration.md, "Access control for customers".`,
+            )
+          }
+        }
+        // D7: an `access.reservations.create` that admits anonymous callers lets
+        // an unauthenticated POST /api/<reservations> name ANY customer —
+        // enforceCustomerOwnership only pins the customer when there is a
+        // user, and the guest gate exits once a customer is present. Only
+        // /reserve/book refuses that. Probe the rule with a userless request.
+        const createRule = resolved.access.reservations?.create
+        if (typeof createRule === 'function') {
+          let anonymousCreate = false
+          try {
+            anonymousCreate =
+              (await createRule({
+                req: { payload, user: null } as unknown as PayloadRequest,
+              })) === true
+          } catch {
+            // A rule that throws for a userless probe refuses anonymous callers.
+          }
+          if (anonymousCreate) {
+            payload.logger.warn(
+              `payload-reserve: "access.reservations.create" allows anonymous callers, so an unauthenticated POST /api/${resolved.slugs.reservations} can create a reservation on any customer's account. Public booking should go through POST /api/reserve/book, which refuses an anonymous "customer"; restrict the collection rule to authenticated users.`,
+            )
+          }
         }
 
         // D5: a custom detail component whose calendar slot is set to ANYTHING —

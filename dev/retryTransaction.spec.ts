@@ -223,6 +223,10 @@ describe('takeHold — a failed expiry sweep cannot poison the hold that follows
           await initTransaction(req as never)
           return { docs: [], errors: [] }
         },
+        // The schedule read behind enforceSchedule (4.1.2): no schedules, so
+        // the resource is unconstrained and the hold proceeds to the write.
+        // eslint-disable-next-line @typescript-eslint/require-await
+        find: async () => ({ docs: [] }),
         // Service, then resource — both resolved before the write.
         // eslint-disable-next-line @typescript-eslint/require-await
         findByID: async () => ({ active: true, duration: 60, durationType: 'fixed' }),
