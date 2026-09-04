@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.1.1] - 2026-09-04
+
+Security release. **Every install on the default (standalone) configuration should upgrade.**
+No collection schema change, no migration, no import-map regeneration.
+
+### Security
+
+- **Standalone mode left Reservations and Customers on Payload's default access, so any customer with a login could take over any other customer's account.**
+
+  With `payloadReserve()` and no options (the Quick Start), the generated `customers` auth
+  collection and the `reservations` collection carried no `read`/`update`/`delete` rules, so
+  Payload's built-in default — `Boolean(user)`, any authenticated user — applied. Through the
+  stock collection REST API a logged-in customer could read, modify and delete every other
+  customer's reservation; list every customer's name, email, phone and internal notes; and
+  `PATCH /api/customers/:id` with a new `password`, then log in as that customer. Only `create`
+  was guarded (`enforceCustomerOwnership`). Reported privately by an external researcher
+  (Trenyx) against 4.1.0; reproduced before the fix.
+
+  Standalone mode now ships scoped defaults with nothing to configure:
+
+  | Collection | Customer | Staff/admin (any other auth collection) |
+  |------------|----------|------------------------------------------|
+  | Reservations | read/update own rows only (`customer equals req.user.id`); no delete; cannot re-assign `customer` | everything |
+  | Customers | read/update own document only; `notes` is staff-only at field level; no delete | everything |
+
+  `create` is unchanged on both, so `access.customers.create: () => true` still opens
+  self-registration without reopening reads. Any rule you pass in `access.reservations` or
+  `access.customers` replaces the default for that operation only. `enforceCustomerOwnership`
+  now also runs on `update`, so a customer editing their own reservation cannot hand it to
+  another account.
+
+  **`userCollection` mode is deliberately not changed.** Staff and customers share one
+  collection there and the plugin cannot tell them apart without configured roles, so
+  Reservations stays on Payload's default. The plugin now warns at boot when `userCollection`
+  is set with nothing narrowing `access.reservations.read` and no `resourceOwnerMode`; if
+  customers can log in to that collection, supply the rule yourself — a copy-paste example is
+  in docs/configuration.md, "Access control for customers". `resourceOwnerMode` installs
+  already had their own rules and are unaffected.
+
+  Covered by `dev/standaloneAccess.int.spec.ts` (18 cases, access checks on).
+
+### Fixed
+
+- **Date-only schedule fields resolved to the previous day in business timezones west of UTC.**
+  `exceptions[].date`/`endDate` and `manualSlots[].date` name a calendar day but are stored as
+  instants; the plugin re-keyed them in the business `timezone`, so an exception written as
+  `'2025-12-25'` (the form the README shows; it parses to midnight UTC) with
+  `timezone: 'America/New_York'` closed December 24 and left the 25th bookable. The admin day
+  picker stores noon UTC and was fine west of UTC, but the same re-keying put it on the 26th at
+  UTC+13. The day is now the UTC calendar date of the stored value everywhere it is read
+  (`dateFieldToDayKey`): slot generation, conflict-free availability, the resource-availability
+  endpoint, the availability overview grid, and the `endDate >= date` validation. Also reported
+  by Trenyx.
+- **`guestCount` accepted a fractional value.** `min: 1` let `1.5` through on the collection
+  (top-level and per `items[]` entry) while `/api/reserve/hold` already rejected it. Both now
+  reject a non-integer with `guestCount must be a whole number`.
+
+### Docs
+
+- docs/collections.md no longer claims customer `notes` are "visible only to admins" on the
+  strength of nothing — the field now actually is, in standalone mode — and documents the
+  access matrix for Reservations per mode. docs/configuration.md gains "Access control for
+  customers". README "Business Timezone" and docs/booking-features.md state the date-only rule.
+
 ## [4.1.0] - 2026-08-27
 
 Two optional calendar options: per-status colour overrides, and view tabs a host can hide.
