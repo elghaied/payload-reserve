@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.1.3] - 2026-09-09
+
+Security release: the second batch from the researcher behind 4.1.1, confirmed against 4.1.1 and
+fixed here. Both only matter with `slotHolds.enabled` (the first) or a database having a bad day
+(the second). No schema change, no migration. Two new options on `slotHolds`, both with safe
+defaults.
+
+### Security
+
+- **`/reserve/hold` was unauthenticated and uncapped.** A hold costs nothing to take and needed no
+  login, so one anonymous script could hold every future slot of a resource and re-hold each one
+  as it lapsed, keeping the schedule unbookable for as long as it ran. No data exposed, and it
+  self-heals when the script stops, but a real availability hole. Two new knobs:
+  `slotHolds.maxActivePerCustomer` (default `5`, `false` to disable) caps the unexpired holds one
+  signed-in customer may have (`429 { error: 'hold_limit_reached', detail }` past it; staff exempt),
+  and `slotHolds.requireAuth` (default `false`) refuses anonymous callers with
+  `401 { error: 'authentication_required' }`. It stays off by default because holds exist so a
+  customer can claim a slot before an account exists. **If you keep anonymous holds, rate-limit
+  `POST /api/reserve/hold` at your proxy or middleware** — a Payload handler has no trustworthy
+  client address to throttle on, so the plugin does not pretend to.
+- **The conflict check fell back to zero buffers when a service lookup failed.** `bufferFor`
+  swallowed any error from reading a neighbouring reservation's service, logged it only under
+  `debug`, and carried on with `0/0` for the rest of the call — so a transient database error let a
+  back-to-back booking through the gap the buffer should have blocked, silently. It now fails
+  closed: the availability check rejects (a booking or hold gets a 500, never a slip-through) and
+  the failure is logged at `error` level regardless of `debug`. A service that no longer exists (a
+  dangling reference, only reachable past the delete guard with `context.skipReservationHooks`)
+  still resolves to zero buffer, now with a `warn` line.
+
+### Added
+
+- `slotHolds.requireAuth` and `slotHolds.maxActivePerCustomer` (validated at init: a positive
+  integer or `false`).
+- `HoldRefusalReason` gains `authentication_required` (401) and `hold_limit_reached` (429).
+
 ## [4.1.2] - 2026-09-04
 
 Security release: the full audit that followed the 4.1.1 disclosure. **Every install should
