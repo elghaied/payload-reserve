@@ -16,6 +16,8 @@ import {
  * a single 409 carrying an internal message.
  */
 const REFUSAL_STATUS: Record<HoldRefusalReason, number> = {
+  authentication_required: 401,
+  hold_limit_reached: 429,
   invalid_window: 400,
   outside_schedule: 409,
   resource_not_found: 404,

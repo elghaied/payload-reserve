@@ -4924,10 +4924,11 @@ describe.skipIf(Boolean(process.env.PG_URL || process.env.SQLITE))(
       })
     })
 
-    it('logs a bufferFor error under err and still fails open', async () => {
+    it('warns about the dangling service reference and still fails open', async () => {
       const { checkAvailability } = await import('../src/services/AvailabilityService.js')
       const { createReserveDebug } = await import('../src/utilities/reserveDebug.js')
       const info = vi.spyOn(payload.logger, 'info')
+      const warn = vi.spyOn(payload.logger, 'warn')
 
       const result = await checkAvailability({
         blockingStatuses: ['pending', 'confirmed'],
@@ -4945,7 +4946,11 @@ describe.skipIf(Boolean(process.env.PG_URL || process.env.SQLITE))(
         startTime: new Date('2030-06-06T09:00:00.000Z'),
       })
 
-      // Fails open: bufferFor's error doesn't stop checkAvailability from returning.
+      // A service that no longer exists is a data problem, not a failed check:
+      // there is no buffer to apply, so the check completes with 0 — but it is
+      // said out loud, at warn level, regardless of `debug` (4.1.3). A lookup
+      // that THROWS is a different case and fails closed; see
+      // dev/bufferFailClosed.spec.ts.
       expect(result).toBeDefined()
       expect(typeof result.available).toBe('boolean')
 
@@ -4959,8 +4964,11 @@ describe.skipIf(Boolean(process.env.PG_URL || process.env.SQLITE))(
             o.where === 'bufferFor',
         )
       expect(errLine).toBeDefined()
-      expect(errLine!.err).toBeInstanceOf(Error)
+      expect(
+        warn.mock.calls.some(([m]) => typeof m === 'string' && /no longer exists/.test(m)),
+      ).toBe(true)
       info.mockRestore()
+      warn.mockRestore()
     })
   },
 )

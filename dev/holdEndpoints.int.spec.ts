@@ -209,3 +209,27 @@ describe('slot-hold endpoints', () => {
     expect(res.status).toBe(409)
   })
 })
+
+describe('4.1.3 hold abuse limits over HTTP', () => {
+  test('401 for an anonymous caller under requireAuth, 429 past the per-customer cap', async () => {
+    const strict = resolveConfig({ slotHolds: { enabled: true, maxActivePerCustomer: 1, requireAuth: true } })
+    const { customer, resource, service } = await seed('limits')
+    const user = { ...customer, collection: 'customers' }
+    const body = (day: number) => ({
+      resource: resource.id,
+      service: service.id,
+      startTime: `2034-04-${String(day).padStart(2, '0')}T10:00:00.000Z`,
+    })
+
+    const anon = await call(createHoldSlotEndpoint(strict), body(1))
+    expect(anon.status).toBe(401)
+    expect(await anon.json()).toEqual({ error: 'authentication_required' })
+
+    const first = await call(createHoldSlotEndpoint(strict), body(1), user)
+    expect(first.status).toBe(201)
+
+    const second = await call(createHoldSlotEndpoint(strict), body(2), user)
+    expect(second.status).toBe(429)
+    expect(await second.json()).toMatchObject({ detail: expect.stringMatching(/1 active hold;/), error: 'hold_limit_reached' })
+  })
+})

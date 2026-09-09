@@ -7,6 +7,7 @@ import type { ResolvedReservationPluginConfig } from '../types.js'
 import { flexibleWindowProblem } from '../utilities/flexibleWindow.js'
 import { isTransientWriteConflict } from '../utilities/retryOnWriteConflict.js'
 import { isWithinSchedule } from '../utilities/scheduleWindow.js'
+import { isPrivilegedUser } from '../utilities/userRoles.js'
 import { computeEndTime } from './AvailabilityService.js'
 
 /**
@@ -22,6 +23,8 @@ import { computeEndTime } from './AvailabilityService.js'
  * plausible-looking 409 the caller cannot act on.
  */
 export type HoldRefusalReason =
+  | 'authentication_required'
+  | 'hold_limit_reached'
   | 'invalid_window'
   | 'outside_schedule'
   | 'resource_not_found'
@@ -54,6 +57,51 @@ export async function takeHold(params: {
 }): Promise<TakeHoldResult> {
   const { config, guestCount = 1, req, resourceId, serviceId, startTime } = params
   const { payload } = req
+
+  // Abuse limits (4.1.3). This endpoint needs no login by default, and a hold
+  // is free to take: an anonymous script could hold every future slot of a
+  // resource and re-hold each one as it lapsed, keeping the schedule
+  // unbookable for as long as it ran (reported privately by an external
+  // researcher against 4.1.1). Two knobs, both on `slotHolds`:
+  //
+  // - `requireAuth` turns anonymous callers away outright. Off by default,
+  //   because holds exist so a customer can claim a slot BEFORE an account
+  //   exists; a host that leaves it off must rate-limit at the edge — a Payload
+  //   handler has no trustworthy client address to throttle on.
+  // - `maxActivePerCustomer` bounds what one authenticated customer can hold at
+  //   once. Counted only for a customers-collection user who is not staff: the
+  //   `customer` stamp below is what the count keys on, and it is written only
+  //   for that collection. The check is a read before the write, so two
+  //   simultaneous requests from one customer can both pass it — the cap is a
+  //   bound on abuse, not an exact quota.
+  if (config.slotHolds.requireAuth && !req.user) {
+    return { ok: false, reason: 'authentication_required' }
+  }
+  const countsAgainstCap =
+    req.user &&
+    req.user.collection === config.slugs.customers &&
+    !isPrivilegedUser(req.user, config) &&
+    config.slotHolds.maxActivePerCustomer !== Infinity
+  if (countsAgainstCap) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { totalDocs } = (await (payload.count as any)({
+      collection: config.slugs.holds,
+      req,
+      where: {
+        and: [
+          { customer: { equals: req.user!.id } },
+          { expiresAt: { greater_than: new Date().toISOString() } },
+        ],
+      },
+    })) as { totalDocs: number }
+    if (totalDocs >= config.slotHolds.maxActivePerCustomer) {
+      return {
+        detail: `You already have ${totalDocs} active hold${totalDocs === 1 ? '' : 's'}; release one or let it expire`,
+        ok: false,
+        reason: 'hold_limit_reached',
+      }
+    }
+  }
 
   // `disableErrors` is what makes the `!service` guard below reachable at all:
   // without it `findByID` THROWS `NotFound`, and this call sits outside the

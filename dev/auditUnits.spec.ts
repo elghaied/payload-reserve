@@ -2,6 +2,7 @@ import type { Config } from 'payload'
 
 import { describe, expect, it } from 'vitest'
 
+import { resolveConfig } from '../src/defaults.js'
 import { payloadReserve } from '../src/index.js'
 import { flattenRelations } from '../src/utilities/flattenRelations.js'
 import { flexibleWindowProblem } from '../src/utilities/flexibleWindow.js'
@@ -74,5 +75,20 @@ describe('plugin-time guards', () => {
 
   it('maxFlexibleDuration must be positive', () => {
     expect(() => payloadReserve({ maxFlexibleDuration: 0 })(base())).toThrow(/maxFlexibleDuration/)
+  })
+
+  it('slotHolds.maxActivePerCustomer must be a positive integer or false', () => {
+    for (const bad of [0, -1, 1.5]) {
+      expect(() => payloadReserve({ slotHolds: { enabled: true, maxActivePerCustomer: bad } })(base())).toThrow(
+        /maxActivePerCustomer/,
+      )
+    }
+    expect(resolveConfig({ slotHolds: { enabled: true } }).slotHolds).toMatchObject({
+      maxActivePerCustomer: 5,
+      requireAuth: false,
+    })
+    expect(resolveConfig({ slotHolds: { enabled: true, maxActivePerCustomer: false } }).slotHolds.maxActivePerCustomer).toBe(
+      Infinity,
+    )
   })
 })

@@ -419,3 +419,71 @@ describe('4.1.2 hold hardening', () => {
     expect(deleted.id).toBeTruthy()
   })
 })
+
+describe('4.1.3 hold abuse limits', () => {
+  const asCustomer = (customer: { id: unknown }) =>
+    ({ payload, user: { ...customer, collection: 'customers' } }) as unknown as Parameters<
+      typeof takeHold
+    >[0]['req']
+  const asStaff = () =>
+    ({ payload, user: { id: 'staff-1', collection: 'users' } }) as unknown as Parameters<
+      typeof takeHold
+    >[0]['req']
+  const slot = (day: number) => new Date(`2034-03-${String(day).padStart(2, '0')}T10:00:00Z`)
+
+  test('requireAuth turns an anonymous caller away and lets a customer through', async () => {
+    const strict = resolveConfig({ slotHolds: { enabled: true, requireAuth: true } })
+    const { customer, resource, service } = await seed('reqauth')
+    const base = { config: strict, resourceId: resource.id, serviceId: service.id }
+    const anon = await takeHold({ ...base, req: reqFor(), startTime: slot(1) })
+    expect(anon).toMatchObject({ ok: false, reason: 'authentication_required' })
+    const signedIn = await takeHold({ ...base, req: asCustomer(customer), startTime: slot(1) })
+    expect(signedIn.ok).toBe(true)
+    // The default leaves the endpoint open — the documented reason to rate-limit at the edge.
+    const open = await takeHold({ ...base, config: resolved, req: reqFor(), startTime: slot(2) })
+    expect(open.ok).toBe(true)
+  })
+
+  test('a customer is capped at maxActivePerCustomer unexpired holds; staff and anonymous are not', async () => {
+    const capped = resolveConfig({ slotHolds: { enabled: true, maxActivePerCustomer: 2 } })
+    const { customer, resource, service } = await seed('cap')
+    const base = { config: capped, resourceId: resource.id, serviceId: service.id }
+
+    const first = await takeHold({ ...base, req: asCustomer(customer), startTime: slot(3) })
+    const second = await takeHold({ ...base, req: asCustomer(customer), startTime: slot(4) })
+    expect(first.ok).toBe(true)
+    expect(second.ok).toBe(true)
+    const third = await takeHold({ ...base, req: asCustomer(customer), startTime: slot(5) })
+    expect(third).toMatchObject({ ok: false, reason: 'hold_limit_reached' })
+    expect(third.ok ? '' : third.detail).toMatch(/2 active holds/)
+
+    // Releasing one frees a place; an expired one never counted.
+    if (!first.ok) {return}
+    await releaseHold({ config: capped, req: reqFor(), token: first.hold.token })
+    const again = await takeHold({ ...base, req: asCustomer(customer), startTime: slot(5) })
+    expect(again.ok).toBe(true)
+    if (!again.ok) {return}
+    await payload.update({
+      id: again.hold.id,
+      collection: col(capped.slugs.holds),
+      data: { expiresAt: new Date(Date.now() - 1_000).toISOString() },
+    })
+    const afterExpiry = await takeHold({ ...base, req: asCustomer(customer), startTime: slot(6) })
+    expect(afterExpiry.ok).toBe(true)
+
+    // Staff are exempt, and an anonymous caller has nothing to count against.
+    for (const day of [7, 8, 9]) {
+      expect((await takeHold({ ...base, req: asStaff(), startTime: slot(day) })).ok).toBe(true)
+      expect((await takeHold({ ...base, req: reqFor(), startTime: slot(day + 10) })).ok).toBe(true)
+    }
+
+    // The default cap is 5, so the plain config still stops a runaway customer.
+    const other = await seed('cap5')
+    const dflt = { config: resolved, resourceId: other.resource.id, serviceId: other.service.id }
+    for (const day of [1, 2, 3, 4, 5]) {
+      expect((await takeHold({ ...dflt, req: asCustomer(other.customer), startTime: slot(day) })).ok).toBe(true)
+    }
+    const sixth = await takeHold({ ...dflt, req: asCustomer(other.customer), startTime: slot(6) })
+    expect(sixth).toMatchObject({ ok: false, reason: 'hold_limit_reached' })
+  })
+})

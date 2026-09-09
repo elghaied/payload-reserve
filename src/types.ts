@@ -317,6 +317,20 @@ export type ReservationPluginConfig = {
    */
   slotHolds?: {
     enabled?: boolean
+    /**
+     * Ceiling on the unexpired holds one customer may have at once (default 5).
+     * Counted for authenticated non-staff callers only — an anonymous caller
+     * has no identity to count against, so this does nothing for them; see
+     * `requireAuth`. `false` disables the cap.
+     */
+    maxActivePerCustomer?: false | number
+    /**
+     * Refuse `/reserve/hold` to anonymous callers (401 `authentication_required`).
+     * Default `false`: holds exist so a customer can claim a slot before an
+     * account exists. Leaving it off means the endpoint must be rate-limited at
+     * the edge — the plugin has no reliable client identity to throttle on.
+     */
+    requireAuth?: boolean
     /** Minutes a hold survives before it stops occupying its slot. Default 10. */
     ttlMinutes?: number
   }
@@ -386,6 +400,9 @@ export type ResolvedReservationPluginConfig = {
   resourceTypes: string[]
   slotHolds: {
     enabled: boolean
+    /** `Infinity` when the cap is disabled. */
+    maxActivePerCustomer: number
+    requireAuth: boolean
     ttlMinutes: number
   }
   slugs: {

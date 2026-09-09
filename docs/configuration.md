@@ -47,6 +47,16 @@ payloadReserve({
   // resource for decades.
   maxFlexibleDuration: 1440,
 
+  // Short-lived slot claims taken during checkout (opt-in). /reserve/hold needs
+  // no login by default, so rate-limit it at your edge; `requireAuth` closes it
+  // to anonymous callers, and `maxActivePerCustomer` bounds a signed-in one.
+  slotHolds: {
+    enabled: false,
+    maxActivePerCustomer: 5, // or false to disable the cap
+    requireAuth: false,
+    ttlMinutes: 10,
+  },
+
   // Extend an existing auth collection instead of creating a standalone Customers collection.
   // The named collection must exist in your Payload config before the plugin runs.
   userCollection: 'users',
@@ -210,6 +220,10 @@ payloadReserve({
 | `cancellationNoticePeriod` | `number` | `24` | Minimum hours notice before a customer may cancel or reschedule, measured against the stored start time. Staff/admin are exempt. A customer also cannot cancel a booking that has already started. Userless Local API calls keep the legacy rule (blocked inside the window, free once started) |
 | `enforceSchedule` | `boolean` | `true` | Public actors — anonymous `/reserve/book` and `/reserve/hold` callers and authenticated customers, on any path — may not book in the past, and for a resource that has at least one active schedule the whole window must fall inside it (and not on an exception day). Staff and userless Local API calls are exempt, so seeds, imports and walk-ins are untouched. A resource with no schedule is unconstrained |
 | `maxFlexibleDuration` | `number` | `1440` | Ceiling in minutes on a `flexible` booking or hold window; the service `duration` is the floor (now enforced). Must be positive |
+| `slotHolds.enabled` | `boolean` | `false` | Create the `reservation-holds` collection and register `/reserve/hold` + `/reserve/hold/release`. See the README's "Slot holds" section |
+| `slotHolds.ttlMinutes` | `number` | `10` | Minutes an unconverted hold occupies its slot |
+| `slotHolds.requireAuth` | `boolean` | `false` | Refuse `/reserve/hold` to anonymous callers (`401 authentication_required`). Off by default because holds exist so a customer can claim a slot before an account exists — **if you leave it off, rate-limit the endpoint at your proxy or middleware**: an anonymous script can otherwise hold every future slot of a resource and re-hold each as it lapses, and the plugin has no trustworthy client address to throttle on |
+| `slotHolds.maxActivePerCustomer` | `number \| false` | `5` | Ceiling on the unexpired holds one signed-in customer may have at once (`429 hold_limit_reached` past it). Counted for non-staff users of the customers collection only; staff are exempt and an anonymous caller has no identity to count against. Must be a positive integer; `false` disables the cap |
 | `userCollection` | `string` | `undefined` | Existing auth collection slug to extend. Leaves Reservations on Payload's default access — supply `access.reservations` if customers log in there (see [Access control for customers](#access-control-for-customers)) |
 | `access` | `Record<collection, CollectionConfig['access']>` | `{}` | Per-collection, per-operation access overrides. A rule you supply replaces the plugin's default for that operation only |
 | `slugs.services` | `string` | `'services'` | Services collection slug |

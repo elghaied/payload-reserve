@@ -105,6 +105,7 @@ export const DEFAULT_SLUGS = {
 } as const
 
 export const DEFAULT_HOLD_TTL_MINUTES = 10
+export const DEFAULT_MAX_ACTIVE_HOLDS_PER_CUSTOMER = 5
 export const DEFAULT_ADMIN_GROUP = 'Reservations'
 export const DEFAULT_ALLOW_GUEST_BOOKING = false
 export const DEFAULT_BUFFER_TIME = 0
@@ -173,6 +174,12 @@ export function resolveConfig(
     resourceTypes,
     slotHolds: {
       enabled: !disabled && (pluginOptions.slotHolds?.enabled ?? false),
+      maxActivePerCustomer:
+        pluginOptions.slotHolds?.maxActivePerCustomer === false
+          ? Infinity
+          : (pluginOptions.slotHolds?.maxActivePerCustomer ??
+            DEFAULT_MAX_ACTIVE_HOLDS_PER_CUSTOMER),
+      requireAuth: pluginOptions.slotHolds?.requireAuth ?? false,
       ttlMinutes: pluginOptions.slotHolds?.ttlMinutes ?? DEFAULT_HOLD_TTL_MINUTES,
     },
     slugs: {
@@ -209,6 +216,10 @@ export function resolveConfig(
     validateTimezone(resolved.timezone)
     if (!(resolved.maxFlexibleDuration > 0)) {
       throw new Error('maxFlexibleDuration must be a positive number of minutes')
+    }
+    const cap = resolved.slotHolds.maxActivePerCustomer
+    if (cap !== Infinity && !(Number.isInteger(cap) && cap > 0)) {
+      throw new Error('slotHolds.maxActivePerCustomer must be a positive integer or false')
     }
   }
 

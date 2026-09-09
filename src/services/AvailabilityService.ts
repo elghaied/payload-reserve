@@ -317,25 +317,49 @@ export async function checkAvailability(params: {
     }
     let result = { after: 0, before: 0 }
     if (serviceId !== undefined) {
+      // Fail CLOSED (4.1.3). Until then every error here was swallowed, logged
+      // only under `debug`, and replaced by zero buffers — cached for the rest
+      // of the call — so a transient database error during the conflict check
+      // silently let a back-to-back booking through the gap the neighbour's
+      // buffer should have blocked (reported privately by an external
+      // researcher). A check that cannot be completed must refuse, not guess.
+      //
+      // The one shape that still degrades is a service that no longer exists:
+      // that is a dangling reference (only reachable past the delete guard via
+      // `context.skipReservationHooks`), there is no buffer to apply, and
+      // refusing every booking on the resource until the row is repaired helps
+      // nobody. It is logged at warn level regardless of `debug`.
+      let service: null | Record<string, unknown>
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const service = await (payload.findByID as any)({
+        service = await (payload.findByID as any)({
           id: serviceId,
           collection: servicesSlug,
           depth: 0,
+          disableErrors: true,
           // Skip the resources join — internal logic never reads it, and without this
           // every service read becomes an aggregation with a $lookup.
           joins: false,
           req,
         })
-        if (service) {
-          result = {
-            after: (service.bufferTimeAfter as number) ?? 0,
-            before: (service.bufferTimeBefore as number) ?? 0,
-          }
-        }
       } catch (err) {
         trace.dbg('error', { err, serviceId, where: 'bufferFor' })
+        payload.logger.error({
+          err,
+          msg: `payload-reserve: could not read service ${String(serviceId)} to apply its buffer times; refusing the availability check rather than checking without them`,
+        })
+        throw err
+      }
+      if (service) {
+        result = {
+          after: (service.bufferTimeAfter as number) ?? 0,
+          before: (service.bufferTimeBefore as number) ?? 0,
+        }
+      } else {
+        trace.dbg('error', { serviceId, where: 'bufferFor' })
+        payload.logger.warn(
+          `payload-reserve: a blocking reservation references service ${String(serviceId)}, which no longer exists; its buffer times are treated as 0`,
+        )
       }
     }
     bufferCache.set(key, result)
