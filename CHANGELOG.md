@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.2.0] - 2026-09-17
+
+One additive option on the availability service, no schema change, no migration, nothing
+changes for callers that do not pass it.
+
+### Added
+
+- **`getAvailableSlots({ excludeReservationId })`** — the read-path counterpart of the option
+  `checkAvailability` has always taken. A reschedule UI or agent that asks "which starts are
+  on offer for this booking?" was being told that its own current window is taken, because
+  the generator counts every blocking reservation on the resource including the one being
+  moved. So a 09:00–11:00 booking could never be offered 10:00 — no move shorter than the
+  service duration was ever bookable through a slot list. Pass the reservation's id and its
+  own occupancy is left out; every other reservation, hold and external busy interval keeps
+  blocking exactly as before. Pinned by `dev/availabilityExcludeReservation.int.spec.ts`.
+
 ## [4.1.3] - 2026-09-09
 
 Security release: the second batch from the researcher behind 4.1.1, confirmed against 4.1.1 and
@@ -61,7 +77,7 @@ Two new plugin options, both with safe defaults.
   host's `beforeBookingConfirm`/`afterBookingConfirm` hooks can no longer be fired by a customer.
 - **The cancellation notice period was bypassable in one request.** It read the incoming
   `startTime`, and skipped entirely once a booking had started, so `{ startTime: yesterday,
-  status: 'cancelled' }` cancelled a booking two hours out and the refund hook saw the fake start.
+status: 'cancelled' }` cancelled a booking two hours out and the refund hook saw the fake start.
   It now reads the stored start; a customer also cannot reschedule inside the window (the
   two-step bypass) or cancel after the start. Staff/admin are exempt (they could not cancel an
   abusive booking inside the window before). Userless Local API calls keep the previous rule.
@@ -151,10 +167,10 @@ No collection schema change, no migration, no import-map regeneration.
 
   Standalone mode now ships scoped defaults with nothing to configure:
 
-  | Collection | Customer | Staff/admin (any other auth collection) |
-  |------------|----------|------------------------------------------|
-  | Reservations | read/update own rows only (`customer equals req.user.id`); no delete; cannot re-assign `customer` | everything |
-  | Customers | read/update own document only; `notes` is staff-only at field level; no delete | everything |
+  | Collection   | Customer                                                                                          | Staff/admin (any other auth collection) |
+  | ------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------- |
+  | Reservations | read/update own rows only (`customer equals req.user.id`); no delete; cannot re-assign `customer` | everything                              |
+  | Customers    | read/update own document only; `notes` is staff-only at field level; no delete                    | everything                              |
 
   `create` is unchanged on both, so `access.customers.create: () => true` still opens
   self-registration without reopening reads. Any rule you pass in `access.reservations` or
@@ -235,7 +251,9 @@ rendering to 4.0.0. No collection schema change, no migration, no import-map reg
 - **`calendar.hiddenViews` — hide view tabs your users do not need.**
 
   ```ts
-  calendar: { hiddenViews: ['lanes', 'pending'] }
+  calendar: {
+    hiddenViews: ['lanes', 'pending']
+  }
   ```
 
   **`pending` here is a view tab, not a status.** Hiding the tab leaves the `pending` status
@@ -303,7 +321,7 @@ disclosed below.
 - **A custom status may render in a different colour than before, and now gets a matching text
   colour.** Palette assignment changed from "index into the whole `statuses` array" to "index
   over custom (non-built-in) statuses only" — for a machine like `['pending', 'confirmed',
-  'waitlisted']`, the `waitlisted` swatch changes, and now has an explicit foreground colour
+'waitlisted']`, the `waitlisted` swatch changes, and now has an explicit foreground colour
   instead of inheriting the default. Built-in statuses (`pending`, `confirmed`, `completed`,
   `cancelled`, `no-show`) are unaffected — their exact background/foreground pairs were carried
   over verbatim.
