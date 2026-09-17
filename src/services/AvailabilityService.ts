@@ -540,6 +540,13 @@ export async function getAvailableSlots(params: {
   debug?: ReserveDebug
   /** Skip the service/resource `active` short-circuits when explicitly `false`. */
   enforceActive?: boolean
+  /**
+   * A reservation to leave out of the occupancy count — the one being MOVED.
+   * A reschedule that asks "which starts are on offer?" must not be told that
+   * its own current window is taken, or no move shorter than the service
+   * duration can ever be offered. Same contract as `checkAvailability`.
+   */
+  excludeReservationId?: number | string
   /** External busy resolver (calendar sync etc.) — intervals block the whole resource. */
   getExternalBusy?: GetExternalBusy
   guestCount?: number
@@ -569,6 +576,7 @@ export async function getAvailableSlots(params: {
     date,
     debug,
     enforceActive,
+    excludeReservationId,
     getExternalBusy,
     guestCount,
     holdsSlug,
@@ -765,6 +773,7 @@ export async function getAvailableSlots(params: {
         bufferBefore: bBefore,
         debug: trace,
         endTime: end,
+        excludeReservationId,
         getExternalBusy,
         guestCount: guestCount ?? 1,
         holdsSlug,
