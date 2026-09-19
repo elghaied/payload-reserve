@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.4.0] - 2026-09-19
+
+The calendar now speaks the admin's language, starts the week where the host wants, and lets a
+host fit it into its own page rhythm. No schema change, no migration. One default changes: the
+smallest calendar text is raised to a readability floor (see Changed).
+
+### Added
+
+- **`calendar.weekStartsOn`** (`0`–`6`, default `0` = Sunday): first day of the week in the
+  month/week grids and the availability overview; day headers rotate to match. Validated at init.
+- **Styling hooks** — `--reserve-calendar-padding` (default `20px`) and
+  `--reserve-calendar-padding-mobile` (default `12px`, ≤768px) override the calendar wrapper
+  padding so a host can align it with its own page gutter; `--reserve-calendar-font-size`
+  (default `1rem`) scales every font size in the calendar, lanes, event pills, badges and pending
+  table with one property (each is now `calc(var(--reserve-calendar-font-size, 1rem) * ratio)`).
+  Unset, every size renders as before.
+- The reservation detail drawer has a visible **close button** (label from Payload's
+  `general:close`) and 16px of top room.
+- `formatReservationTime` and `formatReservationDateLabel` gain a trailing optional `locale`
+  argument and are exported from `payload-reserve/client`.
+
+### Changed
+
+- The smallest calendar text (event pills, capacity / time-off badges, hour labels, overflow dots,
+  phone-size day headers and pending-table labels) is raised to a readability floor of
+  `0.75 × --reserve-calendar-font-size` — 9.75px at Payload's 13px root, up from 8–10px.
+
+### Fixed
+
+- **Dates and times follow the admin UI language** (`i18n.language`) in the calendar, lanes,
+  detail drawer, availability overview, time field and dashboard widget — not the browser locale.
+  This also fixes a React hydration error ("Hydration failed because the server rendered text
+  didn't match the client") on every calendar load whenever the browser locale differed from the
+  server's: the calendar is server-rendered, and the two sides formatted the same date
+  differently.
+- A host language key that is not valid BCP 47 (e.g. `en_GB`) no longer throws inside the
+  calendar's date formatting — it falls back to `en`.
+
 ## [4.3.0] - 2026-09-19
 
 The reservations calendar gets a configurable landing view and a real phone layout. No schema
