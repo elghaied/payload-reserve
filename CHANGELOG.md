@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.3.0] - 2026-09-19
+
+The reservations calendar gets a configurable landing view and a real phone layout. No schema
+change, no migration; desktop rendering is unchanged apart from a `data-layout` attribute on the
+calendar wrapper.
+
+### Added
+
+- **`calendar.defaultView`** (default `'month'`) and **`calendar.mobileDefaultView`** (viewport
+  ≤768px, falls back to `defaultView`) pick the tab the calendar opens on. Both are validated at
+  init, and so — newly — is `calendar.hiddenViews`: a misspelled view name used to be silently
+  ignored and now throws at boot.
+- **Phone layout** (Payload's `s` breakpoint, 768px): the toolbar stacks with a scrollable tab
+  strip and a floating **+** button; **Month** shows status dots per day and lists the selected
+  day's bookings under the grid (tap a row for the detail drawer, **+** in the list header to
+  create on that day); **Week** becomes a row of seven day chips over a single hourly day column,
+  keyboard-operable with Left/Right; **Lanes** scrolls inside its own track with sticky labels;
+  **Pending** renders as stacked cards; the detail drawer goes full width. RTL-aware and clear of
+  the iOS bottom bar. `AvailabilityOverview` (`/reservation-availability`) is not part of this
+  change.
+- New translation key `calendarNoBookingsDay` in all 12 locales.
+
+### Fixed
+
+- Month navigation from the 29th–31st no longer skips a month — a bare `setMonth` turned
+  Jan 31 into Mar 3. Pre-existing, but on a phone the day-of-month is also the selected day, so
+  the overshoot became visible.
+- Mobile month cells and the day-list **+** have a visible focus outline; the tab strip no
+  longer clips focus rings.
+
 ## [4.2.0] - 2026-09-17
 
 One additive option on the availability service, no schema change, no migration, nothing
