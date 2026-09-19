@@ -487,4 +487,43 @@ describe('CalendarView on a phone', () => {
     await renderCalendar({}, makeFetchMock({ reservations: [] }))
     expect(screen.getByText('No bookings on this day')).toBeTruthy()
   })
+
+  it('week view renders a 7-chip day strip over a single day column', async () => {
+    mockConfig.admin.custom.reservationCalendar = { mobileDefaultView: 'week' }
+    setPhoneViewport()
+    const { container } = await renderCalendar({}, makeFetchMock({ reservations: [reservationA] }))
+
+    const strip = screen.getByRole('group')
+    const chips = within(strip).getAllByRole('button')
+    expect(chips).toHaveLength(7)
+    expect(within(strip).getByRole('button', { pressed: true }).getAttribute('aria-label')).toBe(
+      todayCellName(),
+    )
+    // Single day column, not the 7-column week grid.
+    expect(container.querySelector('[class*="weekView"]')).toBeNull()
+    expect(container.querySelector('[class*="dayView"]')).not.toBeNull()
+    expect(getPill('Jane Doe')).toBeTruthy()
+  })
+
+  it('tapping a chip switches the column to that day without refetching', async () => {
+    mockConfig.admin.custom.reservationCalendar = { mobileDefaultView: 'week' }
+    setPhoneViewport()
+    const fetchMock = makeFetchMock({ reservations: [reservationA] })
+    await renderCalendar({}, fetchMock)
+    const listCalls = () =>
+      fetchMock.mock.calls.filter(
+        ([input]) =>
+          requestUrl(input).includes('/api/reservations') && requestUrl(input).includes('startTime'),
+      ).length
+    const before = listCalls()
+
+    const strip = screen.getByRole('group')
+    const chips = within(strip).getAllByRole('button')
+    const other = chips.find((c) => c.getAttribute('aria-pressed') !== 'true')!
+    fireEvent.click(other)
+
+    expect(other.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByTitle(/Jane Doe/)).toBeNull() // reservationA is today, not the tapped day
+    expect(listCalls()).toBe(before)
+  })
 })

@@ -1120,7 +1120,58 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     )
   }
 
+  // Mobile week: seven tappable day chips; the single day column below them is
+  // the ordinary day view for `currentDate`, so slot shading, capacity badges
+  // and the current-time line come for free.
+  const renderDayStrip = () => {
+    const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
+    const todayKey = getDayKeyInTimezone(new Date(), reservationTimezone)
+    const keys = dayKeySequence(startOfWeekDayKey(currentKey), 7)
+    return (
+      <div aria-label={dateLabel} className={styles.dayStrip} role="group">
+        {keys.map((dayKey) => {
+          const display = displayDateForDayKey(dayKey, reservationTimezone)
+          const isSelected = dayKey === currentKey
+          const isToday = dayKey === todayKey
+          return (
+            <button
+              aria-current={isToday ? 'date' : undefined}
+              aria-label={display.toLocaleDateString([], {
+                day: 'numeric',
+                month: 'long',
+                timeZone: reservationTimezone,
+                weekday: 'long',
+              })}
+              aria-pressed={isSelected}
+              className={`${styles.dayStripChip} ${isSelected ? styles.dayStripChipSelected : ''} ${isToday ? styles.dayStripChipToday : ''}`}
+              key={dayKey}
+              onClick={() => setCurrentDate(display)}
+              type="button"
+            >
+              <span className={styles.dayStripWeekday}>
+                {display.toLocaleDateString([], {
+                  timeZone: reservationTimezone,
+                  weekday: 'short',
+                })}
+              </span>
+              <span className={styles.dayStripDay}>{Number(dayKey.slice(8, 10))}</span>
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   const renderWeekView = () => {
+    if (isMobile) {
+      return (
+        <>
+          {renderDayStrip()}
+          {renderDayView()}
+        </>
+      )
+    }
+
     const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
     const weekDayKeys = dayKeySequence(startOfWeekDayKey(currentKey), 7)
 

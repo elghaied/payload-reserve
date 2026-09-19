@@ -807,6 +807,53 @@
   padding: 12px 4px;
 }
 
+/* Mobile week: the day strip. */
+.dayStrip {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 8px;
+}
+
+.dayStripChip {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font-family: inherit;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 0;
+}
+
+.dayStripChipToday {
+  box-shadow: inset 0 0 0 1px var(--theme-elevation-800);
+}
+
+.dayStripChipSelected {
+  background: var(--theme-elevation-800);
+  color: var(--theme-elevation-0);
+}
+
+.dayStripChip:focus-visible {
+  outline: 2px solid var(--theme-text);
+  outline-offset: 2px;
+}
+
+.dayStripWeekday {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+}
+
+.dayStripDay {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .wrapper {
     /* Bottom room so the FAB never covers the last row. */
@@ -885,5 +932,18 @@
   .dayHeader {
     font-size: 0.625rem;
     padding: 6px 2px;
+  }
+
+  .dayView {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .dayViewCell {
+    min-height: 44px;
+  }
+
+  .timeLabel {
+    font-size: 0.6875rem;
+    padding: 4px 2px;
   }
 }
