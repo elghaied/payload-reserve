@@ -239,6 +239,12 @@ export type ReservationCalendarConfig = {
    * light/dark in its own stylesheet.
    */
   statusPresentation?: Partial<Record<string, StatusPresentation>>
+  /**
+   * First day of the week in the month/week grids and the availability
+   * overview. `0` = Sunday (default) … `6` = Saturday. Day headers rotate to
+   * match. Validated at init.
+   */
+  weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6
 }
 
 export type ReservationPluginConfig = {

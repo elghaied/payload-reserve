@@ -480,6 +480,19 @@ describe('calendar config validation', () => {
     ).toThrow(/calendar\.mobileDefaultView "day" is also listed in calendar\.hiddenViews/)
   })
 
+  it('accepts calendar.weekStartsOn 0–6', () => {
+    expect(resolveConfig({ calendar: { weekStartsOn: 1 } }).calendar.weekStartsOn).toBe(1)
+    expect(resolveConfig({ calendar: { weekStartsOn: 0 } }).calendar.weekStartsOn).toBe(0)
+  })
+
+  it('rejects a weekStartsOn outside 0–6 or not an integer', () => {
+    for (const bad of [7, -1, 1.5, 'mon']) {
+      expect(() => resolveConfig({ calendar: { weekStartsOn: bad as never } })).toThrow(
+        `payload-reserve: calendar.weekStartsOn must be an integer 0–6, got "${String(bad)}"`,
+      )
+    }
+  })
+
   it('does not validate calendar config for a disabled plugin', () => {
     expect(() =>
       resolveConfig({ calendar: { defaultView: 'nope' as never }, disabled: true }),

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { initialCalendarView, resolveActiveView, visibleCalendarViews } from '../src/utilities/calendarViews.js'
+import {
+  initialCalendarView,
+  resolveActiveView,
+  visibleCalendarViews,
+  weekdayLabels,
+} from '../src/utilities/calendarViews.js'
 
 const ALL = ['month', 'week', 'day', 'lanes', 'pending'] as const
 
@@ -81,5 +86,16 @@ describe('initialCalendarView', () => {
   it('resolves a hidden pick to the first visible view', () => {
     const visible = visibleCalendarViews([...ALL], ['week'])
     expect(initialCalendarView({ defaultView: 'week', isMobile: false, visible })).toBe('month')
+  })
+})
+
+describe('weekdayLabels', () => {
+  const t = (key: string) => key.replace('reservation:dayShort', '')
+  it('starts on Sunday by default', () => {
+    expect(weekdayLabels(t)).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'])
+  })
+  it('rotates to the configured first day', () => {
+    expect(weekdayLabels(t, 1)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+    expect(weekdayLabels(t, 6)).toEqual(['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
   })
 })

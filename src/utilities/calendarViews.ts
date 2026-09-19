@@ -55,3 +55,18 @@ export function initialCalendarView(args: {
     (args.isMobile ? args.mobileDefaultView : undefined) ?? args.defaultView ?? 'month'
   return resolveActiveView(picked, args.visible)
 }
+
+const DAY_SHORT_KEYS = [
+  'reservation:dayShortSun',
+  'reservation:dayShortMon',
+  'reservation:dayShortTue',
+  'reservation:dayShortWed',
+  'reservation:dayShortThu',
+  'reservation:dayShortFri',
+  'reservation:dayShortSat',
+] as const
+
+/** The seven short weekday labels, starting on `weekStartsOn` (0 = Sunday). */
+export function weekdayLabels(t: (key: string) => string, weekStartsOn = 0): string[] {
+  return Array.from({ length: 7 }, (_, i) => t(DAY_SHORT_KEYS[(i + weekStartsOn) % 7]))
+}

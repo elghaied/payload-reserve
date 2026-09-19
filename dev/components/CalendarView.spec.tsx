@@ -432,6 +432,39 @@ describe('CalendarView default view', () => {
   })
 })
 
+describe('CalendarView week start', () => {
+  it('starts the month grid on Sunday by default', async () => {
+    setDesktopViewport()
+    await renderCalendar()
+    const headers = await screen.findAllByText(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$/)
+    expect(headers.slice(0, 7).map((h) => h.textContent)).toEqual([
+      'Sun',
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat',
+    ])
+  })
+
+  it('honours calendar.weekStartsOn: the month grid starts on Monday', async () => {
+    mockConfig.admin.custom.reservationCalendar = { weekStartsOn: 1 }
+    setDesktopViewport()
+    await renderCalendar()
+    const headers = await screen.findAllByText(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$/)
+    expect(headers.slice(0, 7).map((h) => h.textContent)).toEqual([
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat',
+      'Sun',
+    ])
+  })
+})
+
 describe('CalendarView on a phone', () => {
   it('renders Create New as a floating button, not a toolbar button', async () => {
     setPhoneViewport()

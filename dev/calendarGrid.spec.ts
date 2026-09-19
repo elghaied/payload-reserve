@@ -40,6 +40,19 @@ describe('calendarGrid — pure day-key math', () => {
     expect(seq[0]).toBe('2026-08-30')
     expect(seq[41]).toBe('2026-10-10')
   })
+
+  it('snaps to the configured first day of the week', () => {
+    expect(startOfWeekDayKey('2026-09-17', 1)).toBe('2026-09-14') // Thu → Mon
+    expect(startOfWeekDayKey('2026-09-14', 1)).toBe('2026-09-14') // Mon stays
+    expect(startOfWeekDayKey('2026-09-13', 1)).toBe('2026-09-07') // Sun → previous Mon
+    expect(startOfWeekDayKey('2026-09-17', 6)).toBe('2026-09-12') // Sat start
+  })
+
+  it('month grid origin honours the first day of the week', () => {
+    expect(monthGridStartDayKey('2026-09-17', 1)).toBe('2026-08-31')
+    expect(monthGridStartDayKey('2026-02-14', 1)).toBe('2026-01-26')
+    expect(monthGridStartDayKey('2026-09-17')).toBe('2026-08-30') // default unchanged
+  })
 })
 
 describe('calendarGrid — instants are built in the BUSINESS zone', () => {

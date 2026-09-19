@@ -31,6 +31,7 @@ import {
   initialCalendarView,
   resolveActiveView,
   visibleCalendarViews,
+  weekdayLabels,
 } from '../../utilities/calendarViews.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { externalPillLabel } from '../../utilities/externalPillLabel.js'
@@ -171,6 +172,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     | undefined
   const hiddenViews = calendarConfig?.hiddenViews
   const visibleViews = visibleCalendarViews([...CALENDAR_VIEW_MODES], hiddenViews)
+  const weekStartsOn = calendarConfig?.weekStartsOn ?? 0
   const { isMobile, viewportKnown } = useIsMobile()
 
   // Labels, colours, and confirm/cancel targets, all derived from the resolved
@@ -380,13 +382,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     if (viewMode === 'month') {
       // The grid always renders 42 cells (6 weeks); fetch the same span so
       // trailing weeks aren't silently empty (review D1).
-      return { dayCount: 42, startKey: monthGridStartDayKey(currentKey) }
+      return { dayCount: 42, startKey: monthGridStartDayKey(currentKey, weekStartsOn) }
     }
     if (viewMode === 'week') {
-      return { dayCount: 7, startKey: startOfWeekDayKey(currentKey) }
+      return { dayCount: 7, startKey: startOfWeekDayKey(currentKey, weekStartsOn) }
     }
     return { dayCount: 1, startKey: currentKey }
-  }, [currentDate, reservationTimezone, viewMode])
+  }, [currentDate, reservationTimezone, viewMode, weekStartsOn])
 
   const { rangeEnd, rangeStart } = useMemo(
     () => ({
@@ -992,7 +994,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
 
   const renderMonthView = () => {
     const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
-    const dayKeys = dayKeySequence(monthGridStartDayKey(currentKey), 42)
+    const dayKeys = dayKeySequence(monthGridStartDayKey(currentKey, weekStartsOn), 42)
 
     const today = new Date()
     const todayStr = getDayKeyInTimezone(today, reservationTimezone)
@@ -1002,15 +1004,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
       return (
         <>
           <div className={styles.monthGrid}>
-            {[
-              t('reservation:dayShortSun'),
-              t('reservation:dayShortMon'),
-              t('reservation:dayShortTue'),
-              t('reservation:dayShortWed'),
-              t('reservation:dayShortThu'),
-              t('reservation:dayShortFri'),
-              t('reservation:dayShortSat'),
-            ].map((d) => (
+            {weekdayLabels(t, weekStartsOn).map((d) => (
               <div className={styles.dayHeader} key={d}>
                 {d}
               </div>
@@ -1074,15 +1068,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
 
     return (
       <div className={styles.monthGrid}>
-        {[
-          t('reservation:dayShortSun'),
-          t('reservation:dayShortMon'),
-          t('reservation:dayShortTue'),
-          t('reservation:dayShortWed'),
-          t('reservation:dayShortThu'),
-          t('reservation:dayShortFri'),
-          t('reservation:dayShortSat'),
-        ].map((d) => (
+        {weekdayLabels(t, weekStartsOn).map((d) => (
           <div className={styles.dayHeader} key={d}>
             {d}
           </div>
@@ -1141,7 +1127,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   const renderDayStrip = () => {
     const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
     const todayKey = getDayKeyInTimezone(new Date(), reservationTimezone)
-    const keys = dayKeySequence(startOfWeekDayKey(currentKey), 7)
+    const keys = dayKeySequence(startOfWeekDayKey(currentKey, weekStartsOn), 7)
     // Left/Right move the selection (and focus) to the neighbouring chip so the
     // strip is keyboard-operable as one widget, not seven unrelated buttons.
     const onChipKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -1206,7 +1192,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     }
 
     const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
-    const weekDayKeys = dayKeySequence(startOfWeekDayKey(currentKey), 7)
+    const weekDayKeys = dayKeySequence(startOfWeekDayKey(currentKey, weekStartsOn), 7)
 
     // Visible-hour window derived from the week's bookings (review D8)
     const weekReservations = filteredReservations.filter((r) => {
@@ -1700,7 +1686,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
       })
     }
     if (viewMode === 'week') {
-      const startKey = startOfWeekDayKey(getDayKeyInTimezone(currentDate, reservationTimezone))
+      const startKey = startOfWeekDayKey(
+        getDayKeyInTimezone(currentDate, reservationTimezone),
+        weekStartsOn,
+      )
       const start = displayDateForDayKey(startKey, reservationTimezone).toLocaleDateString([], {
         day: 'numeric',
         month: 'short',
@@ -1724,7 +1713,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
       weekday: 'long',
       year: 'numeric',
     })
-  }, [currentDate, reservationTimezone, viewMode])
+  }, [currentDate, reservationTimezone, viewMode, weekStartsOn])
 
   const handleDrawerSave = useCallback(() => {
     void fetchReservations()

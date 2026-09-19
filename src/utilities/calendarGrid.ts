@@ -17,15 +17,15 @@ export function weekdayIndexOfDayKey(dayKey: string): number {
   return new Date(`${dayKey}T00:00:00Z`).getUTCDay()
 }
 
-/** The Sunday on or before `dayKey`. */
-export function startOfWeekDayKey(dayKey: string): string {
-  return addDaysToDayKey(dayKey, -weekdayIndexOfDayKey(dayKey))
+/** The first day of the week (`weekStartsOn`, 0 = Sunday) on or before `dayKey`. */
+export function startOfWeekDayKey(dayKey: string, weekStartsOn = 0): string {
+  return addDaysToDayKey(dayKey, -((weekdayIndexOfDayKey(dayKey) - weekStartsOn + 7) % 7))
 }
 
-/** The Sunday on or before the 1st of `dayKey`'s month — the month grid origin. */
-export function monthGridStartDayKey(dayKey: string): string {
+/** The week start on or before the 1st of `dayKey`'s month — the month grid origin. */
+export function monthGridStartDayKey(dayKey: string, weekStartsOn = 0): string {
   assertDayKey(dayKey)
-  return startOfWeekDayKey(`${dayKey.slice(0, 8)}01`)
+  return startOfWeekDayKey(`${dayKey.slice(0, 8)}01`, weekStartsOn)
 }
 
 /** `count` consecutive day keys starting at `startDayKey`. */

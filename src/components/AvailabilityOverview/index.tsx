@@ -5,7 +5,9 @@ import { useConfig, useTranslation } from '@payloadcms/ui'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
+import type { ReservationCalendarConfig } from '../../types.js'
 
+import { weekdayLabels } from '../../utilities/calendarViews.js'
 import {
   dateFieldToDayKey,
   getDayKeyInTimezone,
@@ -68,6 +70,10 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   // resolved server-side from the tenant cookie; fall back to the static global
   // zone until it resolves and for plain installs.
   const staticReservationTimezone: string = config.admin?.custom?.reservationTimezone ?? 'UTC'
+  const calendarConfig = config.admin?.custom?.reservationCalendar as
+    | ReservationCalendarConfig
+    | undefined
+  const weekStartsOn = calendarConfig?.weekStartsOn ?? 0
 
   const resourcesTenantParams = useTenantFilter(slugs?.resources ?? 'resources')
   const schedulesTenantParams = useTenantFilter(slugs?.schedules ?? 'schedules')
@@ -102,23 +108,15 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
      
   }, [config.serverURL, config.routes.api, tenantKey])
 
-  const DAY_NAMES = useMemo(
-    () => [
-      t('reservation:dayShortSun'),
-      t('reservation:dayShortMon'),
-      t('reservation:dayShortTue'),
-      t('reservation:dayShortWed'),
-      t('reservation:dayShortThu'),
-      t('reservation:dayShortFri'),
-      t('reservation:dayShortSat'),
-    ],
-    [t],
-  )
+  // Kept UNROTATED (Sunday-indexed) on purpose: the header row below looks a
+  // label up by the cell's real weekday via `DAY_MAP`, and `weekDays` is already
+  // rotated by `weekStart`, so only the week origin needs `weekStartsOn`.
+  const DAY_NAMES = useMemo(() => weekdayLabels(t), [t])
 
   const [weekStart, setWeekStart] = useState(() => {
     const now = new Date()
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    d.setDate(d.getDate() - d.getDay())
+    d.setDate(d.getDate() - ((d.getDay() - weekStartsOn + 7) % 7))
     return d
   })
 
@@ -223,9 +221,9 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const goToThisWeek = useCallback(() => {
     const now = new Date()
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    d.setDate(d.getDate() - d.getDay())
+    d.setDate(d.getDate() - ((d.getDay() - weekStartsOn + 7) % 7))
     setWeekStart(d)
-  }, [])
+  }, [weekStartsOn])
 
   const getResourceId = (r: { id: string } | string) =>
     typeof r === 'object' ? r.id : r

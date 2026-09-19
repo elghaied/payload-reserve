@@ -149,6 +149,15 @@ export function validateCalendarConfig(calendar: ReservationCalendarConfig): voi
       )
     }
   }
+  const { weekStartsOn } = calendar
+  if (
+    weekStartsOn !== undefined &&
+    !(Number.isInteger(weekStartsOn) && weekStartsOn >= 0 && weekStartsOn <= 6)
+  ) {
+    throw new Error(
+      `payload-reserve: calendar.weekStartsOn must be an integer 0–6, got "${String(weekStartsOn)}"`,
+    )
+  }
 }
 
 export function resolveConfig(
