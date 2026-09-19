@@ -535,6 +535,31 @@ describe('CalendarView on a phone', () => {
     expect(listCalls()).toBe(before)
   })
 
+  it('Left/Right arrow keys move the day-strip selection and focus', async () => {
+    mockConfig.admin.custom.reservationCalendar = { mobileDefaultView: 'week' }
+    setPhoneViewport()
+    await renderCalendar()
+
+    const chips = within(screen.getByRole('group')).getAllByRole('button')
+    const selectedIndex = chips.findIndex((c) => c.getAttribute('aria-pressed') === 'true')
+    const target = chips[selectedIndex]
+    target.focus()
+
+    if (selectedIndex < chips.length - 1) {
+      fireEvent.keyDown(target, { key: 'ArrowRight' })
+      expect(chips[selectedIndex + 1].getAttribute('aria-pressed')).toBe('true')
+      expect(document.activeElement).toBe(chips[selectedIndex + 1])
+      fireEvent.keyDown(chips[selectedIndex + 1], { key: 'ArrowLeft' })
+      expect(chips[selectedIndex].getAttribute('aria-pressed')).toBe('true')
+    } else {
+      // Today is Saturday: Right is a no-op at the edge, Left still moves.
+      fireEvent.keyDown(target, { key: 'ArrowRight' })
+      expect(target.getAttribute('aria-pressed')).toBe('true')
+      fireEvent.keyDown(target, { key: 'ArrowLeft' })
+      expect(chips[selectedIndex - 1].getAttribute('aria-pressed')).toBe('true')
+    }
+  })
+
   it('pending rows carry data-labels so the card layout can name each cell', async () => {
     setPhoneViewport()
     await renderCalendar({}, makeFetchMock({ pending: [reservationA] }))
@@ -545,5 +570,32 @@ describe('CalendarView on a phone', () => {
       td.getAttribute('data-label'),
     )
     expect(labels).toEqual(['Customer', 'Service', 'Resource', 'Date / Time'])
+  })
+})
+
+describe('CalendarView month navigation', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('steps one month at a time from the 31st instead of overshooting', async () => {
+    // Fake only Date: waitFor still needs real timers.
+    vi.useFakeTimers({ now: new Date('2026-01-31T12:00:00Z'), toFake: ['Date'] })
+    await renderCalendar()
+
+    const monthLabel = (monthIndex: number) =>
+      new Date(2026, monthIndex, 15).toLocaleDateString([], {
+        month: 'long',
+        timeZone: 'UTC',
+        year: 'numeric',
+      })
+    expect(screen.getByText(monthLabel(0))).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '→' }))
+    // A bare setMonth from Jan 31 lands on "Feb 31" → Mar 3 and skips February.
+    expect(screen.getByText(monthLabel(1))).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '→' }))
+    expect(screen.getByText(monthLabel(2))).toBeTruthy()
   })
 })

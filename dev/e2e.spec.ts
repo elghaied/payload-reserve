@@ -757,6 +757,18 @@ async function deleteTestReservation(page: Page, id: string): Promise<void> {
   }
 }
 
+// Admin-side status update through the same REST API the drawer uses.
+async function patchTestReservation(
+  page: Page,
+  id: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  const res = await page.request.patch(`/api/reservations/${id}`, { data })
+  if (!res.ok()) {
+    throw new Error(`Failed to patch test reservation: ${res.status()} ${await res.text()}`)
+  }
+}
+
 test.describe('reservation detail drawer status actions', () => {
   // Cleanup lives in `afterEach`, not an inline `try/finally`, because
   // Playwright's default 30s test timeout (playwright.config.js sets none)
@@ -819,15 +831,14 @@ test.describe('reservation detail drawer status actions', () => {
     await expect(event).toHaveAttribute('title', /Status: Confirmed/, { timeout: 10_000 })
   })
 
-  test('cancelling inside the notice period shows the real sentence, not "The following field is invalid: status"', async ({
+  test('a refused transition shows the hook\'s real sentence, not "The following field is invalid: status"', async ({
     page,
   }) => {
     await loginAsAdmin(page)
 
     const service = await apiFindOne(page, 'services', 'Haircut')
     const resource = await apiFindOne(page, 'resources', 'Bob Smith')
-    const customer = await createTestCustomer(page, 'NoticePeriod')
-    // 2 hours out is inside the dev config's 24-hour cancellationNoticePeriod.
+    const customer = await createTestCustomer(page, 'StaleDrawer')
     const reservation = await createTestReservation(page, {
       customerId: customer.id,
       hoursFromNow: 2,
@@ -839,12 +850,21 @@ test.describe('reservation detail drawer status actions', () => {
     await page.goto('/admin/collections/reservations')
     await page.waitForSelector('text="Pending"', { timeout: 15_000 })
 
-    const event = page.locator('[title*="ZzzE2E NoticePeriod"]')
+    const event = page.locator('[title*="ZzzE2E StaleDrawer"]')
     await expect(event).toBeVisible({ timeout: 15_000 })
 
     await event.click()
     const drawer = page.locator('[data-reservation-detail]')
     await expect(drawer).toBeVisible()
+
+    // Move the reservation to a TERMINAL status behind the drawer's back. The
+    // drawer resolves its doc from the calendar's already-fetched arrays, so it
+    // still shows "Pending" with a Cancel button — and the server, seeing
+    // completed → cancelled, refuses via validateStatusTransition. (This used to
+    // drive the cancellation notice period instead, but validateCancellation
+    // exempts privileged users since 4.1.2, so an admin never hits that rule.)
+    await patchTestReservation(page, reservation.id, { status: 'confirmed' })
+    await patchTestReservation(page, reservation.id, { status: 'completed' })
 
     // The cancel transition prompts for a reason; accept it empty.
     page.once('dialog', (dialog) => void dialog.accept(''))
@@ -855,11 +875,12 @@ test.describe('reservation detail drawer status actions', () => {
     // nested error shape — not the generic wrapper string every naive read
     // would show.
     await expect(
-      drawer.getByText(/Cancellations require at least \d+ hours notice/),
+      drawer.getByText(/Cannot transition from "completed" to "cancelled"/),
     ).toBeVisible()
     await expect(drawer.getByText('The following field is invalid: status')).toHaveCount(0)
     // Nothing actually transitioned.
-    await expect(event).toHaveAttribute('title', /Status: Pending/)
+    const after = await page.request.get(`/api/reservations/${reservation.id}?depth=0`)
+    expect(((await after.json()) as { status: string }).status).toBe('completed')
   })
 })
 

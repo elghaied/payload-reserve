@@ -735,7 +735,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
       setCurrentDate((prev) => {
         const next = new Date(prev)
         if (viewMode === 'month') {
+          // Clamp the day-of-month first: a bare `setMonth` from the 31st rolls
+          // over (Jan 31 → "Feb 31" → Mar 3) and skips a month. On mobile the
+          // day-of-month is also the selected day, so the overshoot was visible.
+          const day = next.getDate()
+          next.setDate(1)
           next.setMonth(next.getMonth() + direction)
+          const daysInTarget = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()
+          next.setDate(Math.min(day, daysInTarget))
         } else if (viewMode === 'week') {
           next.setDate(next.getDate() + 7 * direction)
         } else {
@@ -1135,9 +1142,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
     const todayKey = getDayKeyInTimezone(new Date(), reservationTimezone)
     const keys = dayKeySequence(startOfWeekDayKey(currentKey), 7)
+    // Left/Right move the selection (and focus) to the neighbouring chip so the
+    // strip is keyboard-operable as one widget, not seven unrelated buttons.
+    const onChipKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
+        return
+      }
+      e.preventDefault()
+      const nextIndex = index + (e.key === 'ArrowRight' ? 1 : -1)
+      if (nextIndex < 0 || nextIndex >= keys.length) {
+        return
+      }
+      setCurrentDate(displayDateForDayKey(keys[nextIndex], reservationTimezone))
+      const sibling = e.currentTarget.parentElement?.children[nextIndex]
+      if (sibling instanceof HTMLElement) {
+        sibling.focus()
+      }
+    }
     return (
       <div aria-label={dateLabel} className={styles.dayStrip} role="group">
-        {keys.map((dayKey) => {
+        {keys.map((dayKey, index) => {
           const display = displayDateForDayKey(dayKey, reservationTimezone)
           const isSelected = dayKey === currentKey
           const isToday = dayKey === todayKey
@@ -1154,6 +1178,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
               className={`${styles.dayStripChip} ${isSelected ? styles.dayStripChipSelected : ''} ${isToday ? styles.dayStripChipToday : ''}`}
               key={dayKey}
               onClick={() => setCurrentDate(display)}
+              onKeyDown={(e) => onChipKeyDown(e, index)}
               type="button"
             >
               <span className={styles.dayStripWeekday}>
