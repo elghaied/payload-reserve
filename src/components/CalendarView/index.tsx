@@ -10,7 +10,11 @@ import {
 import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
-import type { ReservationCalendarConfig, ReservationCalendarViewMode } from '../../types.js'
+import type {
+  ExternalBusyInterval,
+  ReservationCalendarConfig,
+  ReservationCalendarViewMode,
+} from '../../types.js'
 import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 import type { CalendarReservation, ResourceOption } from '../shared/types.js'
 
@@ -871,6 +875,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     return <div className={styles.currentTimeLine} style={{ top: `${topPercent}%` }} />
   }
 
+  // External busy intervals (calendar sync etc.) overlapping this day —
+  // display-only pills; enforcement already lives in checkAvailability. End
+  // is exclusive: subtract 1ms so an interval ending at midnight doesn't
+  // claim the next day.
+  const externalOverlapsDay = (ev: ExternalBusyInterval, dayKey: string): boolean => {
+    const startKey = getDayKeyInTimezone(new Date(ev.start), reservationTimezone)
+    const endKey = getDayKeyInTimezone(
+      new Date(new Date(ev.end).getTime() - 1),
+      reservationTimezone,
+    )
+    return startKey <= dayKey && dayKey <= endKey
+  }
+
   // Mobile month: the selected day's bookings, listed under the grid. Rows
   // carry the same tooltip the desktop pills do, so tests/e2e find them the
   // same way. External busy intervals are display-only, as in the grid.
@@ -878,14 +895,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     const rows = filteredReservations
       .filter((r) => getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === dayKey)
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
-    const external = (availability?.external ?? []).filter((ev) => {
-      const startKey = getDayKeyInTimezone(new Date(ev.start), reservationTimezone)
-      const endKey = getDayKeyInTimezone(
-        new Date(new Date(ev.end).getTime() - 1),
-        reservationTimezone,
-      )
-      return startKey <= dayKey && dayKey <= endKey
-    })
+    const external = (availability?.external ?? []).filter((ev) => externalOverlapsDay(ev, dayKey))
     const title = displayDateForDayKey(dayKey, reservationTimezone).toLocaleDateString([], {
       day: 'numeric',
       month: 'short',
@@ -1002,14 +1012,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
               const dayReservations = filteredReservations.filter(
                 (r) => getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === dayKey,
               )
-              const hasExternal = (availability?.external ?? []).some((ev) => {
-                const startKey = getDayKeyInTimezone(new Date(ev.start), reservationTimezone)
-                const endKey = getDayKeyInTimezone(
-                  new Date(new Date(ev.end).getTime() - 1),
-                  reservationTimezone,
-                )
-                return startKey <= dayKey && dayKey <= endKey
-              })
+              const hasExternal = (availability?.external ?? []).some((ev) =>
+                externalOverlapsDay(ev, dayKey),
+              )
               const dots = dayReservations.slice(0, 3)
               const overflow = dayReservations.length - dots.length
               const display = displayDateForDayKey(dayKey, reservationTimezone)
@@ -1075,18 +1080,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
             return rKey === dayKey
           })
 
-          // External busy intervals (calendar sync etc.) overlapping this day —
-          // display-only pills; enforcement already lives in checkAvailability.
-          const dayExternal = (availability?.external ?? []).filter((ev) => {
-            const startKey = getDayKeyInTimezone(new Date(ev.start), reservationTimezone)
-            // end is exclusive: subtract 1ms so an interval ending at midnight
-            // doesn't claim the next day.
-            const endKey = getDayKeyInTimezone(
-              new Date(new Date(ev.end).getTime() - 1),
-              reservationTimezone,
-            )
-            return startKey <= dayKey && dayKey <= endKey
-          })
+          const dayExternal = (availability?.external ?? []).filter((ev) =>
+            externalOverlapsDay(ev, dayKey),
+          )
 
           const clickDate = instantAtHour(dayKey, 9, reservationTimezone)
 
