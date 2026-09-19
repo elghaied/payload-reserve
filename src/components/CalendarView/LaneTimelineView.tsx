@@ -66,7 +66,7 @@ function Lane({
   return (
     <div className={styles.lane}>
       <div className={styles.laneLabel}>{resource.name}</div>
-      <div className={styles.laneTrack}>
+      <div className={styles.laneTrack} style={{ minWidth: `${(endHour - startHour) * 48}px` }}>
         {slots.map((s) => {
           const cls =
             s.state === 'off-shift'
@@ -140,7 +140,7 @@ export function LaneTimelineView({
     <div className={styles.lanes}>
       <div className={styles.laneHeader}>
         <div className={styles.laneLabel} />
-        <div className={styles.laneTrack}>
+        <div className={styles.laneTrack} style={{ minWidth: `${(endHour - startHour) * 48}px` }}>
           {hours.map((h) => (
             <div className={styles.laneTime} key={h}>
               {String(h).padStart(2, '0')}:00

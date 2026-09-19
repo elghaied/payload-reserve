@@ -526,4 +526,16 @@ describe('CalendarView on a phone', () => {
     expect(screen.queryByTitle(/Jane Doe/)).toBeNull() // reservationA is today, not the tapped day
     expect(listCalls()).toBe(before)
   })
+
+  it('pending rows carry data-labels so the card layout can name each cell', async () => {
+    setPhoneViewport()
+    await renderCalendar({}, makeFetchMock({ pending: [reservationA] }))
+    fireEvent.click(screen.getByRole('button', { name: /Pending/ }))
+    await waitFor(() => expect(screen.getByText('Jane Doe')).toBeTruthy())
+    const row = screen.getByText('Jane Doe').closest('tr')!
+    const labels = Array.from(row.querySelectorAll('td[data-label]')).map((td) =>
+      td.getAttribute('data-label'),
+    )
+    expect(labels).toEqual(['Customer', 'Service', 'Resource', 'Date / Time'])
+  })
 })

@@ -946,4 +946,86 @@
     font-size: 0.6875rem;
     padding: 4px 2px;
   }
+
+  /* Lanes: a timeline is allowed to be wider than the phone — but it scrolls
+     inside its own track, never the page. Header and rows share this one
+     scroll container so hour labels stay aligned with cells. */
+  .lanes {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+  }
+
+  .laneLabel {
+    background: var(--theme-bg);
+    flex-basis: 88px;
+    font-size: 12px;
+    left: 0;
+    position: sticky;
+    z-index: 1;
+  }
+
+  .laneCell {
+    min-height: 44px;
+  }
+
+  /* Pending: table → stacked cards. `data-label` (set on each labelled <td>)
+     becomes the row caption; the checkbox and actions cells have none. */
+  .pendingTable thead {
+    display: none;
+  }
+
+  .pendingTable,
+  .pendingTable tbody,
+  .pendingRow,
+  .pendingTd {
+    display: block;
+  }
+
+  .pendingRow {
+    border: 1px solid var(--theme-elevation-150);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    padding: 4px 0;
+  }
+
+  .pendingTd {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    padding: 6px 12px;
+  }
+
+  .pendingTd[data-label]::before {
+    color: var(--theme-elevation-500);
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .pendingTd:last-child {
+    justify-content: flex-end;
+  }
+
+  .pendingToolbar {
+    flex-wrap: wrap;
+  }
+
+  .bulkConfirmButton,
+  .confirmButton,
+  .cancelButton {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Detail drawer: full width on a phone. */
+  .detailDrawer :global(.drawer__content) {
+    max-width: 100vw;
+  }
+
+  .detailDrawerBody {
+    max-width: none;
+  }
 }

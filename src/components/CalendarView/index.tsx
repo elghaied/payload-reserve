@@ -1559,7 +1559,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
                       type="checkbox"
                     />
                   </td>
-                  <td className={styles.pendingTd}>
+                  <td className={styles.pendingTd} data-label={t('reservation:fieldCustomer')}>
                     <span
                       className={styles.pendingCustomerLink}
                       onClick={() => openDetail(r.id)}
@@ -1575,11 +1575,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
                       {getCustomerName(r.customer) || t('reservation:calendarUnknownCustomer')}
                     </span>
                   </td>
-                  <td className={styles.pendingTd}>
+                  <td className={styles.pendingTd} data-label={t('reservation:fieldService')}>
                     {getResName(r.service) || t('reservation:calendarUnknownService')}
                   </td>
-                  <td className={styles.pendingTd}>{resourceDisplay}</td>
-                  <td className={styles.pendingTd}>{formatDateTime(r.startTime)}</td>
+                  <td className={styles.pendingTd} data-label={t('reservation:fieldResource')}>
+                    {resourceDisplay}
+                  </td>
+                  <td className={styles.pendingTd} data-label={t('reservation:pendingDateTime')}>
+                    {formatDateTime(r.startTime)}
+                  </td>
                   <td className={styles.pendingTd}>
                     <button
                       className={styles.confirmButton}

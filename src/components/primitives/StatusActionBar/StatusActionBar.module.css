@@ -24,3 +24,10 @@
   cursor: default;
   opacity: 0.5;
 }
+
+@media (max-width: 768px) {
+  .button {
+    flex: 1 1 100%;
+    min-height: 44px;
+  }
+}
