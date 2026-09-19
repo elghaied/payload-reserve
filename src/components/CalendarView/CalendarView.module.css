@@ -672,7 +672,7 @@
   background: var(--theme-elevation-800);
   border: none;
   border-radius: 50%;
-  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   color: var(--theme-elevation-0);
   cursor: pointer;
@@ -680,10 +680,10 @@
   font-family: inherit;
   font-size: 28px;
   height: 56px;
+  inset-inline-end: 20px;
   justify-content: center;
   line-height: 1;
   position: fixed;
-  right: 20px;
   width: 56px;
   z-index: 5;
 }
@@ -901,6 +901,13 @@
     padding: 0 14px;
   }
 
+  /* The toolbar create button isn't rendered on mobile, so
+     `.createButton + .viewToggleButton` never matches to round the first
+     tab's left corners. */
+  .viewToggleButton:first-child {
+    border-radius: 3px 0 0 3px;
+  }
+
   .statusLegend {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -955,11 +962,25 @@
     overflow-x: auto;
   }
 
+  /* `.lane`/`.laneHeader` are stretched items of the column-flex `.lanes`, so
+     without this their box stays at viewport width while `.laneTrack`'s
+     min-width overflows out of them — and a sticky `.laneLabel` is confined
+     to its containing block, so it would leave the screen after ~278px of
+     scroll instead of staying pinned. */
+  .lane,
+  .laneHeader {
+    min-width: max-content;
+  }
+
+  .laneTrack {
+    min-width: var(--lane-track-min);
+  }
+
   .laneLabel {
     background: var(--theme-bg);
     flex-basis: 88px;
     font-size: 12px;
-    left: 0;
+    inset-inline-start: 0;
     position: sticky;
     z-index: 1;
   }

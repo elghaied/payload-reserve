@@ -194,6 +194,10 @@ function todayCellName(): string {
   })
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 const reservationA: CalendarReservation = {
   id: 'res-a',
   customer: { name: 'Jane Doe' },
@@ -462,8 +466,12 @@ describe('CalendarView on a phone', () => {
     const list = screen.getByRole('region', { name: todayListTitle() })
     expect(within(list).getByText(/Haircut/)).toBeTruthy()
     expect(within(list).getByText(/Shave/)).toBeTruthy()
-    // and the today cell shows one dot per booking.
-    const todayCell = screen.getByRole('button', { name: todayCellName(), pressed: true })
+    // and the today cell shows one dot per booking. The accessible name now
+    // carries the booking count too (2 bookings today), hence the prefix match.
+    const todayCell = screen.getByRole('button', {
+      name: new RegExp('^' + escapeRegExp(todayCellName())),
+      pressed: true,
+    })
     expect(todayCell.querySelectorAll('[class*="dot"]:not([class*="dotRow"])').length).toBe(2)
   })
 

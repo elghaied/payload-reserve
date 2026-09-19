@@ -184,14 +184,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   } = useReservationStatusMachine()
 
   const [currentDate, setCurrentDate] = useState(() => new Date())
-  // The viewport is unknown on the first render (WindowInfoProvider measures in
-  // an effect), so start on the desktop default; the effect below applies
-  // `mobileDefaultView` exactly once, and only if the user hasn't already picked
-  // a tab in the meantime.
+  // The viewport is unknown on the first render of a hard load (WindowInfoProvider
+  // measures in an effect), so that render falls back to the desktop default — server
+  // render and first hydration render both see `viewportKnown === false`, so hydration
+  // still matches. On a client-side navigation the viewport is already known, so this
+  // reads it immediately and skips the wasted initial desktop-view fetch. The effect
+  // below applies `mobileDefaultView` exactly once as the hard-load fallback, and only
+  // if the user hasn't already picked a tab in the meantime.
   const [viewModeRaw, setViewMode] = useState<ViewMode>(() =>
     initialCalendarView({
       defaultView: calendarConfig?.defaultView,
-      isMobile: false,
+      isMobile: viewportKnown && isMobile,
       mobileDefaultView: calendarConfig?.mobileDefaultView,
       visible: visibleViews,
     }),
@@ -1018,18 +1021,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
               const dots = dayReservations.slice(0, 3)
               const overflow = dayReservations.length - dots.length
               const display = displayDateForDayKey(dayKey, reservationTimezone)
+              const fullDate = display.toLocaleDateString([], {
+                day: 'numeric',
+                month: 'long',
+                timeZone: reservationTimezone,
+                weekday: 'long',
+              })
+              // Status is conveyed by dot colour alone; append the count so a
+              // screen reader hears it too (locale-neutral — no new translation key).
+              const cellLabel =
+                dayReservations.length > 0 ? `${fullDate} (${dayReservations.length})` : fullDate
               // Selecting sets `currentDate` (the one state everything derives
               // from); the range memo is keyed on the derived span, so this
               // does not refetch unless the tap lands in another month.
               return (
                 <button
                   aria-current={isToday ? 'date' : undefined}
-                  aria-label={display.toLocaleDateString([], {
-                    day: 'numeric',
-                    month: 'long',
-                    timeZone: reservationTimezone,
-                    weekday: 'long',
-                  })}
+                  aria-label={cellLabel}
                   aria-pressed={isSelected}
                   className={`${styles.dayCell} ${styles.dayCellMobile} ${isOtherMonth ? styles.dayCellOtherMonth : ''} ${isToday ? styles.dayCellToday : ''} ${isSelected ? styles.dayCellSelected : ''}`}
                   key={dayKey}
@@ -1532,26 +1540,50 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
             {actionFeedback.message}
           </div>
         )}
-        <table className={styles.pendingTable}>
-          <thead>
-            <tr>
-              <th aria-label={t('reservation:pendingSelectAll')} className={styles.pendingTh} />
-              <th className={styles.pendingTh}>{t('reservation:fieldCustomer')}</th>
-              <th className={styles.pendingTh}>{t('reservation:fieldService')}</th>
-              <th className={styles.pendingTh}>{t('reservation:fieldResource')}</th>
-              <th className={styles.pendingTh}>{t('reservation:pendingDateTime')}</th>
-              <th className={styles.pendingTh}>{t('reservation:pendingActions')}</th>
+        {/* `display: block` on the mobile card layout drops the table role from
+            the a11y tree, so every table/rowgroup/row/cell role is stated
+            explicitly here — redundant on desktop, restores semantics on mobile.
+            eslint-plugin-jsx-a11y flags these two ways with no CSS awareness:
+            `no-redundant-roles` sees thead/tbody's stated role match their
+            static implicit role, and `no-interactive-element-to-noninteractive-role`
+            treats `td` as potentially interactive because aria-query's element→role
+            map also lists `gridcell` for it — neither check knows the implicit
+            role is actually stripped by `display: block` on a phone. */}
+        {/* eslint-disable jsx-a11y/no-redundant-roles, jsx-a11y/no-interactive-element-to-noninteractive-role */}
+        <table className={styles.pendingTable} role="table">
+          <thead role="rowgroup">
+            <tr role="row">
+              <th
+                aria-label={t('reservation:pendingSelectAll')}
+                className={styles.pendingTh}
+                role="columnheader"
+              />
+              <th className={styles.pendingTh} role="columnheader">
+                {t('reservation:fieldCustomer')}
+              </th>
+              <th className={styles.pendingTh} role="columnheader">
+                {t('reservation:fieldService')}
+              </th>
+              <th className={styles.pendingTh} role="columnheader">
+                {t('reservation:fieldResource')}
+              </th>
+              <th className={styles.pendingTh} role="columnheader">
+                {t('reservation:pendingDateTime')}
+              </th>
+              <th className={styles.pendingTh} role="columnheader">
+                {t('reservation:pendingActions')}
+              </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {filteredPendingReservations.map((r) => {
               const isConfirming = confirmingIds.has(r.id)
               // Show all resources from items array if present, else top-level resource
               const resourceDisplay =
                 getResourceNames(r).join(', ') || t('reservation:calendarUnknownResource')
               return (
-                <tr className={styles.pendingRow} key={r.id}>
-                  <td className={styles.pendingTd}>
+                <tr className={styles.pendingRow} key={r.id} role="row">
+                  <td className={styles.pendingTd} role="cell">
                     <input
                       aria-label={getCustomerName(r.customer) || r.id}
                       checked={selectedIds.has(r.id)}
@@ -1559,7 +1591,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
                       type="checkbox"
                     />
                   </td>
-                  <td className={styles.pendingTd} data-label={t('reservation:fieldCustomer')}>
+                  <td
+                    className={styles.pendingTd}
+                    data-label={t('reservation:fieldCustomer')}
+                    role="cell"
+                  >
                     <span
                       className={styles.pendingCustomerLink}
                       onClick={() => openDetail(r.id)}
@@ -1575,16 +1611,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
                       {getCustomerName(r.customer) || t('reservation:calendarUnknownCustomer')}
                     </span>
                   </td>
-                  <td className={styles.pendingTd} data-label={t('reservation:fieldService')}>
+                  <td
+                    className={styles.pendingTd}
+                    data-label={t('reservation:fieldService')}
+                    role="cell"
+                  >
                     {getResName(r.service) || t('reservation:calendarUnknownService')}
                   </td>
-                  <td className={styles.pendingTd} data-label={t('reservation:fieldResource')}>
+                  <td
+                    className={styles.pendingTd}
+                    data-label={t('reservation:fieldResource')}
+                    role="cell"
+                  >
                     {resourceDisplay}
                   </td>
-                  <td className={styles.pendingTd} data-label={t('reservation:pendingDateTime')}>
+                  <td
+                    className={styles.pendingTd}
+                    data-label={t('reservation:pendingDateTime')}
+                    role="cell"
+                  >
                     {formatDateTime(r.startTime)}
                   </td>
-                  <td className={styles.pendingTd}>
+                  <td className={styles.pendingTd} role="cell">
                     <button
                       className={styles.confirmButton}
                       disabled={isConfirming}
@@ -1609,6 +1657,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
             })}
           </tbody>
         </table>
+        {/* eslint-enable jsx-a11y/no-redundant-roles, jsx-a11y/no-interactive-element-to-noninteractive-role */}
       </div>
     )
   }
