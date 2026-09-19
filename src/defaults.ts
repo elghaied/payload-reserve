@@ -1,4 +1,6 @@
 import type {
+  ReservationCalendarConfig,
+  ReservationCalendarViewMode,
   ReservationPluginConfig,
   ResolvedReservationPluginConfig,
   ResolvedStaffProvisioningConfig,
@@ -6,6 +8,7 @@ import type {
 } from './types.js'
 
 import { DEFAULT_STATUS_MACHINE } from './types.js'
+import { CALENDAR_VIEW_MODES } from './utilities/calendarViews.js'
 import { validateTimezone } from './utilities/timezoneUtils.js'
 
 function validateStatusMachine(sm: StatusMachineConfig): void {
@@ -112,6 +115,42 @@ export const DEFAULT_BUFFER_TIME = 0
 export const DEFAULT_CANCELLATION_NOTICE_PERIOD = 24
 export const DEFAULT_MAX_FLEXIBLE_DURATION = 1440
 
+/**
+ * Calendar view names are free strings at the type boundary once a host
+ * spreads config from JSON, so check them at boot: a misspelled view used to
+ * be silently ignored (`hiddenViews`) or would silently land on `month`.
+ */
+export function validateCalendarConfig(calendar: ReservationCalendarConfig): void {
+  const known = CALENDAR_VIEW_MODES.join(', ')
+  const isView = (v: unknown): v is ReservationCalendarViewMode =>
+    CALENDAR_VIEW_MODES.includes(v as ReservationCalendarViewMode)
+
+  for (const entry of calendar.hiddenViews ?? []) {
+    if (!isView(entry)) {
+      throw new Error(
+        `payload-reserve: calendar.hiddenViews must only contain ${known}, got "${String(entry)}"`,
+      )
+    }
+  }
+  const hidden = new Set(calendar.hiddenViews ?? [])
+  for (const key of ['defaultView', 'mobileDefaultView'] as const) {
+    const value = calendar[key]
+    if (value === undefined) {
+      continue
+    }
+    if (!isView(value)) {
+      throw new Error(
+        `payload-reserve: calendar.${key} must be one of ${known}, got "${String(value)}"`,
+      )
+    }
+    if (hidden.has(value)) {
+      throw new Error(
+        `payload-reserve: calendar.${key} "${value}" is also listed in calendar.hiddenViews`,
+      )
+    }
+  }
+}
+
 export function resolveConfig(
   pluginOptions: ReservationPluginConfig,
 ): ResolvedReservationPluginConfig {
@@ -214,6 +253,7 @@ export function resolveConfig(
   if (!disabled) {
     validateStatusMachine(resolved.statusMachine)
     validateTimezone(resolved.timezone)
+    validateCalendarConfig(resolved.calendar)
     if (!(resolved.maxFlexibleDuration > 0)) {
       throw new Error('maxFlexibleDuration must be a positive number of minutes')
     }

@@ -437,3 +437,52 @@ describe('transaction support diagnostic warns at init', () => {
     expect(warn).not.toHaveBeenCalled()
   })
 })
+
+describe('calendar config validation', () => {
+  it('accepts a valid defaultView / mobileDefaultView / hiddenViews', () => {
+    const resolved = resolveConfig({
+      calendar: { defaultView: 'week', hiddenViews: ['lanes'], mobileDefaultView: 'day' },
+    })
+    expect(resolved.calendar).toEqual({
+      defaultView: 'week',
+      hiddenViews: ['lanes'],
+      mobileDefaultView: 'day',
+    })
+  })
+
+  it('rejects an unknown defaultView', () => {
+    expect(() => resolveConfig({ calendar: { defaultView: 'agenda' as never } })).toThrow(
+      /calendar\.defaultView must be one of/,
+    )
+  })
+
+  it('rejects an unknown mobileDefaultView', () => {
+    expect(() => resolveConfig({ calendar: { mobileDefaultView: 'nope' as never } })).toThrow(
+      /calendar\.mobileDefaultView must be one of/,
+    )
+  })
+
+  it('rejects an unknown hiddenViews entry', () => {
+    expect(() => resolveConfig({ calendar: { hiddenViews: ['nope' as never] } })).toThrow(
+      /calendar\.hiddenViews must only contain/,
+    )
+  })
+
+  it('rejects a defaultView that is also hidden', () => {
+    expect(() =>
+      resolveConfig({ calendar: { defaultView: 'week', hiddenViews: ['week'] } }),
+    ).toThrow(/calendar\.defaultView "week" is also listed in calendar\.hiddenViews/)
+  })
+
+  it('rejects a mobileDefaultView that is also hidden', () => {
+    expect(() =>
+      resolveConfig({ calendar: { hiddenViews: ['day'], mobileDefaultView: 'day' } }),
+    ).toThrow(/calendar\.mobileDefaultView "day" is also listed in calendar\.hiddenViews/)
+  })
+
+  it('does not validate calendar config for a disabled plugin', () => {
+    expect(() =>
+      resolveConfig({ calendar: { defaultView: 'nope' as never }, disabled: true }),
+    ).not.toThrow()
+  })
+})

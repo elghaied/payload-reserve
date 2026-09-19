@@ -30,3 +30,28 @@ export function resolveActiveView(
 ): ReservationCalendarViewMode {
   return visible.includes(active) ? active : visible[0]
 }
+
+/** Every view the toolbar can show, in toolbar order. */
+export const CALENDAR_VIEW_MODES: readonly ReservationCalendarViewMode[] = [
+  'month',
+  'week',
+  'day',
+  'lanes',
+  'pending',
+]
+
+/**
+ * The view the calendar opens on. `mobileDefaultView` wins on a phone, then
+ * `defaultView`, then `month`; the pick is then resolved against `visible`
+ * so a hidden default still lands on a tab that exists.
+ */
+export function initialCalendarView(args: {
+  defaultView?: ReservationCalendarViewMode
+  isMobile: boolean
+  mobileDefaultView?: ReservationCalendarViewMode
+  visible: ReservationCalendarViewMode[]
+}): ReservationCalendarViewMode {
+  const picked =
+    (args.isMobile ? args.mobileDefaultView : undefined) ?? args.defaultView ?? 'month'
+  return resolveActiveView(picked, args.visible)
+}

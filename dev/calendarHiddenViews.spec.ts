@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveActiveView, visibleCalendarViews } from '../src/utilities/calendarViews.js'
+import { initialCalendarView, resolveActiveView, visibleCalendarViews } from '../src/utilities/calendarViews.js'
 
 const ALL = ['month', 'week', 'day', 'lanes', 'pending'] as const
 
@@ -51,5 +51,35 @@ describe('resolveActiveView', () => {
     const visible = visibleCalendarViews([...ALL], ['month', 'week'])
     expect(visible).toEqual(['day', 'lanes', 'pending'])
     expect(resolveActiveView('month', visible)).toBe('day')
+  })
+})
+
+describe('initialCalendarView', () => {
+  it('falls back to month when nothing is configured', () => {
+    expect(initialCalendarView({ isMobile: false, visible: [...ALL] })).toBe('month')
+    expect(initialCalendarView({ isMobile: true, visible: [...ALL] })).toBe('month')
+  })
+
+  it('uses defaultView on desktop', () => {
+    expect(initialCalendarView({ defaultView: 'week', isMobile: false, visible: [...ALL] })).toBe(
+      'week',
+    )
+  })
+
+  it('uses defaultView on mobile when mobileDefaultView is unset', () => {
+    expect(initialCalendarView({ defaultView: 'week', isMobile: true, visible: [...ALL] })).toBe(
+      'week',
+    )
+  })
+
+  it('prefers mobileDefaultView on mobile only', () => {
+    const args = { defaultView: 'week' as const, mobileDefaultView: 'day' as const, visible: [...ALL] }
+    expect(initialCalendarView({ ...args, isMobile: true })).toBe('day')
+    expect(initialCalendarView({ ...args, isMobile: false })).toBe('week')
+  })
+
+  it('resolves a hidden pick to the first visible view', () => {
+    const visible = visibleCalendarViews([...ALL], ['week'])
+    expect(initialCalendarView({ defaultView: 'week', isMobile: false, visible })).toBe('month')
   })
 })

@@ -218,10 +218,21 @@ export type ReservationCalendarViewMode = 'day' | 'lanes' | 'month' | 'pending' 
 
 export type ReservationCalendarConfig = {
   /**
+   * View tab the calendar opens on. Default `'month'`. Validated at init;
+   * must not also be listed in `hiddenViews`.
+   */
+  defaultView?: ReservationCalendarViewMode
+  /**
    * View tabs to hide from the calendar toolbar. Hiding `pending` hides the TAB
    * only — the `pending` status keeps its colour on events and its legend entry.
    */
   hiddenViews?: ReservationCalendarViewMode[]
+  /**
+   * View tab the calendar opens on when the viewport is ≤768px (Payload's `s`
+   * breakpoint). Falls back to `defaultView`. Applied once, on first render —
+   * rotating a tablet later never changes the view under the user.
+   */
+  mobileDefaultView?: ReservationCalendarViewMode
   /**
    * Per-status colour overrides. Values are plain CSS colour strings and are
    * applied inline, so `var(--token)` works and the consumer can keep
