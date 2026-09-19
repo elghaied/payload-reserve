@@ -394,3 +394,26 @@ describe('CalendarView default view', () => {
     expect(container.querySelector('[data-layout="mobile"]')).not.toBeNull()
   })
 })
+
+describe('CalendarView on a phone', () => {
+  it('renders Create New as a floating button, not a toolbar button', async () => {
+    setPhoneViewport()
+    await renderCalendar()
+    const create = screen.getByRole('button', { name: 'Create New' })
+    expect(create.className).toMatch(/fab/)
+    expect(create.className).not.toMatch(/createButton/)
+  })
+
+  it('the floating button opens the create drawer', async () => {
+    setPhoneViewport()
+    await renderCalendar()
+    fireEvent.click(screen.getByRole('button', { name: 'Create New' }))
+    expect(mocks.openDrawer).toHaveBeenCalled()
+  })
+
+  it('renders the toolbar Create New on desktop', async () => {
+    setDesktopViewport()
+    await renderCalendar()
+    expect(screen.getByRole('button', { name: 'Create New' }).className).toMatch(/createButton/)
+  })
+})

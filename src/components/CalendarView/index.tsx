@@ -217,6 +217,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     visibleViews,
   ])
   const viewMode = resolveActiveView(viewModeRaw, visibleViews)
+
+  const viewToggleRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!isMobile) {
+      return
+    }
+    const active = viewToggleRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]')
+    // jsdom has no scrollIntoView; real browsers do.
+    active?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [isMobile, viewMode])
   const [reservations, setReservations] = useState<CalendarReservation[]>([])
   const [loading, setLoading] = useState(true)
   // { shown, total } when a fetch hit its cap, else null — drives a non-silent notice (D9)
@@ -1443,10 +1453,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
           </div>
         )}
         {viewMode === 'pending' && <div />}
-        <div className={styles.viewToggle}>
-          <button className={styles.createButton} onClick={handleCreateNew} type="button">
-            {t('reservation:calendarCreateNew')}
-          </button>
+        <div className={styles.viewToggle} ref={viewToggleRef}>
+          {!isMobile && (
+            <button className={styles.createButton} onClick={handleCreateNew} type="button">
+              {t('reservation:calendarCreateNew')}
+            </button>
+          )}
           {([
             { key: 'month' as ViewMode, label: t('reservation:calendarMonth') },
             { key: 'week' as ViewMode, label: t('reservation:calendarWeek') },
@@ -1457,6 +1469,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
             .filter(({ key }) => visibleViews.includes(key))
           ).map(({ key, label }) => (
             <button
+              aria-pressed={viewMode === key}
               className={`${styles.viewToggleButton} ${viewMode === key ? styles.viewToggleButtonActive : ''}`}
               key={key}
               onClick={() => {
@@ -1561,6 +1574,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
             </ReservationDetailProvider>
           </div>
         </Drawer>
+      )}
+      {isMobile && (
+        // Reachable without scrolling back to the toolbar. Sits below Payload's
+        // modal z-index, so an open drawer's overlay covers it.
+        <button
+          aria-label={t('reservation:calendarCreateNew')}
+          className={styles.fab}
+          onClick={handleCreateNew}
+          type="button"
+        >
+          +
+        </button>
       )}
       <DocumentDrawer initialData={initialData} onSave={handleDrawerSave} />
     </div>

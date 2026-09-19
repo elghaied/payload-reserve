@@ -658,3 +658,109 @@
   white-space: nowrap;
   width: 1px;
 }
+
+/* ---------------------------------------------------------------------------
+   Mobile.
+   Structural differences (what renders) branch on `isMobile` in index.tsx —
+   the FAB below, the month dots/day list, the week day strip. Layout-only
+   differences live in the single media block at the very end of this file.
+   The breakpoint is Payload's `s` (768px), the same one `useIsMobile` reads.
+   --------------------------------------------------------------------------- */
+
+.fab {
+  align-items: center;
+  background: var(--theme-elevation-800);
+  border: none;
+  border-radius: 50%;
+  bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  color: var(--theme-elevation-0);
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: 28px;
+  height: 56px;
+  justify-content: center;
+  line-height: 1;
+  position: fixed;
+  right: 20px;
+  width: 56px;
+  z-index: 5;
+}
+
+.fab:focus-visible {
+  outline: 2px solid var(--theme-text);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .wrapper {
+    /* Bottom room so the FAB never covers the last row. */
+    padding: 12px 12px 88px;
+  }
+
+  .header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .navButtons {
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  /* Date label on its own line above the arrows. */
+  .currentDate {
+    flex-basis: 100%;
+    font-size: 1rem;
+    order: -1;
+    text-align: center;
+  }
+
+  .navButton {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .viewToggle {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .viewToggle::-webkit-scrollbar {
+    display: none;
+  }
+
+  .viewToggleButton {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0 14px;
+  }
+
+  .statusLegend {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .statusLegend::-webkit-scrollbar {
+    display: none;
+  }
+
+  .legendItem {
+    flex: 0 0 auto;
+  }
+
+  .filterBar {
+    width: 100%;
+  }
+
+  .resourceFilter {
+    min-height: 44px;
+    min-width: 0;
+    width: 100%;
+  }
+}
