@@ -917,3 +917,89 @@ test('a consumer-supplied components.reservationDetail component renders in plac
   // its Edit button must not be present.
   await expect(drawer.getByRole('button', { name: 'Edit' })).toHaveCount(0)
 })
+
+// ---------------------------------------------------------------------------
+// CalendarView on a phone
+// ---------------------------------------------------------------------------
+
+test.describe('CalendarView on a phone', () => {
+  test.use({ viewport: { height: 844, width: 390 } })
+
+  async function openPhoneCalendar(page: Page) {
+    await loginAsAdmin(page)
+    await page.goto('/admin/collections/reservations')
+    await page.waitForSelector('[data-layout="mobile"]', { timeout: 15_000 })
+    await expect(page.locator('text=Loading reservations...')).toHaveCount(0, { timeout: 15_000 })
+  }
+
+  async function expectNoHorizontalOverflow(page: Page) {
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(0)
+  }
+
+  test('lands on the configured mobileDefaultView (week: day strip + one column)', async ({
+    page,
+  }) => {
+    await openPhoneCalendar(page)
+    await expect(page.getByRole('button', { name: 'Week' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('group').getByRole('button')).toHaveCount(7)
+    await expect(page.locator('[class*="weekView"]')).toHaveCount(0)
+    await expectNoHorizontalOverflow(page)
+  })
+
+  test('every view fits the phone width', async ({ page }) => {
+    await openPhoneCalendar(page)
+    for (const name of ['Month', 'Day', 'Lanes', 'Pending', 'Week']) {
+      // Not `exact: true`: the Pending button's accessible name is "Pending N"
+      // once a count badge renders (seed data has pending reservations today),
+      // so match on the name as a prefix instead.
+      const button = page.getByRole('button', { name: new RegExp(`^${name}`) })
+      await button.click()
+      await expect(button).toHaveAttribute('aria-pressed', 'true')
+      await page.waitForTimeout(300)
+      await expectNoHorizontalOverflow(page)
+    }
+  })
+
+  test('month view selects a day and lists it; its + opens the create drawer', async ({ page }) => {
+    await openPhoneCalendar(page)
+    await page.getByRole('button', { name: 'Month', exact: true }).click()
+    // The seed books today, so today's list has rows and the today cell is selected.
+    const list = page.locator('section[class*="dayList"]')
+    await expect(list).toBeVisible()
+    await expect(list.locator('[title*="Customer:"]').first()).toBeVisible({ timeout: 15_000 })
+
+    await list.getByRole('button', { name: 'Create New' }).click()
+    await expect(page.locator('.doc-drawer')).toBeVisible({ timeout: 10_000 })
+  })
+
+  test('week view: tapping a chip changes the selected day; › moves a whole week', async ({
+    page,
+  }) => {
+    await openPhoneCalendar(page)
+    const strip = page.getByRole('group')
+    const chips = strip.getByRole('button')
+
+    await chips.first().click()
+    const selectedAfter = await strip.getByRole('button', { pressed: true }).getAttribute('aria-label')
+    // Either it was already the first chip (Sunday) or the selection moved.
+    expect(selectedAfter).toBe(await chips.first().getAttribute('aria-label'))
+
+    const firstLabelBefore = await chips.first().getAttribute('aria-label')
+    // `button[class*="navButton"]`, not `[class*="navButton"]`: the wrapper div
+    // carries class "navButtons", which also matches the bare attribute
+    // selector and shifts every index by one.
+    await page.locator('button[class*="navButton"]').nth(2).click()
+    await expect(chips.first()).not.toHaveAttribute('aria-label', firstLabelBefore!)
+  })
+
+  test('the floating Create New button opens the create drawer', async ({ page }) => {
+    await openPhoneCalendar(page)
+    const fab = page.locator('button[class*="fab"]')
+    await expect(fab).toHaveAttribute('aria-label', 'Create New')
+    await fab.click()
+    await expect(page.locator('.doc-drawer')).toBeVisible({ timeout: 10_000 })
+  })
+})

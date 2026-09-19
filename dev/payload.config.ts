@@ -187,6 +187,9 @@ const buildConfigWithMemoryDB = async () => {
         services: { read: () => true },
       },
       allowGuestBooking: true,
+      // Phone-viewport e2e asserts the week view (day strip) is the landing view
+      // on a phone; desktop e2e keeps asserting month.
+      calendar: { mobileDefaultView: 'week' },
       cancellationNoticePeriod: 24,
       // Only present under RESERVE_DETAIL_SLOT=1 — see the constant above.
       // `components: undefined` (the unset case) is equivalent to omitting the
