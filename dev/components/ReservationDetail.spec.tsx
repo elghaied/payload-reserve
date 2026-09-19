@@ -28,7 +28,7 @@ vi.mock('@payloadcms/ui', () => ({
   useConfig: () => ({ config: mockConfig }),
   // vi.mock stub named to match the real hook it replaces, not an actual React hook.
   // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
-  useTranslation: () => ({ t: makeT() }),
+  useTranslation: () => ({ i18n: { language: 'en' }, t: makeT() }),
 }))
 
 const baseDoc: CalendarReservation = {

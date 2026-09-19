@@ -13,8 +13,9 @@ type Slot = { end: string; start: string }
 const extractId = (v: unknown): string =>
   typeof v === 'object' && v !== null ? String((v as { id?: unknown }).id ?? '') : String(v ?? '')
 
-const fmt = (iso: string) =>
-  new Date(iso).toLocaleString([], {
+/** `locale` = the admin language, so server and client render the same text. */
+const fmt = (iso: string, locale: string) =>
+  new Date(iso).toLocaleString(locale, {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
@@ -30,8 +31,9 @@ const toLocalInput = (d: Date) => `${toLocalDay(d)}T${pad(d.getHours())}:${pad(d
 export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: pathProp }) => {
   const fieldPath = pathProp ?? field?.name ?? 'startTime'
   const { config } = useConfig()
-  const { t: _t } = useTranslation()
+  const { i18n, t: _t } = useTranslation()
   const t = _t as PluginT
+  const locale = i18n.language
   const { setValue, value } = useField<string>({ path: fieldPath })
 
   const service = useFormFields(([fields]) => fields?.service?.value)
@@ -111,7 +113,7 @@ export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: p
               onClick={() => setValue(s.start)}
               type="button"
             >
-              {fmt(s.start)}
+              {fmt(s.start, locale)}
             </button>
           ))}
         </div>

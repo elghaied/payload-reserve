@@ -108,7 +108,7 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
           <strong>{t('reservation:dashboardNextAppointment')}</strong>
           <p>
             {t('reservation:dashboardTime')}{' '}
-            {new Date(nextAppointment.startTime as string).toLocaleTimeString([], {
+            {new Date(nextAppointment.startTime as string).toLocaleTimeString(i18n.language, {
               hour: '2-digit',
               minute: '2-digit',
               timeZone: reservationTimezone,

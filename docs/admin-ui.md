@@ -24,6 +24,8 @@ Replaces the default Reservations list view with a CSS Grid-based calendar. No e
 
 All views key days, bucket reservations, and render times in the configured business `timezone` (read from `config.admin.custom.reservationTimezone`), not the browser's local zone.
 
+**Dates follow the admin language.** Every date and time label across the Calendar, Reservation Detail drawer, Availability Overview, Availability Time Field and Dashboard widget is formatted in the admin's current language (`useTranslation().i18n.language`, e.g. `fr` → "sam. 12 sept.", `en` → "Sat, Sep 12") rather than the runtime's default locale. This matters because the calendar is server-rendered: Node's locale is not the browser's, and formatting with the runtime default produced a React hydration mismatch for any non-en-US browser. The `formatReservationTime` / `formatReservationDateLabel` / `externalPillLabel` helpers take an optional trailing `locale` for the same reason — pass `i18n.language` from custom components too.
+
 **Per-tenant timezones (`multiTenant`):** when tenant scoping is active, the Calendar, Availability grid, and Dashboard widget resolve day-boundaries in the **selected tenant's** zone — `tenant's timezoneField → global timezone → 'UTC'`. The server resolves this from the tenant cookie (the calendar fetches it from `GET /api/reserve/effective-timezone`; the RSC dashboard resolves it inline). Set `multiTenant.timezoneField` (default `'timezone'`) to point at the field on your tenant document. A tenant with no timezone value transparently falls back to the global default, so plain single-tenant installs are unaffected.
 
 **Data correctness:**

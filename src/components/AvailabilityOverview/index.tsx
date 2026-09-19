@@ -61,8 +61,9 @@ function capacityClass(booked: number, total: number): string {
 
 export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const { config } = useConfig()
-  const { t: _t } = useTranslation()
+  const { i18n, t: _t } = useTranslation()
   const t = _t as PluginT
+  const locale = i18n.language
   const slugs = config.admin?.custom?.reservationSlugs
   const statusMachine = config.admin?.custom?.reservationStatusMachine
   const blockingStatuses: string[] = statusMachine?.blockingStatuses ?? ['pending', 'confirmed']
@@ -299,7 +300,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     return <div className={styles.loading}>{t('reservation:availabilityLoading')}</div>
   }
 
-  const weekLabel = `${weekDays[0].toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: reservationTimezone })} - ${weekDays[6].toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: reservationTimezone, year: 'numeric' })}`
+  const weekLabel = `${weekDays[0].toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: reservationTimezone })} - ${weekDays[6].toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: reservationTimezone, year: 'numeric' })}`
 
   const gridColumns = `150px repeat(7, 1fr)`
 
@@ -386,7 +387,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
                         /* Single-unit resource: show individual booking times */
                         bookings.map((b) => (
                           <div className={styles.slotBooked} key={b.id}>
-                            {new Date(b.startTime).toLocaleTimeString([], {
+                            {new Date(b.startTime).toLocaleTimeString(locale, {
                               hour: '2-digit',
                               minute: '2-digit',
                               timeZone: reservationTimezone,

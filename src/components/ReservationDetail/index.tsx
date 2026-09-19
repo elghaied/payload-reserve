@@ -35,8 +35,9 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
   const { cancelStatus, labels, presentation } = useReservationStatusMachine()
   const { cancel, transition } = useReservationMutations()
   const { config } = useConfig()
-  const { t: _t } = useTranslation()
+  const { i18n, t: _t } = useTranslation()
   const t = _t as PluginT
+  const locale = i18n.language
 
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null)
@@ -129,7 +130,7 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
       ? doc.service.name
       : t('reservation:detailTitle')
 
-  const dateLabel = formatReservationDateLabel(doc.startTime, timeZone)
+  const dateLabel = formatReservationDateLabel(doc.startTime, timeZone, locale)
 
   const resourceNames = formatResourceNames(doc)
   const [primaryResource, ...additionalResources] = resourceNames
@@ -140,8 +141,8 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
       <div className={styles.header}>
         <div className={styles.service}>{serviceName}</div>
         <div className={styles.when}>
-          {dateLabel} &middot; {formatReservationTime(doc.startTime, timeZone)} –{' '}
-          {formatReservationTime(doc.endTime, timeZone)}
+          {dateLabel} &middot; {formatReservationTime(doc.startTime, timeZone, locale)} –{' '}
+          {formatReservationTime(doc.endTime, timeZone, locale)}
         </div>
         <div className={styles.badgeRow}>
           <StatusBadge

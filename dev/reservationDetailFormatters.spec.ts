@@ -74,9 +74,10 @@ describe('formatResourceNames', () => {
   })
 })
 
-// The functions under test format with `toLocaleTimeString(undefined, ...)` /
-// `toLocaleDateString(undefined, ...)` — the runtime's default locale, which is
-// environmental (`pnpm test:int` runs in CI on whatever locale the runner has).
+// Without a `locale` argument the functions under test format with the
+// runtime's default locale, which is environmental (`pnpm test:int` runs in CI
+// on whatever locale the runner has). The explicit-locale case is pinned in the
+// 'locale parameter' block below.
 // Pinning a literal like '10:00 AM' or 'Thu, Jan 1' assumes en-US and can fail
 // on a non-en-US machine. Building the expectation with the same
 // `Intl.DateTimeFormat(undefined, {...})` options keeps the assertion tied to
@@ -132,5 +133,18 @@ describe('formatReservationDateLabel', () => {
     expect(formatReservationDateLabel('2026-01-01T02:00:00.000Z', 'America/Los_Angeles')).toBe(
       expectedDateLabel('2026-01-01T02:00:00.000Z', 'America/Los_Angeles'),
     )
+  })
+})
+
+describe('locale parameter', () => {
+  it('formats in the given locale, not the process locale', () => {
+    const iso = '2026-09-12T10:00:00.000Z'
+    expect(formatReservationTime(iso, 'UTC', 'fr')).toBe('10:00')
+    expect(formatReservationTime(iso, 'UTC', 'en-US')).toBe('10:00 AM')
+    expect(formatReservationDateLabel(iso, 'UTC', 'fr')).toContain('sept.')
+    // en-GB renders "Sat 12 Sept" on this Node's ICU (no comma, "Sept") — so
+    // assert the parts rather than pin the exact punctuation.
+    expect(formatReservationDateLabel(iso, 'UTC', 'en-GB')).toMatch(/Sat/)
+    expect(formatReservationDateLabel(iso, 'UTC', 'en-GB')).toMatch(/Sep/)
   })
 })

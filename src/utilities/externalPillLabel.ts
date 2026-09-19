@@ -4,12 +4,16 @@ import { getDayKeyInTimezone } from './timezoneUtils.js'
  * Compact month-cell label for an external busy interval on a given day:
  * - interval covers the whole day (or spans past it) → just the label
  * - otherwise → "HH:MM label" using the interval's start in the given timezone
+ *
+ * `locale` is the admin language (`useTranslation().i18n.language`), so the
+ * server and the browser format identically (no hydration mismatch).
  */
 export function externalPillLabel(
   ev: { end: string; label?: string; start: string },
   dayKey: string,
   timeZone: string,
   fallbackLabel: string,
+  locale?: string,
 ): string {
   const label = ev.label ?? fallbackLabel
   const startKey = getDayKeyInTimezone(new Date(ev.start), timeZone)
@@ -18,7 +22,7 @@ export function externalPillLabel(
   if (coversWholeDay) {
     return label
   }
-  const time = new Date(ev.start).toLocaleTimeString([], {
+  const time = new Date(ev.start).toLocaleTimeString(locale, {
     hour: '2-digit',
     hourCycle: 'h23',
     minute: '2-digit',

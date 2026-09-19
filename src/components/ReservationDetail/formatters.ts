@@ -32,12 +32,20 @@ export function formatCustomerName(reservation: CalendarReservation, fallback: s
  * (required on `CalendarReservation`) and `endTime` (optional) — an
  * undefined/empty input renders as `'—'` rather than throwing or printing
  * `Invalid Date`.
+ *
+ * `locale` is the admin language (`useTranslation().i18n.language`). Pass it
+ * from every component: the runtime default differs between the server
+ * (Node) and the browser, and a mismatch is a React hydration error.
  */
-export function formatReservationTime(iso: string | undefined, timeZone: string): string {
+export function formatReservationTime(
+  iso: string | undefined,
+  timeZone: string,
+  locale?: string,
+): string {
   if (!iso) {
     return '—'
   }
-  return new Date(iso).toLocaleTimeString(undefined, {
+  return new Date(iso).toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone,
@@ -46,10 +54,11 @@ export function formatReservationTime(iso: string | undefined, timeZone: string)
 
 /**
  * Locale-aware date label (weekday, day, short month) for an ISO instant, in
- * the given IANA timezone — e.g. `Thu, 1 Jan`.
+ * the given IANA timezone — e.g. `Thu, 1 Jan`. `locale` as for
+ * `formatReservationTime`.
  */
-export function formatReservationDateLabel(iso: string, timeZone: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+export function formatReservationDateLabel(iso: string, timeZone: string, locale?: string): string {
+  return new Date(iso).toLocaleDateString(locale, {
     day: 'numeric',
     month: 'short',
     timeZone,

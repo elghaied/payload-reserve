@@ -104,8 +104,13 @@ export type CalendarViewProps = {
 
 export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, detailSlot }) => {
   const { config } = useConfig()
-  const { t: _t } = useTranslation()
+  const { i18n, t: _t } = useTranslation()
   const t = _t as PluginT
+  // Every date/time string below formats with the ADMIN language, never the
+  // runtime default: this component is server-rendered, and Node's locale is
+  // not the browser's — an empty-locale `toLocale*` call produced a hydration
+  // mismatch for any non-en-US browser. `i18n.language` is the same on both sides.
+  const locale = i18n.language
 
   const slugs = config.admin?.custom?.reservationSlugs
   const reservationSlug = slugs?.reservations ?? 'reservations'
@@ -773,7 +778,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   }
 
   const getEventLabel = (r: CalendarReservation, compact: boolean) => {
-    const time = new Date(r.startTime).toLocaleTimeString([], {
+    const time = new Date(r.startTime).toLocaleTimeString(locale, {
       hour: '2-digit',
       minute: '2-digit',
       timeZone: reservationTimezone,
@@ -801,13 +806,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
 
   const getEventTooltip = (r: CalendarReservation): string => {
     const serviceName = getResName(r.service) || t('reservation:calendarUnknownService')
-    const startStr = new Date(r.startTime).toLocaleTimeString([], {
+    const startStr = new Date(r.startTime).toLocaleTimeString(locale, {
       hour: '2-digit',
       minute: '2-digit',
       timeZone: reservationTimezone,
     })
     const endStr = r.endTime
-      ? new Date(r.endTime).toLocaleTimeString([], {
+      ? new Date(r.endTime).toLocaleTimeString(locale, {
           hour: '2-digit',
           minute: '2-digit',
           timeZone: reservationTimezone,
@@ -908,7 +913,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
       .filter((r) => getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === dayKey)
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
     const external = (availability?.external ?? []).filter((ev) => externalOverlapsDay(ev, dayKey))
-    const title = displayDateForDayKey(dayKey, reservationTimezone).toLocaleDateString([], {
+    const title = displayDateForDayKey(dayKey, reservationTimezone).toLocaleDateString(locale, {
       day: 'numeric',
       month: 'short',
       timeZone: reservationTimezone,
@@ -931,7 +936,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
           <p className={styles.dayListEmpty}>{t('reservation:calendarNoBookingsDay')}</p>
         )}
         {rows.map((r) => {
-          const time = new Date(r.startTime).toLocaleTimeString([], {
+          const time = new Date(r.startTime).toLocaleTimeString(locale, {
             hour: '2-digit',
             minute: '2-digit',
             timeZone: reservationTimezone,
@@ -984,7 +989,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
           >
             <span className={`${styles.dot} ${styles.dotExternal}`} />
             <span className={styles.dayListLabel}>
-              {externalPillLabel(ev, dayKey, reservationTimezone, t('reservation:slotExternal'))}
+              {externalPillLabel(
+                ev,
+                dayKey,
+                reservationTimezone,
+                t('reservation:slotExternal'),
+                locale,
+              )}
             </span>
           </div>
         ))}
@@ -1022,7 +1033,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
               const dots = dayReservations.slice(0, 3)
               const overflow = dayReservations.length - dots.length
               const display = displayDateForDayKey(dayKey, reservationTimezone)
-              const fullDate = display.toLocaleDateString([], {
+              const fullDate = display.toLocaleDateString(locale, {
                 day: 'numeric',
                 month: 'long',
                 timeZone: reservationTimezone,
@@ -1111,7 +1122,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
                   onKeyDown={(e) => e.stopPropagation()}
                   title={ev.label ?? t('reservation:slotExternal')}
                 >
-                  {externalPillLabel(ev, dayKey, reservationTimezone, t('reservation:slotExternal'))}
+                  {externalPillLabel(
+                    ev,
+                    dayKey,
+                    reservationTimezone,
+                    t('reservation:slotExternal'),
+                    locale,
+                  )}
                 </div>
               ))}
             </div>
@@ -1154,7 +1171,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
           return (
             <button
               aria-current={isToday ? 'date' : undefined}
-              aria-label={display.toLocaleDateString([], {
+              aria-label={display.toLocaleDateString(locale, {
                 day: 'numeric',
                 month: 'long',
                 timeZone: reservationTimezone,
@@ -1168,7 +1185,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
               type="button"
             >
               <span className={styles.dayStripWeekday}>
-                {display.toLocaleDateString([], {
+                {display.toLocaleDateString(locale, {
                   timeZone: reservationTimezone,
                   weekday: 'short',
                 })}
@@ -1239,7 +1256,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
         <div className={styles.dayHeader} />
         {weekDayKeys.map((dayKey, i) => (
           <div className={styles.dayHeader} key={i}>
-            {displayDateForDayKey(dayKey, reservationTimezone).toLocaleDateString([], {
+            {displayDateForDayKey(dayKey, reservationTimezone).toLocaleDateString(locale, {
               day: 'numeric',
               month: 'numeric',
               timeZone: reservationTimezone,
@@ -1506,7 +1523,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
 
     const formatDateTime = (iso: string) => {
       const d = new Date(iso)
-      return d.toLocaleString([], {
+      return d.toLocaleString(locale, {
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
@@ -1679,7 +1696,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   // and, at a week boundary, a whole week — away from the cells below it.
   const dateLabel = useMemo(() => {
     if (viewMode === 'month') {
-      return currentDate.toLocaleDateString([], {
+      return currentDate.toLocaleDateString(locale, {
         month: 'long',
         timeZone: reservationTimezone,
         year: 'numeric',
@@ -1690,7 +1707,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
         getDayKeyInTimezone(currentDate, reservationTimezone),
         weekStartsOn,
       )
-      const start = displayDateForDayKey(startKey, reservationTimezone).toLocaleDateString([], {
+      const start = displayDateForDayKey(startKey, reservationTimezone).toLocaleDateString(locale, {
         day: 'numeric',
         month: 'short',
         timeZone: reservationTimezone,
@@ -1698,7 +1715,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
       const end = displayDateForDayKey(
         addDaysToDayKey(startKey, 6),
         reservationTimezone,
-      ).toLocaleDateString([], {
+      ).toLocaleDateString(locale, {
         day: 'numeric',
         month: 'short',
         timeZone: reservationTimezone,
@@ -1706,14 +1723,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
       })
       return `${start} - ${end}`
     }
-    return currentDate.toLocaleDateString([], {
+    return currentDate.toLocaleDateString(locale, {
       day: 'numeric',
       month: 'long',
       timeZone: reservationTimezone,
       weekday: 'long',
       year: 'numeric',
     })
-  }, [currentDate, reservationTimezone, viewMode, weekStartsOn])
+  }, [currentDate, locale, reservationTimezone, viewMode, weekStartsOn])
 
   const handleDrawerSave = useCallback(() => {
     void fetchReservations()

@@ -365,6 +365,33 @@ test('CalendarView resource filter dropdown filters events by resource', async (
   expect(resetTitles.some((t) => t.includes('Bob Smith'))).toBe(true)
 })
 
+// The calendar is server-rendered. Before dates followed the admin language,
+// every date/time string formatted with the runtime locale — Node's on the
+// server, the browser's on the client — so a non-en-US browser hit React's
+// "Hydration failed because the server rendered text didn't match the client"
+// on every calendar load. Guard against a regression with a French browser.
+test('CalendarView renders without a hydration mismatch in a French browser', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ locale: 'fr-FR' })
+  const page = await context.newPage()
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  // React 19 reports a hydration mismatch as a recoverable console error,
+  // not necessarily a page error — capture both.
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      errors.push(msg.text())
+    }
+  })
+  await loginAsAdmin(page)
+  await page.goto('/admin/collections/reservations')
+  await page.waitForSelector('text="Pending"', { timeout: 15_000 })
+  await page.waitForTimeout(2000)
+  expect(errors.filter((e) => /hydrat/i.test(e))).toEqual([])
+  await context.close()
+})
+
 // ---------------------------------------------------------------------------
 // AvailabilityOverview
 // ---------------------------------------------------------------------------

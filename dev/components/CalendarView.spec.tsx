@@ -39,6 +39,8 @@ const mocks = vi.hoisted(() => {
         openSlugs.splice(idx, 1)
       }
     }),
+    /** The admin language `useTranslation().i18n.language` reports — switchable per test. */
+    language: 'en',
     openDrawer: vi.fn(),
     openModal: vi.fn((slug: string) => {
       if (!openSlugs.includes(slug)) {
@@ -93,7 +95,7 @@ vi.mock('@payloadcms/ui', async (importOriginal) => {
     }),
     // vi.mock stub named to match the real hook it replaces, not an actual React hook.
     // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
-    useTranslation: () => ({ i18n: { language: 'en' }, t: makeT() }),
+    useTranslation: () => ({ i18n: { language: mocks.language }, t: makeT() }),
     // vi.mock stub named to match the real hook it replaces, not an actual React hook.
     // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
     useWindowInfo: () => mocks.windowInfo,
@@ -269,6 +271,7 @@ afterEach(() => {
   vi.clearAllMocks()
   mocks.openSlugs.length = 0
   mocks.windowInfo = { breakpoints: {}, eventsFired: 0 }
+  mocks.language = 'en'
   mockConfig.admin.custom.reservationCalendar = undefined
 })
 
@@ -630,5 +633,27 @@ describe('CalendarView month navigation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '→' }))
     expect(screen.getByText(monthLabel(2))).toBeTruthy()
+  })
+})
+
+describe('CalendarView admin language', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('formats the toolbar date label in the admin language, not the runtime locale', async () => {
+    // The runtime (Node here, the browser in production) is en-US; the admin
+    // language is French. The label must follow the admin language — that is
+    // what keeps the server-rendered and client-rendered text identical.
+    vi.useFakeTimers({ now: new Date('2026-08-15T12:00:00Z'), toFake: ['Date'] })
+    mocks.language = 'fr'
+    setDesktopViewport()
+    const { container } = await renderCalendar()
+
+    const label = container.querySelector('[class*="currentDate"]')
+    expect(label?.textContent).toMatch(
+      /janv\.|févr\.|mars|avr\.|mai|juin|juil\.|août|sept\.|oct\.|nov\.|déc\./,
+    )
+    expect(label?.textContent).not.toMatch(/August/)
   })
 })

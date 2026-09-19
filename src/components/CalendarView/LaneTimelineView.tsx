@@ -38,8 +38,9 @@ function Lane({
   startHour: number
   timeZone: string
 }) {
-  const { t: _t } = useTranslation()
+  const { i18n, t: _t } = useTranslation()
   const t = _t as PluginT
+  const locale = i18n.language
 
   const isoDay = getDayKeyInTimezone(day, timeZone)
   const dayStart = gridInstant(isoDay, startHour, timeZone)
@@ -82,7 +83,7 @@ function Lane({
                     ? styles.slotFull
                     : styles.slotFree
           const isFree = s.state === 'free'
-          const slotLabel = `${s.start.toLocaleTimeString([], {
+          const slotLabel = `${s.start.toLocaleTimeString(locale, {
             hour: '2-digit',
             minute: '2-digit',
             timeZone,

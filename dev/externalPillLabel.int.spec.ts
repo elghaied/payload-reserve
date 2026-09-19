@@ -38,3 +38,15 @@ describe('externalPillLabel', () => {
     expect(out).toContain('External event')
   })
 })
+
+describe('externalPillLabel locale', () => {
+  const ev = { end: '2026-09-12T09:00:00Z', start: '2026-09-12T08:05:00Z' }
+
+  it('threads the admin locale through to the time (fr)', () => {
+    expect(externalPillLabel(ev, '2026-09-12', 'UTC', 'Busy', 'fr')).toBe('08:05 Busy')
+  })
+
+  it('threads the admin locale through to the time (en-US, hourCycle h23 pins it)', () => {
+    expect(externalPillLabel(ev, '2026-09-12', 'UTC', 'Busy', 'en-US')).toBe('08:05 Busy')
+  })
+})
