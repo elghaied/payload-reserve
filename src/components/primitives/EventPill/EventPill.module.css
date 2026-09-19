@@ -1,7 +1,7 @@
 .eventItem {
   border-radius: 2px;
   cursor: pointer;
-  font-size: 0.625rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   margin-bottom: 1px;
   overflow: hidden;
   padding: 2px 4px;

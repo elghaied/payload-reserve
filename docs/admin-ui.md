@@ -57,12 +57,13 @@ import { CalendarView } from 'payload-reserve/client'
 
 ### Styling hooks
 
-The calendar's outer padding is exposed as two CSS custom properties so a host can line it up with its own page gutter instead of overriding the plugin's stylesheet:
+The calendar's outer padding and its type scale are exposed as CSS custom properties so a host can line it up with its own page gutter and font size instead of overriding the plugin's stylesheet:
 
 | Property | Default | Applies |
 |---|---|---|
 | `--reserve-calendar-padding` | `20px` | desktop / tablet |
 | `--reserve-calendar-padding-mobile` | `12px` | at and below Payload's `s` breakpoint (768px); the extra bottom room reserved for the floating create button is added on top of it |
+| `--reserve-calendar-font-size` | `1rem` | the base every font size in the calendar (headers, day labels, event pills, lanes, badges, pending table) is multiplied from — set it to e.g. `15px` to match a 15px dashboard and everything in the calendar scales proportionally; the create button's `+` glyph is the one fixed-px exception |
 
 Set them on `:root` or on the admin `body` from your own admin stylesheet:
 
@@ -70,10 +71,11 @@ Set them on `:root` or on the admin `body` from your own admin stylesheet:
 :root {
   --reserve-calendar-padding: 32px;
   --reserve-calendar-padding-mobile: 8px;
+  --reserve-calendar-font-size: 15px;
 }
 ```
 
-Leave them unset and nothing changes — the defaults are the values the calendar always used.
+Leave them unset and nothing changes — the defaults are the values the calendar always used. (One exception: as of 4.4.0 the smallest calendar text — event pills, capacity / time-off badges, hour labels, overflow dots — sits at a readability floor of `0.75 × --reserve-calendar-font-size`, 9.75px at Payload's 13px root, where it used to be 8–10px.)
 
 ---
 

@@ -26,7 +26,7 @@
   padding: 6px 12px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.875);
   color: var(--theme-text);
   transition: box-shadow 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
@@ -41,7 +41,7 @@
 }
 
 .currentDate {
-  font-size: 1.125rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 1.125);
   font-weight: 600;
 }
 
@@ -58,7 +58,7 @@
   padding: 6px 12px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   font-weight: 600;
   margin-right: 8px;
   transition: background-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
@@ -81,7 +81,7 @@
   padding: 6px 12px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   transition: background-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
@@ -126,7 +126,7 @@
 .dayHeader {
   padding: 8px 4px;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   font-weight: 600;
   text-transform: uppercase;
   background: var(--theme-elevation-50);
@@ -153,7 +153,7 @@
 }
 
 .dayNumber {
-  font-size: 0.75rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   font-weight: 600;
   margin-bottom: 2px;
 }
@@ -195,7 +195,7 @@
 
 .timeLabel {
   padding: 4px;
-  font-size: 0.625rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   text-align: right;
   background: var(--theme-bg);
   min-height: 40px;
@@ -250,7 +250,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.75rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
 }
 
 .legendDot {
@@ -280,7 +280,7 @@
   padding: 0 5px;
   margin-left: 6px;
   border-radius: 9px;
-  font-size: 0.625rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   font-weight: 700;
   line-height: 1;
   background: #ef4444;
@@ -307,7 +307,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8125rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
   cursor: pointer;
   user-select: none;
 }
@@ -321,7 +321,7 @@
   padding: 5px 12px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   font-weight: 600;
   transition: background-color 100ms ease, opacity 100ms ease;
 }
@@ -339,7 +339,7 @@
 .feedbackToast {
   padding: 8px 14px;
   border-radius: 4px;
-  font-size: 0.8125rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
   font-weight: 500;
   margin-bottom: 12px;
 }
@@ -358,14 +358,14 @@
 .pendingTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8125rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
 }
 
 .pendingTh {
   text-align: left;
   padding: 8px 10px;
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   text-transform: uppercase;
   color: var(--theme-elevation-500);
   border-bottom: 2px solid var(--theme-elevation-150);
@@ -403,7 +403,7 @@
   border-radius: 3px;
   padding: 4px 8px;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.875);
   line-height: 1;
   transition: background-color 100ms ease, opacity 100ms ease;
 }
@@ -438,7 +438,7 @@
   text-align: center;
   padding: 48px 20px;
   color: var(--theme-elevation-400);
-  font-size: 0.9375rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9375);
 }
 
 /* Resource filter */
@@ -455,7 +455,7 @@
   border-radius: 4px;
   background: var(--theme-warning-100, #fef3c7);
   color: var(--theme-warning-700, #92400e);
-  font-size: 0.85rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.85);
 }
 
 .resourceFilter {
@@ -467,7 +467,7 @@
   padding: 6px 28px 6px 10px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.8125rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
   color: var(--theme-text);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -524,7 +524,7 @@
 }
 
 .capacityBadge {
-  font-size: 10px;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   opacity: 0.7;
   position: absolute;
   right: 4px;
@@ -532,7 +532,7 @@
 }
 
 .timeOffLabel {
-  font-size: 10px;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   opacity: 0.7;
 }
 
@@ -551,7 +551,7 @@
 
 .laneLabel {
   flex: 0 0 120px;
-  font-size: 13px;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 1);
   font-weight: 600;
   padding-top: 4px;
 }
@@ -577,13 +577,13 @@
 .laneTime {
   border-left: 1px solid var(--theme-elevation-100);
   color: var(--theme-elevation-500);
-  font-size: 10px;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   padding: 2px 0 2px 3px;
 }
 
 .hint {
   color: var(--theme-elevation-400);
-  font-size: 12px;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9231);
 }
 
 /* Multi-resource item badges inside event blocks */
@@ -601,7 +601,7 @@
   background: rgba(0, 0, 0, 0.08);
   border-radius: 3px;
   color: inherit;
-  font-size: 9px;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   padding: 1px 4px;
 }
 
@@ -779,7 +779,7 @@
 
 .dotOverflow {
   color: var(--theme-elevation-500);
-  font-size: 0.625rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   line-height: 1;
 }
 
@@ -804,7 +804,7 @@
   color: var(--theme-text);
   cursor: pointer;
   font-family: inherit;
-  font-size: 1.25rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 1.25);
   height: 44px;
   line-height: 1;
   width: 44px;
@@ -827,14 +827,14 @@
 
 .dayListTime {
   color: var(--theme-elevation-600);
-  font-size: 0.8125rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
   font-variant-numeric: tabular-nums;
   min-width: 44px;
 }
 
 .dayListLabel {
   flex: 1;
-  font-size: 0.875rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.875);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -843,7 +843,7 @@
 
 .dayListEmpty {
   color: var(--theme-elevation-400);
-  font-size: 0.8125rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
   margin: 0;
   padding: 12px 4px;
 }
@@ -886,12 +886,12 @@
 }
 
 .dayStripWeekday {
-  font-size: 0.625rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   text-transform: uppercase;
 }
 
 .dayStripDay {
-  font-size: 0.9375rem;
+  font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9375);
   font-weight: 600;
 }
 
@@ -917,7 +917,7 @@
   /* Date label on its own line above the arrows. */
   .currentDate {
     flex-basis: 100%;
-    font-size: 1rem;
+    font-size: calc(var(--reserve-calendar-font-size, 1rem) * 1);
     order: -1;
     text-align: center;
   }
@@ -986,7 +986,7 @@
   }
 
   .dayHeader {
-    font-size: 0.625rem;
+    font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
     padding: 6px 2px;
   }
 
@@ -999,7 +999,7 @@
   }
 
   .timeLabel {
-    font-size: 0.6875rem;
+    font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
     padding: 4px 2px;
   }
 
@@ -1028,7 +1028,7 @@
   .laneLabel {
     background: var(--theme-bg);
     flex-basis: 88px;
-    font-size: 12px;
+    font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9231);
     inset-inline-start: 0;
     position: sticky;
     z-index: 1;
@@ -1070,7 +1070,7 @@
     color: var(--theme-elevation-500);
     content: attr(data-label);
     flex: 0 0 auto;
-    font-size: 0.6875rem;
+    font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
     font-weight: 600;
     text-transform: uppercase;
   }
