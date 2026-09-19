@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { CalendarViewProps } from '../../src/components/CalendarView/index.js'
 import type { CalendarReservation } from '../../src/components/shared/types.js'
+import type { ReservationCalendarConfig } from '../../src/types.js'
 
 import { makeT } from './testUtils/pluginT.js'
 import { DEFAULT_STATUS_MACHINE } from './testUtils/statusMachines.js'
@@ -45,12 +46,14 @@ const mocks = vi.hoisted(() => {
       }
     }),
     openSlugs,
+    windowInfo: { breakpoints: {} as Record<string, boolean>, eventsFired: 0 },
   }
 })
 
 const mockConfig = {
   admin: {
     custom: {
+      reservationCalendar: undefined as ReservationCalendarConfig | undefined,
       reservationSlugs: { reservations: 'reservations', resources: 'resources' },
       reservationStatusMachine: DEFAULT_STATUS_MACHINE,
       reservationTimezone: 'UTC',
@@ -91,6 +94,9 @@ vi.mock('@payloadcms/ui', async (importOriginal) => {
     // vi.mock stub named to match the real hook it replaces, not an actual React hook.
     // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
     useTranslation: () => ({ i18n: { language: 'en' }, t: makeT() }),
+    // vi.mock stub named to match the real hook it replaces, not an actual React hook.
+    // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
+    useWindowInfo: () => mocks.windowInfo,
   }
 })
 
@@ -211,10 +217,22 @@ async function renderCalendar(
   return { ...utils, rerenderSame }
 }
 
+/** Simulate Payload's WindowInfoProvider having measured a ≤768px viewport. */
+function setPhoneViewport() {
+  mocks.windowInfo = { breakpoints: { s: true }, eventsFired: 1 }
+}
+
+/** Simulate a measured desktop viewport (breakpoint `s` not matched). */
+function setDesktopViewport() {
+  mocks.windowInfo = { breakpoints: { s: false }, eventsFired: 1 }
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.clearAllMocks()
   mocks.openSlugs.length = 0
+  mocks.windowInfo = { breakpoints: {}, eventsFired: 0 }
+  mockConfig.admin.custom.reservationCalendar = undefined
 })
 
 describe('CalendarView', () => {
@@ -333,5 +351,46 @@ describe('CalendarView', () => {
     // The modal itself never closed during this — CalendarView's own
     // closeModal call is unrelated to the doc going null.
     expect(mocks.closeModal).not.toHaveBeenCalled()
+  })
+})
+
+describe('CalendarView default view', () => {
+  it('opens on calendar.defaultView on desktop', async () => {
+    mockConfig.admin.custom.reservationCalendar = { defaultView: 'week' }
+    setDesktopViewport()
+    await renderCalendar()
+    // The week view's date label spans two dates ("14 Sep - 20 Sep 2026");
+    // the month view's is "September 2026". Assert via the active tab instead.
+    expect(screen.getByRole('button', { name: 'Week' }).className).toMatch(/viewToggleButtonActive/)
+  })
+
+  it('opens on calendar.mobileDefaultView on a phone', async () => {
+    mockConfig.admin.custom.reservationCalendar = { defaultView: 'month', mobileDefaultView: 'day' }
+    setPhoneViewport()
+    await renderCalendar()
+    expect(screen.getByRole('button', { name: 'Day' }).className).toMatch(/viewToggleButtonActive/)
+  })
+
+  it('ignores mobileDefaultView on desktop', async () => {
+    mockConfig.admin.custom.reservationCalendar = { mobileDefaultView: 'day' }
+    setDesktopViewport()
+    await renderCalendar()
+    expect(screen.getByRole('button', { name: 'Month' }).className).toMatch(/viewToggleButtonActive/)
+  })
+
+  it('does not override a tab the user already picked when the viewport is measured late', async () => {
+    mockConfig.admin.custom.reservationCalendar = { mobileDefaultView: 'day' }
+    // eventsFired 0: WindowInfoProvider has not measured yet (first client render).
+    const { rerenderSame } = await renderCalendar()
+    fireEvent.click(screen.getByRole('button', { name: 'Week' }))
+    setPhoneViewport()
+    rerenderSame()
+    expect(screen.getByRole('button', { name: 'Week' }).className).toMatch(/viewToggleButtonActive/)
+  })
+
+  it('marks the wrapper with data-layout', async () => {
+    setPhoneViewport()
+    const { container } = await renderCalendar()
+    expect(container.querySelector('[data-layout="mobile"]')).not.toBeNull()
   })
 })

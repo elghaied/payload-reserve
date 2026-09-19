@@ -22,7 +22,12 @@ import {
   monthGridStartDayKey,
   startOfWeekDayKey,
 } from '../../utilities/calendarGrid.js'
-import { resolveActiveView, visibleCalendarViews } from '../../utilities/calendarViews.js'
+import {
+  CALENDAR_VIEW_MODES,
+  initialCalendarView,
+  resolveActiveView,
+  visibleCalendarViews,
+} from '../../utilities/calendarViews.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { externalPillLabel } from '../../utilities/externalPillLabel.js'
 import { reservationMatchesResource, sameId } from '../../utilities/reservationResourceFilter.js'
@@ -32,6 +37,7 @@ import {
   getHourInTimezone,
 } from '../../utilities/timezoneUtils.js'
 import { useTenantFilter } from '../../utilities/useTenantFilter.js'
+import { useIsMobile } from '../hooks/useIsMobile.js'
 import { useReservationMutations } from '../hooks/useReservationMutations.js'
 import { useReservationStatusMachine } from '../hooks/useReservationStatusMachine.js'
 import eventPillStyles from '../primitives/EventPill/EventPill.module.css'
@@ -160,10 +166,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     | ReservationCalendarConfig
     | undefined
   const hiddenViews = calendarConfig?.hiddenViews
-  const visibleViews = visibleCalendarViews(
-    ['month', 'week', 'day', 'lanes', 'pending'],
-    hiddenViews,
-  )
+  const visibleViews = visibleCalendarViews([...CALENDAR_VIEW_MODES], hiddenViews)
+  const { isMobile, viewportKnown } = useIsMobile()
 
   // Labels, colours, and confirm/cancel targets, all derived from the resolved
   // status machine — shared with every other status-aware admin component.
@@ -176,7 +180,42 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   } = useReservationStatusMachine()
 
   const [currentDate, setCurrentDate] = useState(() => new Date())
-  const [viewModeRaw, setViewMode] = useState<ViewMode>('month')
+  // The viewport is unknown on the first render (WindowInfoProvider measures in
+  // an effect), so start on the desktop default; the effect below applies
+  // `mobileDefaultView` exactly once, and only if the user hasn't already picked
+  // a tab in the meantime.
+  const [viewModeRaw, setViewMode] = useState<ViewMode>(() =>
+    initialCalendarView({
+      defaultView: calendarConfig?.defaultView,
+      isMobile: false,
+      mobileDefaultView: calendarConfig?.mobileDefaultView,
+      visible: visibleViews,
+    }),
+  )
+  const userPickedView = useRef(false)
+  const mobileDefaultApplied = useRef(false)
+  useEffect(() => {
+    if (!viewportKnown || mobileDefaultApplied.current) {
+      return
+    }
+    mobileDefaultApplied.current = true
+    if (isMobile && !userPickedView.current) {
+      setViewMode(
+        initialCalendarView({
+          defaultView: calendarConfig?.defaultView,
+          isMobile: true,
+          mobileDefaultView: calendarConfig?.mobileDefaultView,
+          visible: visibleViews,
+        }),
+      )
+    }
+  }, [
+    calendarConfig?.defaultView,
+    calendarConfig?.mobileDefaultView,
+    isMobile,
+    viewportKnown,
+    visibleViews,
+  ])
   const viewMode = resolveActiveView(viewModeRaw, visibleViews)
   const [reservations, setReservations] = useState<CalendarReservation[]>([])
   const [loading, setLoading] = useState(true)
@@ -315,28 +354,30 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     void fetchResources()
   }, [config.routes.api, config.serverURL, resourceSlug, resourceTenantParams])
 
-  const { rangeEnd, rangeStart } = useMemo(() => {
+  // Split in two on purpose: the span is derived as strings first so that a
+  // `currentDate` change INSIDE the current span (the mobile week's day chips
+  // and month day cells set `currentDate` to select a day) yields the same
+  // `startKey`/`dayCount` and therefore the same Date objects — no refetch.
+  const { dayCount, startKey } = useMemo(() => {
     const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
-    let startKey: string
-    let dayCount: number
     if (viewMode === 'month') {
       // The grid always renders 42 cells (6 weeks); fetch the same span so
       // trailing weeks aren't silently empty (review D1).
-      startKey = monthGridStartDayKey(currentKey)
-      dayCount = 42
-    } else if (viewMode === 'week') {
-      startKey = startOfWeekDayKey(currentKey)
-      dayCount = 7
-    } else {
-      startKey = currentKey
-      dayCount = 1
+      return { dayCount: 42, startKey: monthGridStartDayKey(currentKey) }
     }
+    if (viewMode === 'week') {
+      return { dayCount: 7, startKey: startOfWeekDayKey(currentKey) }
+    }
+    return { dayCount: 1, startKey: currentKey }
+  }, [currentDate, reservationTimezone, viewMode])
 
-    return {
+  const { rangeEnd, rangeStart } = useMemo(
+    () => ({
       rangeEnd: instantAtHour(addDaysToDayKey(startKey, dayCount), 0, reservationTimezone),
       rangeStart: instantAtHour(startKey, 0, reservationTimezone),
-    }
-  }, [currentDate, reservationTimezone, viewMode])
+    }),
+    [dayCount, reservationTimezone, startKey],
+  )
 
   // Availability data for the selected resource (null when no resource selected — grid unshaded)
   const { data: availability } = useResourceAvailability(
@@ -1385,7 +1426,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   }, [fetchReservations, fetchPendingCount, fetchPendingReservations, viewMode])
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.wrapper} data-layout={isMobile ? 'mobile' : 'desktop'}>
       <div className={styles.header}>
         {viewMode !== 'pending' && (
           <div className={styles.navButtons}>
@@ -1418,7 +1459,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
             <button
               className={`${styles.viewToggleButton} ${viewMode === key ? styles.viewToggleButtonActive : ''}`}
               key={key}
-              onClick={() => setViewMode(key)}
+              onClick={() => {
+                userPickedView.current = true
+                setViewMode(key)
+              }}
               type="button"
             >
               {label}
