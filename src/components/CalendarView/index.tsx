@@ -533,11 +533,38 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   )
 
   // Memoized so the Drawer's `Header` prop is referentially stable across
-  // renders that don't touch the translation — a fresh element every render
-  // would defeat Payload's own memoization inside `Drawer`.
+  // renders that don't touch its inputs — a fresh element every render would
+  // defeat Payload's own memoization inside `Drawer`. Supplying `Header`
+  // replaces Payload's whole header, visible close button included, so this
+  // carries its own; it acts on the modal directly, exactly like Payload's
+  // did — the detailWasOpen effect mirrors the close back into detailId.
   const detailDrawerHeader = useMemo(
-    () => <h2 className={styles.detailDrawerTitle}>{t('reservation:detailTitle')}</h2>,
-    [t],
+    () => (
+      <div className={styles.detailDrawerHeader}>
+        <h2 className={styles.detailDrawerTitle}>{t('reservation:detailTitle')}</h2>
+        <button
+          // Payload core key, outside the plugin's typed `t` — read via the untyped hook result.
+          aria-label={_t('general:close')}
+          className={styles.detailDrawerClose}
+          onClick={() => closeModal(detailDrawerSlug)}
+          type="button"
+        >
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height={16}
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+            width={16}
+          >
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    ),
+    [_t, closeModal, detailDrawerSlug, t],
   )
 
   // Client-side resource filtering. Delegated to a pure, unit-tested helper:

@@ -70,8 +70,14 @@ vi.mock('@payloadcms/ui', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   return {
     ...actual,
-    Drawer: ({ children }: { children?: ReactNode }) => (
-      <div data-testid="drawer">{children}</div>
+    // Renders the `Header` slot too: Payload's real Drawer drops its own
+    // header (and the visible close button in it) whenever `Header` is
+    // supplied, so the close affordance under test lives in ours.
+    Drawer: ({ children, Header }: { children?: ReactNode; Header?: ReactNode }) => (
+      <div data-testid="drawer">
+        {Header}
+        {children}
+      </div>
     ),
     // vi.mock stub named to match the real hook it replaces, not an actual React hook.
     // eslint-disable-next-line @eslint-react/hooks-extra/no-redundant-custom-hook
@@ -313,6 +319,21 @@ describe('CalendarView', () => {
     expect(screen.getByTestId('drawer')).toBeTruthy()
     expect(within(screen.getByTestId('drawer')).getByText('Haircut')).toBeTruthy()
     expect(mocks.openModal).toHaveBeenCalledTimes(2)
+  })
+
+  it('the detail drawer has a visible close button that closes it', async () => {
+    await renderCalendar({}, makeFetchMock({ reservations: [reservationA] }))
+
+    fireEvent.click(getPill('Jane Doe'))
+
+    // `general:close` is a Payload core key, not a plugin one — makeT() only
+    // resolves `reservation:*` against en.json and echoes anything else back,
+    // so the accessible name here is the raw key, not "Close".
+    const close = within(screen.getByTestId('drawer')).getByRole('button', {
+      name: 'general:close',
+    })
+    fireEvent.click(close)
+    expect(mocks.closeModal).toHaveBeenCalledWith(DETAIL_SLUG)
   })
 
   it('never calls closeModal on mount or once the modal is already closed', async () => {

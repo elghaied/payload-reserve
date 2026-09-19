@@ -1,5 +1,6 @@
 .wrapper {
-  padding: 20px;
+  /* Hosts align the calendar with their own page gutter via this property. */
+  padding: var(--reserve-calendar-padding, 20px);
 }
 
 .header {
@@ -637,11 +638,45 @@
   max-width: 720px;
 }
 
+/* Our own header row for the detail Drawer. Passing `Header` to Payload's
+   Drawer replaces its whole header — including the visible close button it
+   would otherwise render — so the close affordance has to be ours. The title
+   inside it stays visually hidden (see .detailDrawerTitle); the button is the
+   only thing that shows, pinned to the end of the row. */
+.detailDrawerHeader {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+}
+
+.detailDrawerClose {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 6px;
+  color: var(--theme-elevation-800);
+  cursor: pointer;
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  padding: 0;
+  width: 32px;
+}
+
+.detailDrawerClose:hover {
+  background: var(--theme-elevation-50);
+}
+
+.detailDrawerClose:focus-visible {
+  outline: 2px solid var(--theme-text);
+  outline-offset: 2px;
+}
+
 .detailDrawerBody {
   /* Slightly under the panel cap above, minus Payload's gutters, so the rows
      stay bounded even if a consumer's detailSlot renders something wider. */
   max-width: 600px;
-  padding: 4px 0 8px;
+  padding: 16px 0 8px;
 }
 
 /* Visually-hidden accessible name for the detail Drawer. ReservationDetail (or a
@@ -862,8 +897,9 @@
 
 @media (max-width: 768px) {
   .wrapper {
-    /* Bottom room so the FAB never covers the last row. */
-    padding: 12px 12px 88px;
+    padding: var(--reserve-calendar-padding-mobile, 12px);
+    /* Bottom room so the FAB never covers the last row (88px at the default). */
+    padding-bottom: calc(var(--reserve-calendar-padding-mobile, 12px) + 76px);
   }
 
   .header {

@@ -55,11 +55,33 @@ Clicking a free slot opens the create drawer pre-filled with both the `startTime
 import { CalendarView } from 'payload-reserve/client'
 ```
 
+### Styling hooks
+
+The calendar's outer padding is exposed as two CSS custom properties so a host can line it up with its own page gutter instead of overriding the plugin's stylesheet:
+
+| Property | Default | Applies |
+|---|---|---|
+| `--reserve-calendar-padding` | `20px` | desktop / tablet |
+| `--reserve-calendar-padding-mobile` | `12px` | at and below Payload's `s` breakpoint (768px); the extra bottom room reserved for the floating create button is added on top of it |
+
+Set them on `:root` or on the admin `body` from your own admin stylesheet:
+
+```css
+:root {
+  --reserve-calendar-padding: 32px;
+  --reserve-calendar-padding-mobile: 8px;
+}
+```
+
+Leave them unset and nothing changes — the defaults are the values the calendar always used.
+
 ---
 
 ## Reservation Detail Drawer
 
 Clicking a reservation chip on the Calendar — or a row in the Pending view — opens a read-optimized drawer over the calendar instead of jumping straight to Payload's full edit form. The full form is still one click away (the **Edit** button), but the common "glance, then confirm or cancel" action no longer requires opening it.
+
+The drawer carries its own close button (top-right, labelled with Payload's own "Close" string) in addition to the overlay click and Escape — Payload's Drawer drops its built-in one whenever a custom header is supplied, so the plugin renders its own.
 
 **Header:** the service name, the reservation's time window, and a status badge.
 
