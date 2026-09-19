@@ -64,6 +64,7 @@
   "errorServiceInactive": "Die Leistung „{{name}}\" ist nicht aktiv und kann nicht gebucht werden.",
   "errorResourceInactive": "Die Ressource „{{name}}\" ist nicht aktiv und kann nicht gebucht werden.",
   "calendarLoading": "Reservierungen werden geladen...",
+  "calendarNoBookingsDay": "Keine Buchungen an diesem Tag",
   "calendarToday": "Heute",
   "calendarCreateNew": "Neu erstellen",
   "calendarMonth": "Monat",

@@ -64,6 +64,7 @@
   "errorServiceInactive": "سرویس «{{name}}» فعال نیست و قابل رزرو نیست.",
   "errorResourceInactive": "منبع «{{name}}» فعال نیست و قابل رزرو نیست.",
   "calendarLoading": "در حال بارگذاری رزروها...",
+  "calendarNoBookingsDay": "هیچ رزروی برای این روز وجود ندارد",
   "calendarToday": "امروز",
   "calendarCreateNew": "ایجاد جدید",
   "calendarMonth": "ماه",

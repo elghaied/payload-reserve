@@ -64,6 +64,7 @@
   "errorServiceInactive": "Usługa „{{name}}\" nie jest aktywna i nie można jej zarezerwować.",
   "errorResourceInactive": "Zasób „{{name}}\" nie jest aktywny i nie można go zarezerwować.",
   "calendarLoading": "Ładowanie rezerwacji...",
+  "calendarNoBookingsDay": "Brak rezerwacji tego dnia",
   "calendarToday": "Dziś",
   "calendarCreateNew": "Utwórz nową",
   "calendarMonth": "Miesiąc",

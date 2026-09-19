@@ -64,6 +64,7 @@
   "errorServiceInactive": "Layanan \"{{name}}\" tidak aktif dan tidak dapat dipesan.",
   "errorResourceInactive": "Sumber daya \"{{name}}\" tidak aktif dan tidak dapat dipesan.",
   "calendarLoading": "Memuat reservasi...",
+  "calendarNoBookingsDay": "Tidak ada pemesanan pada hari ini",
   "calendarToday": "Hari Ini",
   "calendarCreateNew": "Buat Baru",
   "calendarMonth": "Bulan",

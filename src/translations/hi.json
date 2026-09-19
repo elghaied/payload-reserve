@@ -64,6 +64,7 @@
   "errorServiceInactive": "सेवा \"{{name}}\" सक्रिय नहीं है और बुक नहीं की जा सकती।",
   "errorResourceInactive": "संसाधन \"{{name}}\" सक्रिय नहीं है और बुक नहीं किया जा सकता।",
   "calendarLoading": "आरक्षण लोड हो रहे हैं...",
+  "calendarNoBookingsDay": "इस दिन कोई बुकिंग नहीं",
   "calendarToday": "आज",
   "calendarCreateNew": "नया बनाएँ",
   "calendarMonth": "माह",

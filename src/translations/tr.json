@@ -64,6 +64,7 @@
   "errorServiceInactive": "\"{{name}}\" hizmeti aktif değil ve rezerve edilemez.",
   "errorResourceInactive": "\"{{name}}\" kaynağı aktif değil ve rezerve edilemez.",
   "calendarLoading": "Rezervasyonlar yükleniyor...",
+  "calendarNoBookingsDay": "Bu gün için rezervasyon yok",
   "calendarToday": "Bugün",
   "calendarCreateNew": "Yeni Oluştur",
   "calendarMonth": "Ay",

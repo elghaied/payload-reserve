@@ -64,6 +64,7 @@
   "errorServiceInactive": "الخدمة \"{{name}}\" غير نشطة ولا يمكن حجزها.",
   "errorResourceInactive": "المورد \"{{name}}\" غير نشط ولا يمكن حجزه.",
   "calendarLoading": "جارٍ تحميل الحجوزات...",
+  "calendarNoBookingsDay": "لا توجد حجوزات في هذا اليوم",
   "calendarToday": "اليوم",
   "calendarCreateNew": "إنشاء جديد",
   "calendarMonth": "الشهر",

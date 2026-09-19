@@ -64,6 +64,7 @@
   "errorServiceInactive": "Услуга «{{name}}» неактивна и недоступна для бронирования.",
   "errorResourceInactive": "Ресурс «{{name}}» неактивен и недоступен для бронирования.",
   "calendarLoading": "Загрузка бронирований...",
+  "calendarNoBookingsDay": "На этот день бронирований нет",
   "calendarToday": "Сегодня",
   "calendarCreateNew": "Создать",
   "calendarMonth": "Месяц",

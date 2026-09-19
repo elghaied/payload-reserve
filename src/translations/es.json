@@ -64,6 +64,7 @@
   "errorServiceInactive": "El servicio \"{{name}}\" no está activo y no se puede reservar.",
   "errorResourceInactive": "El recurso \"{{name}}\" no está activo y no se puede reservar.",
   "calendarLoading": "Cargando reservas...",
+  "calendarNoBookingsDay": "No hay reservas este día",
   "calendarToday": "Hoy",
   "calendarCreateNew": "Crear nueva",
   "calendarMonth": "Mes",

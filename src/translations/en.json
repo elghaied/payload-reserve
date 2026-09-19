@@ -64,6 +64,7 @@
   "errorServiceInactive": "Service \"{{name}}\" is not active and cannot be booked.",
   "errorResourceInactive": "Resource \"{{name}}\" is not active and cannot be booked.",
   "calendarLoading": "Loading reservations...",
+  "calendarNoBookingsDay": "No bookings on this day",
   "calendarToday": "Today",
   "calendarCreateNew": "Create New",
   "calendarMonth": "Month",

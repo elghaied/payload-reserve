@@ -693,6 +693,120 @@
   outline-offset: 2px;
 }
 
+/* Mobile month: dots per day + the selected day's list. */
+.dayCellMobile {
+  align-items: center;
+  border: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  font-family: inherit;
+  justify-content: flex-start;
+  min-height: 44px;
+  padding: 6px 2px;
+  text-align: center;
+}
+
+.dayCellMobile .dayNumber {
+  margin-bottom: 4px;
+}
+
+.dayCellSelected {
+  box-shadow: inset 0 0 0 2px var(--theme-elevation-800);
+}
+
+.dotRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+  min-height: 8px;
+}
+
+.dot {
+  background: var(--theme-elevation-400);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 7px;
+  width: 7px;
+}
+
+.dotExternal {
+  background: var(--theme-elevation-300);
+}
+
+.dotOverflow {
+  color: var(--theme-elevation-500);
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+.dayList {
+  border-top: 1px solid var(--theme-elevation-150);
+  margin-top: 12px;
+}
+
+.dayListHeader {
+  align-items: center;
+  display: flex;
+  font-weight: 600;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.dayListAdd {
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--theme-elevation-250);
+  color: var(--theme-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1.25rem;
+  height: 44px;
+  line-height: 1;
+  width: 44px;
+}
+
+.dayListRow {
+  align-items: center;
+  border-bottom: 1px solid var(--theme-elevation-100);
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 4px;
+}
+
+.dayListRowExternal {
+  color: var(--theme-elevation-500);
+  cursor: default;
+}
+
+.dayListTime {
+  color: var(--theme-elevation-600);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+}
+
+.dayListLabel {
+  flex: 1;
+  font-size: 0.875rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dayListEmpty {
+  color: var(--theme-elevation-400);
+  font-size: 0.8125rem;
+  margin: 0;
+  padding: 12px 4px;
+}
+
 @media (max-width: 768px) {
   .wrapper {
     /* Bottom room so the FAB never covers the last row. */
@@ -762,5 +876,14 @@
     min-height: 44px;
     min-width: 0;
     width: 100%;
+  }
+
+  .dayCell {
+    min-height: 44px;
+  }
+
+  .dayHeader {
+    font-size: 0.625rem;
+    padding: 6px 2px;
   }
 }

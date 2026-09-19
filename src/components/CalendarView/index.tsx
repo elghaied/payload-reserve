@@ -871,12 +871,186 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     return <div className={styles.currentTimeLine} style={{ top: `${topPercent}%` }} />
   }
 
+  // Mobile month: the selected day's bookings, listed under the grid. Rows
+  // carry the same tooltip the desktop pills do, so tests/e2e find them the
+  // same way. External busy intervals are display-only, as in the grid.
+  const renderDayList = (dayKey: string) => {
+    const rows = filteredReservations
+      .filter((r) => getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === dayKey)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+    const external = (availability?.external ?? []).filter((ev) => {
+      const startKey = getDayKeyInTimezone(new Date(ev.start), reservationTimezone)
+      const endKey = getDayKeyInTimezone(
+        new Date(new Date(ev.end).getTime() - 1),
+        reservationTimezone,
+      )
+      return startKey <= dayKey && dayKey <= endKey
+    })
+    const title = displayDateForDayKey(dayKey, reservationTimezone).toLocaleDateString([], {
+      day: 'numeric',
+      month: 'short',
+      timeZone: reservationTimezone,
+      weekday: 'short',
+    })
+    return (
+      <section aria-label={title} className={styles.dayList}>
+        <div className={styles.dayListHeader}>
+          <span className={styles.dayListTitle}>{title}</span>
+          <button
+            aria-label={t('reservation:calendarCreateNew')}
+            className={styles.dayListAdd}
+            onClick={() => handleDateClick(instantAtHour(dayKey, 9, reservationTimezone))}
+            type="button"
+          >
+            +
+          </button>
+        </div>
+        {rows.length === 0 && external.length === 0 && (
+          <p className={styles.dayListEmpty}>{t('reservation:calendarNoBookingsDay')}</p>
+        )}
+        {rows.map((r) => {
+          const time = new Date(r.startTime).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: reservationTimezone,
+          })
+          const label = [getResName(r.service), getCustomerName(r.customer)]
+            .filter(Boolean)
+            .join(' - ')
+          const hasItems = Array.isArray(r.items) && r.items.length > 0
+          return (
+            <div
+              className={styles.dayListRow}
+              key={r.id}
+              onClick={() => openDetail(r.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openDetail(r.id)
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              title={getEventTooltip(r)}
+            >
+              <span className={styles.dayListTime}>{time}</span>
+              <span
+                className={styles.dot}
+                style={{ background: STATUS_PRESENTATION[r.status]?.background }}
+              />
+              <span className={styles.dayListLabel}>{label}</span>
+              {hasItems && (
+                <span className={styles.itemBadges}>
+                  {r.items!.map((it, i) => {
+                    const name = typeof it.resource === 'object' ? it.resource?.name : it.resource
+                    return (
+                      <span className={styles.itemBadge} key={i}>
+                        {String(name ?? '')}
+                      </span>
+                    )
+                  })}
+                </span>
+              )}
+            </div>
+          )
+        })}
+        {external.map((ev, j) => (
+          <div
+            className={`${styles.dayListRow} ${styles.dayListRowExternal}`}
+            key={`ext-${ev.start}-${j}`}
+            title={ev.label ?? t('reservation:slotExternal')}
+          >
+            <span className={`${styles.dot} ${styles.dotExternal}`} />
+            <span className={styles.dayListLabel}>
+              {externalPillLabel(ev, dayKey, reservationTimezone, t('reservation:slotExternal'))}
+            </span>
+          </div>
+        ))}
+      </section>
+    )
+  }
+
   const renderMonthView = () => {
     const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
     const dayKeys = dayKeySequence(monthGridStartDayKey(currentKey), 42)
 
     const today = new Date()
     const todayStr = getDayKeyInTimezone(today, reservationTimezone)
+
+    if (isMobile) {
+      const selectedKey = currentKey
+      return (
+        <>
+          <div className={styles.monthGrid}>
+            {[
+              t('reservation:dayShortSun'),
+              t('reservation:dayShortMon'),
+              t('reservation:dayShortTue'),
+              t('reservation:dayShortWed'),
+              t('reservation:dayShortThu'),
+              t('reservation:dayShortFri'),
+              t('reservation:dayShortSat'),
+            ].map((d) => (
+              <div className={styles.dayHeader} key={d}>
+                {d}
+              </div>
+            ))}
+            {dayKeys.map((dayKey) => {
+              const isToday = dayKey === todayStr
+              const isOtherMonth = dayKey.slice(0, 7) !== currentKey.slice(0, 7)
+              const isSelected = dayKey === selectedKey
+              const dayReservations = filteredReservations.filter(
+                (r) => getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === dayKey,
+              )
+              const hasExternal = (availability?.external ?? []).some((ev) => {
+                const startKey = getDayKeyInTimezone(new Date(ev.start), reservationTimezone)
+                const endKey = getDayKeyInTimezone(
+                  new Date(new Date(ev.end).getTime() - 1),
+                  reservationTimezone,
+                )
+                return startKey <= dayKey && dayKey <= endKey
+              })
+              const dots = dayReservations.slice(0, 3)
+              const overflow = dayReservations.length - dots.length
+              const display = displayDateForDayKey(dayKey, reservationTimezone)
+              // Selecting sets `currentDate` (the one state everything derives
+              // from); the range memo is keyed on the derived span, so this
+              // does not refetch unless the tap lands in another month.
+              return (
+                <button
+                  aria-current={isToday ? 'date' : undefined}
+                  aria-label={display.toLocaleDateString([], {
+                    day: 'numeric',
+                    month: 'long',
+                    timeZone: reservationTimezone,
+                    weekday: 'long',
+                  })}
+                  aria-pressed={isSelected}
+                  className={`${styles.dayCell} ${styles.dayCellMobile} ${isOtherMonth ? styles.dayCellOtherMonth : ''} ${isToday ? styles.dayCellToday : ''} ${isSelected ? styles.dayCellSelected : ''}`}
+                  key={dayKey}
+                  onClick={() => setCurrentDate(display)}
+                  type="button"
+                >
+                  <span className={styles.dayNumber}>{Number(dayKey.slice(8, 10))}</span>
+                  <span className={styles.dotRow}>
+                    {dots.map((r) => (
+                      <span
+                        className={styles.dot}
+                        key={r.id}
+                        style={{ background: STATUS_PRESENTATION[r.status]?.background }}
+                      />
+                    ))}
+                    {hasExternal && <span className={`${styles.dot} ${styles.dotExternal}`} />}
+                    {overflow > 0 && <span className={styles.dotOverflow}>+{overflow}</span>}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          {renderDayList(selectedKey)}
+        </>
+      )
+    }
 
     return (
       <div className={styles.monthGrid}>

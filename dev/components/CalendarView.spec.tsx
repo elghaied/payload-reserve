@@ -174,6 +174,26 @@ function todayIso(hour: number): string {
   return d.toISOString()
 }
 
+/** The mobile day list's accessible name for today (business tz UTC). */
+function todayListTitle(): string {
+  return new Date().toLocaleDateString([], {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+    weekday: 'short',
+  })
+}
+
+/** The mobile month cell's accessible name for today. */
+function todayCellName(): string {
+  return new Date().toLocaleDateString([], {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+    weekday: 'long',
+  })
+}
+
 const reservationA: CalendarReservation = {
   id: 'res-a',
   customer: { name: 'Jane Doe' },
@@ -215,6 +235,19 @@ async function renderCalendar(
   await waitFor(() => expect(screen.queryByText('Loading reservations...')).toBeNull())
   const rerenderSame = () => utils.rerender(<CalendarView {...props} />)
   return { ...utils, rerenderSame }
+}
+
+/**
+ * The floating "Create New" button, disambiguated from the mobile month
+ * view's day-list "+" button — both carry the same accessible name.
+ */
+function getFab(): HTMLElement {
+  const buttons = screen.getAllByRole('button', { name: 'Create New' })
+  const fab = buttons.find((b) => b.className.includes('fab'))
+  if (!fab) {
+    throw new Error('FAB button not found among "Create New" buttons')
+  }
+  return fab
 }
 
 /** Simulate Payload's WindowInfoProvider having measured a ≤768px viewport. */
@@ -399,7 +432,9 @@ describe('CalendarView on a phone', () => {
   it('renders Create New as a floating button, not a toolbar button', async () => {
     setPhoneViewport()
     await renderCalendar()
-    const create = screen.getByRole('button', { name: 'Create New' })
+    // The mobile month view's day list also has a "Create New"-labelled +
+    // button (see below), so the FAB must be disambiguated by its own class.
+    const create = getFab()
     expect(create.className).toMatch(/fab/)
     expect(create.className).not.toMatch(/createButton/)
   })
@@ -407,7 +442,7 @@ describe('CalendarView on a phone', () => {
   it('the floating button opens the create drawer', async () => {
     setPhoneViewport()
     await renderCalendar()
-    fireEvent.click(screen.getByRole('button', { name: 'Create New' }))
+    fireEvent.click(getFab())
     expect(mocks.openDrawer).toHaveBeenCalled()
   })
 
@@ -415,5 +450,41 @@ describe('CalendarView on a phone', () => {
     setDesktopViewport()
     await renderCalendar()
     expect(screen.getByRole('button', { name: 'Create New' }).className).toMatch(/createButton/)
+  })
+
+  it('month view shows dots per day and lists the selected day’s bookings', async () => {
+    setPhoneViewport()
+    await renderCalendar({}, makeFetchMock({ reservations: [reservationA, reservationB] }))
+
+    // No event pills in the grid on a phone…
+    expect(screen.queryByText(/Haircut/, { selector: '[class*="eventItem"]' })).toBeNull()
+    // …the day list (today is selected by default) carries the rows instead.
+    const list = screen.getByRole('region', { name: todayListTitle() })
+    expect(within(list).getByText(/Haircut/)).toBeTruthy()
+    expect(within(list).getByText(/Shave/)).toBeTruthy()
+    // and the today cell shows one dot per booking.
+    const todayCell = screen.getByRole('button', { name: todayCellName(), pressed: true })
+    expect(todayCell.querySelectorAll('[class*="dot"]:not([class*="dotRow"])').length).toBe(2)
+  })
+
+  it('tapping a day list row opens the detail drawer', async () => {
+    setPhoneViewport()
+    await renderCalendar({}, makeFetchMock({ reservations: [reservationA] }))
+    fireEvent.click(getPill('Jane Doe'))
+    expect(mocks.openModal).toHaveBeenCalledWith(DETAIL_SLUG)
+  })
+
+  it('the day list header’s + opens the create drawer for that day', async () => {
+    setPhoneViewport()
+    await renderCalendar({}, makeFetchMock({ reservations: [reservationA] }))
+    const list = screen.getByRole('region', { name: todayListTitle() })
+    fireEvent.click(within(list).getByRole('button', { name: 'Create New' }))
+    expect(mocks.openDrawer).toHaveBeenCalled()
+  })
+
+  it('shows the empty hint when the selected day has no bookings', async () => {
+    setPhoneViewport()
+    await renderCalendar({}, makeFetchMock({ reservations: [] }))
+    expect(screen.getByText('No bookings on this day')).toBeTruthy()
   })
 })
