@@ -7,6 +7,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import type { PluginT } from '../../translations/index.js'
 import type { ReservationCalendarConfig } from '../../types.js'
 
+import { safeLocale } from '../../utilities/adminLocale.js'
 import { weekdayLabels } from '../../utilities/calendarViews.js'
 import {
   dateFieldToDayKey,
@@ -63,7 +64,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const { config } = useConfig()
   const { i18n, t: _t } = useTranslation()
   const t = _t as PluginT
-  const locale = i18n.language
+  const locale = safeLocale(i18n.language)
   const slugs = config.admin?.custom?.reservationSlugs
   const statusMachine = config.admin?.custom?.reservationStatusMachine
   const blockingStatuses: string[] = statusMachine?.blockingStatuses ?? ['pending', 'confirmed']

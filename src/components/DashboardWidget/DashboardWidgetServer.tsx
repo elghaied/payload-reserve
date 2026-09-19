@@ -3,6 +3,7 @@ import type { Where, WidgetServerProps } from 'payload'
 import type { PluginT } from '../../translations/index.js'
 import type { StatusMachineConfig } from '../../types.js'
 
+import { safeLocale } from '../../utilities/adminLocale.js'
 import { buildStatusLabels } from '../../utilities/statusPresentation.js'
 import { collectionHasTenantField, readCookie, tenantWhereClause } from '../../utilities/tenantFilter.js'
 import { getEffectiveTenantTimezone } from '../../utilities/tenantTimezone.js'
@@ -18,6 +19,7 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
   const { req } = props
   const { i18n, payload } = req
   const t = i18n.t as PluginT
+  const locale = safeLocale(i18n.language)
 
   const slugs = payload.config.admin?.custom?.reservationSlugs
   if (!slugs) {
@@ -108,7 +110,7 @@ export const DashboardWidgetServer = async (props: WidgetServerProps) => {
           <strong>{t('reservation:dashboardNextAppointment')}</strong>
           <p>
             {t('reservation:dashboardTime')}{' '}
-            {new Date(nextAppointment.startTime as string).toLocaleTimeString(i18n.language, {
+            {new Date(nextAppointment.startTime as string).toLocaleTimeString(locale, {
               hour: '2-digit',
               minute: '2-digit',
               timeZone: reservationTimezone,

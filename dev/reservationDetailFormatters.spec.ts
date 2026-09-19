@@ -140,7 +140,9 @@ describe('locale parameter', () => {
   it('formats in the given locale, not the process locale', () => {
     const iso = '2026-09-12T10:00:00.000Z'
     expect(formatReservationTime(iso, 'UTC', 'fr')).toBe('10:00')
-    expect(formatReservationTime(iso, 'UTC', 'en-US')).toBe('10:00 AM')
+    // ICU < 78 (older Node) separates time and day period with U+202F, not a space
+    // (`\s` matches it; spelled out so the intent is visible).
+    expect(formatReservationTime(iso, 'UTC', 'en-US')).toMatch(/^10:00\sAM$/)
     expect(formatReservationDateLabel(iso, 'UTC', 'fr')).toContain('sept.')
     // en-GB renders "Sat 12 Sept" on this Node's ICU (no comma, "Sept") — so
     // assert the parts rather than pin the exact punctuation.

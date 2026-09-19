@@ -18,6 +18,7 @@ import type {
 import type { SlotInfo } from '../../utilities/computeSlotStates.js'
 import type { CalendarReservation, ResourceOption } from '../shared/types.js'
 
+import { safeLocale } from '../../utilities/adminLocale.js'
 import {
   dayKeySequence,
   displayDateForDayKey,
@@ -110,7 +111,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
   // runtime default: this component is server-rendered, and Node's locale is
   // not the browser's — an empty-locale `toLocale*` call produced a hydration
   // mismatch for any non-en-US browser. `i18n.language` is the same on both sides.
-  const locale = i18n.language
+  const locale = safeLocale(i18n.language)
 
   const slugs = config.admin?.custom?.reservationSlugs
   const reservationSlug = slugs?.reservations ?? 'reservations'

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
 
+import { safeLocale } from '../../utilities/adminLocale.js'
 import { useReservationMutations } from '../hooks/useReservationMutations.js'
 import { useReservationStatusMachine } from '../hooks/useReservationStatusMachine.js'
 import { DetailRow } from '../primitives/DetailRow/index.js'
@@ -37,7 +38,7 @@ export const ReservationDetail: React.FC<ReservationDetailProps> = ({ onEdit }) 
   const { config } = useConfig()
   const { i18n, t: _t } = useTranslation()
   const t = _t as PluginT
-  const locale = i18n.language
+  const locale = safeLocale(i18n.language)
 
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null)

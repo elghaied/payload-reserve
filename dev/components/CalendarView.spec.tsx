@@ -182,9 +182,16 @@ function todayIso(hour: number): string {
   return d.toISOString()
 }
 
+/**
+ * Expectations are formatted in `'en'` — the mocked admin language the
+ * component formats with — never in the runner's locale (`[]`), so the suite
+ * passes under any `LANG`.
+ */
+const ADMIN_LOCALE = 'en'
+
 /** The mobile day list's accessible name for today (business tz UTC). */
 function todayListTitle(): string {
-  return new Date().toLocaleDateString([], {
+  return new Date().toLocaleDateString(ADMIN_LOCALE, {
     day: 'numeric',
     month: 'short',
     timeZone: 'UTC',
@@ -194,7 +201,7 @@ function todayListTitle(): string {
 
 /** The mobile month cell's accessible name for today. */
 function todayCellName(): string {
-  return new Date().toLocaleDateString([], {
+  return new Date().toLocaleDateString(ADMIN_LOCALE, {
     day: 'numeric',
     month: 'long',
     timeZone: 'UTC',
@@ -641,7 +648,7 @@ describe('CalendarView month navigation', () => {
     await renderCalendar()
 
     const monthLabel = (monthIndex: number) =>
-      new Date(2026, monthIndex, 15).toLocaleDateString([], {
+      new Date(2026, monthIndex, 15).toLocaleDateString(ADMIN_LOCALE, {
         month: 'long',
         timeZone: 'UTC',
         year: 'numeric',

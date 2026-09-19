@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
 
+import { safeLocale } from '../../utilities/adminLocale.js'
 import styles from './AvailabilityTimeField.module.css'
 
 type Slot = { end: string; start: string }
@@ -33,7 +34,7 @@ export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: p
   const { config } = useConfig()
   const { i18n, t: _t } = useTranslation()
   const t = _t as PluginT
-  const locale = i18n.language
+  const locale = safeLocale(i18n.language)
   const { setValue, value } = useField<string>({ path: fieldPath })
 
   const service = useFormFields(([fields]) => fields?.service?.value)

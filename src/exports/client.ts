@@ -22,6 +22,10 @@ export {
   useReservationDetail,
 } from '../components/ReservationDetail/context.js'
 export type { ReservationDetailContextValue } from '../components/ReservationDetail/context.js'
+export {
+  formatReservationDateLabel,
+  formatReservationTime,
+} from '../components/ReservationDetail/formatters.js'
 export { ReservationDetail } from '../components/ReservationDetail/index.js'
 export type { ReservationDetailProps } from '../components/ReservationDetail/index.js'
 export type {

@@ -5,6 +5,7 @@ import React from 'react'
 import type { PluginT } from '../../translations/index.js'
 import type { SlotState } from '../../utilities/computeSlotStates.js'
 
+import { safeLocale } from '../../utilities/adminLocale.js'
 import { gridInstant } from '../../utilities/calendarGrid.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { getDayKeyInTimezone } from '../../utilities/timezoneUtils.js'
@@ -40,7 +41,7 @@ function Lane({
 }) {
   const { i18n, t: _t } = useTranslation()
   const t = _t as PluginT
-  const locale = i18n.language
+  const locale = safeLocale(i18n.language)
 
   const isoDay = getDayKeyInTimezone(day, timeZone)
   const dayStart = gridInstant(isoDay, startHour, timeZone)
