@@ -861,8 +861,10 @@
 
 .dayStripChip {
   align-items: center;
-  background: transparent;
-  border: none;
+  /* A visible edge and surface: without them the chips read as a static
+     weekday header, not seven buttons. */
+  background: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-150);
   border-radius: 8px;
   color: inherit;
   cursor: pointer;
@@ -880,7 +882,22 @@
 
 .dayStripChipSelected {
   background: var(--theme-elevation-800);
+  border-color: var(--theme-elevation-800);
   color: var(--theme-elevation-0);
+}
+
+/* Status dots keep their colour on the dark selected chip; the "+N" and the
+   external-busy dot inherit/lighten so they stay legible. */
+.dayStripChipSelected .dotOverflow {
+  color: var(--theme-elevation-200);
+}
+
+.dayStripChipSelected .dotExternal {
+  background: var(--theme-elevation-400);
+}
+
+.dayStripChip .dotRow {
+  min-height: 7px;
 }
 
 .dayStripChip:focus-visible {

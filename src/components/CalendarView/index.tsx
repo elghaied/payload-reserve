@@ -1031,6 +1031,37 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     )
   }
 
+  // One dot per booking on `dayKey` (up to three, status-coloured, then "+N"),
+  // plus a grey dot when an external busy interval overlaps the day. Shared by
+  // the mobile month cell and the mobile week's day-strip chip so the two views
+  // can't drift. Returns the count too, for the caller's accessible label.
+  const renderDayDots = (dayKey: string) => {
+    const dayReservations = filteredReservations.filter(
+      (r) => getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === dayKey,
+    )
+    const hasExternal = (availability?.external ?? []).some((ev) =>
+      externalOverlapsDay(ev, dayKey),
+    )
+    const dots = dayReservations.slice(0, 3)
+    const overflow = dayReservations.length - dots.length
+    return {
+      count: dayReservations.length,
+      node: (
+        <span className={styles.dotRow}>
+          {dots.map((r) => (
+            <span
+              className={styles.dot}
+              key={r.id}
+              style={{ background: STATUS_PRESENTATION[r.status]?.background }}
+            />
+          ))}
+          {hasExternal && <span className={`${styles.dot} ${styles.dotExternal}`} />}
+          {overflow > 0 && <span className={styles.dotOverflow}>+{overflow}</span>}
+        </span>
+      ),
+    }
+  }
+
   const renderMonthView = () => {
     const currentKey = getDayKeyInTimezone(currentDate, reservationTimezone)
     const dayKeys = dayKeySequence(monthGridStartDayKey(currentKey, weekStartsOn), 42)
@@ -1052,14 +1083,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
               const isToday = dayKey === todayStr
               const isOtherMonth = dayKey.slice(0, 7) !== currentKey.slice(0, 7)
               const isSelected = dayKey === selectedKey
-              const dayReservations = filteredReservations.filter(
-                (r) => getDayKeyInTimezone(new Date(r.startTime), reservationTimezone) === dayKey,
-              )
-              const hasExternal = (availability?.external ?? []).some((ev) =>
-                externalOverlapsDay(ev, dayKey),
-              )
-              const dots = dayReservations.slice(0, 3)
-              const overflow = dayReservations.length - dots.length
+              const { count, node: dayDots } = renderDayDots(dayKey)
               const display = displayDateForDayKey(dayKey, reservationTimezone)
               const fullDate = display.toLocaleDateString(locale, {
                 day: 'numeric',
@@ -1069,8 +1093,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
               })
               // Status is conveyed by dot colour alone; append the count so a
               // screen reader hears it too (locale-neutral — no new translation key).
-              const cellLabel =
-                dayReservations.length > 0 ? `${fullDate} (${dayReservations.length})` : fullDate
+              const cellLabel = count > 0 ? `${fullDate} (${count})` : fullDate
               // Selecting sets `currentDate` (the one state everything derives
               // from); the range memo is keyed on the derived span, so this
               // does not refetch unless the tap lands in another month.
@@ -1085,17 +1108,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
                   type="button"
                 >
                   <span className={styles.dayNumber}>{Number(dayKey.slice(8, 10))}</span>
-                  <span className={styles.dotRow}>
-                    {dots.map((r) => (
-                      <span
-                        className={styles.dot}
-                        key={r.id}
-                        style={{ background: STATUS_PRESENTATION[r.status]?.background }}
-                      />
-                    ))}
-                    {hasExternal && <span className={`${styles.dot} ${styles.dotExternal}`} />}
-                    {overflow > 0 && <span className={styles.dotOverflow}>+{overflow}</span>}
-                  </span>
+                  {dayDots}
                 </button>
               )
             })}
@@ -1196,15 +1209,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
           const display = displayDateForDayKey(dayKey, reservationTimezone)
           const isSelected = dayKey === currentKey
           const isToday = dayKey === todayKey
+          const { count, node: dayDots } = renderDayDots(dayKey)
+          const fullDate = display.toLocaleDateString(locale, {
+            day: 'numeric',
+            month: 'long',
+            timeZone: reservationTimezone,
+            weekday: 'long',
+          })
           return (
             <button
               aria-current={isToday ? 'date' : undefined}
-              aria-label={display.toLocaleDateString(locale, {
-                day: 'numeric',
-                month: 'long',
-                timeZone: reservationTimezone,
-                weekday: 'long',
-              })}
+              aria-label={count > 0 ? `${fullDate} (${count})` : fullDate}
               aria-pressed={isSelected}
               className={`${styles.dayStripChip} ${isSelected ? styles.dayStripChipSelected : ''} ${isToday ? styles.dayStripChipToday : ''}`}
               key={dayKey}
@@ -1219,6 +1234,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
                 })}
               </span>
               <span className={styles.dayStripDay}>{Number(dayKey.slice(8, 10))}</span>
+              {dayDots}
             </button>
           )
         })}

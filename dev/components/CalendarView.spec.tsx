@@ -568,8 +568,9 @@ describe('CalendarView on a phone', () => {
     const strip = screen.getByRole('group')
     const chips = within(strip).getAllByRole('button')
     expect(chips).toHaveLength(7)
-    expect(within(strip).getByRole('button', { pressed: true }).getAttribute('aria-label')).toBe(
-      todayCellName(),
+    // Prefix match: the label also carries the day's booking count, "(1)" here.
+    expect(within(strip).getByRole('button', { pressed: true }).getAttribute('aria-label')).toMatch(
+      new RegExp('^' + escapeRegExp(todayCellName())),
     )
     // Single day column, not the 7-column week grid.
     expect(container.querySelector('[class*="weekView"]')).toBeNull()
@@ -597,6 +598,25 @@ describe('CalendarView on a phone', () => {
     expect(other.getAttribute('aria-pressed')).toBe('true')
     expect(screen.queryByTitle(/Jane Doe/)).toBeNull() // reservationA is today, not the tapped day
     expect(listCalls()).toBe(before)
+  })
+
+  it('day-strip chips show one status dot per booking and carry the count in their label', async () => {
+    mockConfig.admin.custom.reservationCalendar = { mobileDefaultView: 'week' }
+    setPhoneViewport()
+    await renderCalendar({}, makeFetchMock({ reservations: [reservationA, reservationB] }))
+
+    const strip = screen.getByRole('group')
+    const todayChip = within(strip).getByRole('button', {
+      name: new RegExp('^' + escapeRegExp(todayCellName()) + ' \\(2\\)$'),
+    })
+    expect(todayChip.querySelectorAll('[class*="dot"]:not([class*="dotRow"])').length).toBe(2)
+
+    // A day with nothing booked has no dots and no count suffix.
+    const empty = within(strip)
+      .getAllByRole('button')
+      .find((c) => c !== todayChip)!
+    expect(empty.getAttribute('aria-label')).not.toMatch(/\(\d+\)$/)
+    expect(empty.querySelectorAll('[class*="dot"]:not([class*="dotRow"])').length).toBe(0)
   })
 
   it('Left/Right arrow keys move the day-strip selection and focus', async () => {
