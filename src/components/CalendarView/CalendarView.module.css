@@ -117,7 +117,7 @@
 
 .monthGrid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
   background: var(--theme-elevation-150);
   border: 1px solid var(--theme-elevation-150);
@@ -134,6 +134,8 @@
 
 .dayCell {
   min-height: 80px;
+  /* Let the column shrink below a nowrap pill's text; the pill ellipsizes. */
+  min-width: 0;
   padding: 4px;
   background: var(--theme-bg);
   vertical-align: top;
@@ -187,7 +189,7 @@
 
 .weekView {
   display: grid;
-  grid-template-columns: 60px repeat(7, 1fr);
+  grid-template-columns: 60px repeat(7, minmax(0, 1fr));
   gap: 1px;
   background: var(--theme-elevation-150);
   border: 1px solid var(--theme-elevation-150);
@@ -202,6 +204,7 @@
 }
 
 .weekCell {
+  min-width: 0;
   padding: 2px;
   background: var(--theme-bg);
   min-height: 40px;
@@ -852,7 +855,7 @@
 .dayStrip {
   display: grid;
   gap: 4px;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   margin-bottom: 8px;
 }
 

@@ -55,3 +55,26 @@ describe('CalendarView.module.css host-fit hooks', () => {
     expect(Math.min(...ratios)).toBeGreaterThanOrEqual(0.75)
   })
 })
+
+describe('CalendarView.module.css day columns never grow past the viewport', () => {
+  /**
+   * `repeat(7, 1fr)` is `repeat(7, minmax(auto, 1fr))`: a nowrap event pill
+   * widens its column to the pill's full text and pushes Friday–Sunday off the
+   * page. Every seven-column grid must cap the track minimum at 0 so the pills
+   * ellipsize inside the cell instead.
+   */
+  it('caps every 7-column grid track at minmax(0, 1fr)', async () => {
+    const css = await readFile(cssPath, 'utf8')
+    const sevenCols = [...css.matchAll(/grid-template-columns:\s*([^;]*repeat\(7,[^;]*);/g)].map((m) => m[1])
+    expect(sevenCols.length).toBeGreaterThanOrEqual(3)
+    for (const value of sevenCols) expect(value).toContain('repeat(7, minmax(0, 1fr))')
+  })
+
+  it('lets week and month cells shrink below their pill text (min-width: 0)', async () => {
+    const css = await readFile(cssPath, 'utf8')
+    for (const cls of ['.weekCell', '.dayCell']) {
+      const block = css.match(new RegExp(`\\${cls} \\{([^}]*)\\}`))?.[1] ?? ''
+      expect(block, cls).toContain('min-width: 0')
+    }
+  })
+})
