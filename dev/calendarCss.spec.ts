@@ -65,9 +65,13 @@ describe('CalendarView.module.css day columns never grow past the viewport', () 
    */
   it('caps every 7-column grid track at minmax(0, 1fr)', async () => {
     const css = await readFile(cssPath, 'utf8')
-    const sevenCols = [...css.matchAll(/grid-template-columns:\s*([^;]*repeat\(7,[^;]*);/g)].map((m) => m[1])
+    const sevenCols = [...css.matchAll(/grid-template-columns:([^;]*);/g)]
+      .map((m) => m[1].trim())
+      .filter((v) => v.includes('repeat(7,'))
     expect(sevenCols.length).toBeGreaterThanOrEqual(3)
-    for (const value of sevenCols) expect(value).toContain('repeat(7, minmax(0, 1fr))')
+    for (const value of sevenCols) {
+      expect(value).toContain('repeat(7, minmax(0, 1fr))')
+    }
   })
 
   it('lets week and month cells shrink below their pill text (min-width: 0)', async () => {
