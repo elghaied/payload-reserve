@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.4.1] - 2026-09-20
+
+### Fixed
+
+- **Week/month columns no longer widen past the viewport.** A `nowrap` event pill in a
+  `repeat(7, 1fr)` track raised the column's automatic minimum to the pill's full text width,
+  pushing the last days of the week off-screen. The seven-column grids now use
+  `repeat(7, minmax(0, 1fr))` and cells get `min-width: 0`, so pills ellipsize inside their day.
+
 ## [4.4.0] - 2026-09-19
 
 The calendar now speaks the admin's language, starts the week where the host wants, and lets a
