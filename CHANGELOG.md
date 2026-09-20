@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.4.2] - 2026-09-20
+
+### Changed
+
+- **Mobile week view: the day-strip chips read as buttons and show booking dots.** The seven
+  day chips were flat text on a transparent background — indistinguishable from a static
+  weekday header — and nothing said which days had bookings. Each chip now has a surface and
+  border, and carries the same dot row the mobile month grid uses: one status-coloured dot per
+  booking (up to three, then `+N`) and a grey dot for an external busy interval, with the
+  booking count in the chip's accessible name. Both views render through one shared helper so
+  they cannot drift.
+
 ## [4.4.1] - 2026-09-20
 
 ### Fixed
