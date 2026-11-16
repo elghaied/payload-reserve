@@ -6,6 +6,7 @@ export const seed = async (payload: Payload) => {
   // Seed dev user
   const { totalDocs } = await payload.count({
     collection: 'users',
+    overrideAccess: true,
     where: { email: { equals: devUser.email } },
   })
 
@@ -13,6 +14,7 @@ export const seed = async (payload: Payload) => {
     await payload.create({
       collection: 'users',
       data: devUser,
+      overrideAccess: true,
     })
   }
 
@@ -32,6 +34,7 @@ export const seed = async (payload: Payload) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { totalDocs: tourExists } = await (payload.count as any)({
     collection: 'services',
+    overrideAccess: true,
     where: { name: { equals: tourName } },
   })
   if (!tourExists) {
@@ -47,11 +50,13 @@ export const seed = async (payload: Payload) => {
         durationType: 'fixed',
         price: 0,
       },
+      overrideAccess: true,
     })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const studio = await (payload.create as any)({
       collection: 'resources',
       data: { name: 'Main Studio', active: true, services: [tour.id] },
+      overrideAccess: true,
     })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (payload.create as any)({
@@ -67,6 +72,7 @@ export const seed = async (payload: Payload) => {
         resource: studio.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     payload.logger.info('Seeded guest-booking demo: "Studio Tour" @ "Main Studio" → visit /book')
   }
@@ -75,13 +81,14 @@ export const seed = async (payload: Payload) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { totalDocs: existingServices } = await (payload.count as any)({
     collection: 'services',
+    overrideAccess: true,
   })
   if (existingServices > 1) { return }
 
   // ---- SERVICES ----
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const create = (collection: string, data: Record<string, unknown>) => (payload.create as any)({ collection, data })
+  const create = (collection: string, data: Record<string, unknown>) => (payload.create as any)({ collection, data, overrideAccess: true })
 
   const haircut = await create('services', {
     name: 'Haircut',
@@ -324,6 +331,7 @@ export const seed = async (payload: Payload) => {
       startTime: makeTime(9, 0),
       status: 'pending',
     },
+    overrideAccess: true,
   })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -331,6 +339,7 @@ export const seed = async (payload: Payload) => {
     id: reservation1.id,
     collection: 'reservations',
     data: { status: 'confirmed' },
+    overrideAccess: true,
   })
 
   // Pending reservation
@@ -344,6 +353,7 @@ export const seed = async (payload: Payload) => {
       startTime: makeTime(10, 0),
       status: 'pending',
     },
+    overrideAccess: true,
   })
 
   // Another pending reservation
@@ -357,6 +367,7 @@ export const seed = async (payload: Payload) => {
       startTime: makeTime(14, 0),
       status: 'pending',
     },
+    overrideAccess: true,
   })
 
   // Multi-resource reservation (uses items array; skip hooks to avoid conflict check during seed)
@@ -386,6 +397,7 @@ export const seed = async (payload: Payload) => {
       startTime: makeTime(11, 0),
       status: 'confirmed',
     },
+    overrideAccess: true,
   })
 
   // Group yoga reservation (guestCount=4; per-guest capacity test)
@@ -402,6 +414,7 @@ export const seed = async (payload: Payload) => {
       startTime: makeTime(8, 0),
       status: 'confirmed',
     },
+    overrideAccess: true,
   })
 
   // Flexible-duration reservation (event space rental with explicit endTime)
@@ -418,6 +431,7 @@ export const seed = async (payload: Payload) => {
       startTime: new Date(nextWeek.getFullYear(), nextWeek.getMonth(), nextWeek.getDate(), 11, 0).toISOString(),
       status: 'confirmed',
     },
+    overrideAccess: true,
   })
 
   // ---- GUEST RESERVATIONS (account-less; for testing email + OTP cancellation) ----

@@ -74,6 +74,7 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
         id: service,
         collection: config.slugs.services,
         depth: 0,
+        overrideAccess: true,
         // Skip the resources join — internal logic never reads it, and without this
         // every service read becomes an aggregation with a $lookup.
         joins: false,
@@ -90,6 +91,7 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
         id: resource,
         collection: config.slugs.resources,
         depth: 0,
+        overrideAccess: true,
         req,
       }).catch(() => null)
       if (!resourceDoc) {
@@ -103,6 +105,7 @@ export function createGetSlotsEndpoint(config: ResolvedReservationPluginConfig):
           collection: config.slugs.resources,
           depth: 0,
           disableErrors: true,
+          overrideAccess: true,
           req,
         }).catch(() => null)
         if (!extraDoc) {

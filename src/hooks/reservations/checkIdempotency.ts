@@ -13,6 +13,7 @@ export const checkIdempotency =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { totalDocs } = await (req.payload.count as any)({
       collection: config.slugs.reservations,
+      overrideAccess: true,
       req,
       where: { idempotencyKey: { equals: data.idempotencyKey } },
     })

@@ -27,10 +27,12 @@ beforeAll(async () => {
       bufferTimeBefore: 0,
       duration: 60,
     },
+    overrideAccess: true,
   })
   const resource = await payload.create({
     collection: col('resources'),
     data: { name: 'Notice Period Resource', active: true, services: [service.id] },
+    overrideAccess: true,
   })
   const customer = await payload.create({
     collection: col('customers'),
@@ -40,6 +42,7 @@ beforeAll(async () => {
       lastName: 'Error',
       password: 'testpass123',
     },
+    overrideAccess: true,
   })
   serviceId = service.id
   resourceId = resource.id
@@ -58,6 +61,7 @@ describe('Payload ValidationError REST shape', () => {
       collection: 'reservations',
       context: { allowConfirmedOnCreate: true },
       data: { customer: customerId, resource: resourceId, service: serviceId, startTime },
+      overrideAccess: true,
     })
 
     let thrown: unknown
@@ -66,6 +70,7 @@ describe('Payload ValidationError REST shape', () => {
         id: created.id,
         collection: 'reservations',
         data: { status: 'cancelled' },
+        overrideAccess: true,
       })
     } catch (error) {
       thrown = error

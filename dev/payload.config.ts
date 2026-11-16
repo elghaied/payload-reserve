@@ -11,7 +11,6 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server'
 import path from 'path'
 import { buildConfig } from 'payload'
 import { payloadReserve } from 'payload-reserve'
-import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
 import { externalBusyResolver } from './helpers/externalBusyState.js'
@@ -338,7 +337,6 @@ const buildConfigWithMemoryDB = async () => {
     },
     plugins,
     secret: process.env.PAYLOAD_SECRET || 'test-secret_key',
-    sharp,
     typescript: {
       // Never fire-and-forget a generate:types child on boot — they outlive the
       // parent and pin the CPU (117 orphans observed after one test session).

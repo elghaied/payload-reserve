@@ -5,7 +5,6 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig, getPayload } from 'payload'
 import { payloadReserve } from 'payload-reserve'
-import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
 import { testDbUri } from './testDbUri.js'
@@ -44,7 +43,6 @@ export async function buildAvailabilityReasonPayload(
     email: testEmailAdapter,
     plugins: [payloadReserve({})],
     secret: 'availability-reason-test-secret',
-    sharp,
     typescript: {
       autoGenerate: false,
     },

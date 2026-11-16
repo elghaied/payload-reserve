@@ -1,5 +1,5 @@
 'use client'
-import type { RelationshipFieldClientComponent } from 'payload'
+import type { RelationshipFieldClientProps } from 'payload'
 
 import { FieldLabel, useConfig, useDocumentDrawer, useField, useTranslation } from '@payloadcms/ui'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -23,7 +23,7 @@ const getDisplayName = (customer: CustomerDoc): string => {
   return fullName || customer.email
 }
 
-export const CustomerField: RelationshipFieldClientComponent = ({ field, path: pathProp }) => {
+export const CustomerField: React.FC<RelationshipFieldClientProps> = ({ field, path: pathProp }) => {
   const fieldPath = pathProp ?? field?.name ?? 'customer'
   const { config } = useConfig()
   const { t: _t } = useTranslation()

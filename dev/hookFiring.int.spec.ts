@@ -34,10 +34,12 @@ beforeAll(async () => {
       bufferTimeBefore: 0,
       duration: 60,
     },
+    overrideAccess: true,
   })
   const resource = await payload.create({
     collection: col('resources'),
     data: { name: 'Hook Resource', active: true, services: [service.id] },
+    overrideAccess: true,
   })
   const customer = await payload.create({
     collection: col('customers'),
@@ -47,6 +49,7 @@ beforeAll(async () => {
       lastName: 'Tester',
       password: 'testpass123',
     },
+    overrideAccess: true,
   })
   serviceId = service.id
   resourceId = resource.id
@@ -96,6 +99,7 @@ describe('Plugin hook firing (review A6/A7/A8/A15)', () => {
         startTime: future(72),
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(hookCalls.afterStatusChange).toHaveLength(0)
 
@@ -103,6 +107,7 @@ describe('Plugin hook firing (review A6/A7/A8/A15)', () => {
       id: reservation.id,
       collection: col('reservations'),
       data: { status: 'confirmed' },
+      overrideAccess: true,
     })
     expect(hookCalls.afterStatusChange).toEqual([
       { newStatus: 'confirmed', previousStatus: 'pending' },
@@ -121,6 +126,7 @@ describe('Plugin hook firing (review A6/A7/A8/A15)', () => {
         startTime: future(96),
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(hookCalls.afterBookingCreate).toBe(0)
 
@@ -133,6 +139,7 @@ describe('Plugin hook firing (review A6/A7/A8/A15)', () => {
         startTime: future(120),
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(hookCalls.afterBookingCreate).toBe(1)
   })
@@ -148,6 +155,7 @@ describe('Plugin hook firing (review A6/A7/A8/A15)', () => {
         startTime: future(2),
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     await expect(
@@ -155,6 +163,7 @@ describe('Plugin hook firing (review A6/A7/A8/A15)', () => {
         id: reservation.id,
         collection: col('reservations'),
         data: { status: 'cancelled' },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
     expect(hookCalls.beforeBookingCancel).toBe(0)
@@ -171,12 +180,14 @@ describe('Plugin hook firing (review A6/A7/A8/A15)', () => {
         startTime: future(144),
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const cancelled = await payload.update({
       id: reservation.id,
       collection: col('reservations'),
       data: { status: 'cancelled' },
+      overrideAccess: true,
     })
     expect(cancelled.status).toBe('cancelled')
     expect(hookCalls.beforeBookingCancel).toBe(1)

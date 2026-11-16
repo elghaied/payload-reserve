@@ -88,6 +88,7 @@ export async function takeHold(params: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { totalDocs } = (await (payload.count as any)({
       collection: config.slugs.holds,
+      overrideAccess: true,
       req,
       where: {
         and: [
@@ -119,6 +120,7 @@ export async function takeHold(params: {
     depth: 0,
     disableErrors: true,
     joins: false,
+    overrideAccess: true,
     req,
   }).catch(() => null)
 
@@ -140,6 +142,7 @@ export async function takeHold(params: {
     collection: config.slugs.resources,
     depth: 0,
     disableErrors: true,
+    overrideAccess: true,
     req,
   }).catch(() => null)
 
@@ -201,6 +204,7 @@ export async function takeHold(params: {
   try {
     await payload.delete({
       collection: config.slugs.holds,
+      overrideAccess: true,
       req,
       where: { expiresAt: { less_than: new Date().toISOString() } },
     })
@@ -250,6 +254,7 @@ export async function takeHold(params: {
         startTime: startTime.toISOString(),
         token,
       },
+      overrideAccess: true,
       req,
     })
   } catch (error) {
@@ -284,6 +289,7 @@ export async function releaseHold(params: {
 
   const { docs } = await req.payload.delete({
     collection: config.slugs.holds,
+    overrideAccess: true,
     req,
     where: { token: { equals: token } },
   })

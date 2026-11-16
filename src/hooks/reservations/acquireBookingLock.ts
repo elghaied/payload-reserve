@@ -38,7 +38,9 @@ import { resolveReservationItems } from '../../utilities/resolveReservationItems
 export const acquireBookingLock =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
   async ({ context, data, operation, originalDoc, req }) => {
-    if (context?.skipReservationHooks) {
+    // Payload 4's on-demand `validate` runs beforeChange hooks without saving:
+    // nothing is being claimed, so nothing is locked.
+    if (context?.skipReservationHooks || (operation as string) === 'validate') {
       return data
     }
 

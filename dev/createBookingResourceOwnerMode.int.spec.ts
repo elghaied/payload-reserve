@@ -30,6 +30,7 @@ beforeAll(async () => {
   owner = await payload.create({
     collection: 'users',
     data: { email: 'rom-owner@test.com', password: 'testpass123' },
+    overrideAccess: true,
   })
 }, 60_000)
 
@@ -51,10 +52,12 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
     const service = await payload.create({
       collection: 'services',
       data: { name: 'ROM Cut', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'ROM Chair', quantity: 1, services: [service.id] },
+      overrideAccess: true,
       user: owner,
     })
     const customer = await payload.create({
@@ -65,6 +68,7 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
         lastName: 'Customer',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     const endpoint = createBookingEndpoint(resolved)
@@ -92,10 +96,12 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
     const service = await payload.create({
       collection: 'services',
       data: { name: 'ROM Cut 2', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'ROM Chair 2', quantity: 1, services: [service.id] },
+      overrideAccess: true,
       user: owner,
     })
     const customerA = await payload.create({
@@ -106,6 +112,7 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
         lastName: 'A',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     const customerB = await payload.create({
       collection: 'customers',
@@ -115,6 +122,7 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
         lastName: 'B',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     const endpoint = createBookingEndpoint(resolved)
@@ -152,10 +160,12 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
     const service = await payload.create({
       collection: 'services',
       data: { name: 'ROM Cut Staff', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'ROM Chair Staff', quantity: 1, services: [service.id] },
+      overrideAccess: true,
       user: owner,
     })
     const customer = await payload.create({
@@ -166,6 +176,7 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
         lastName: 'StaffWalkin',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     // `owner` is a users-collection account with NO role — staff, not admin.
@@ -197,10 +208,12 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
     const service = await payload.create({
       collection: 'services',
       data: { name: 'ROM Cut 3', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'ROM Chair 3', quantity: 1, services: [service.id] },
+      overrideAccess: true,
       user: owner,
     })
     const customer = await payload.create({
@@ -211,10 +224,12 @@ describe('createBooking under resourceOwnerMode — customer self-booking', () =
         lastName: 'Walkin',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     const admin = await payload.create({
       collection: 'users',
       data: { email: 'rom-admin@test.com', password: 'testpass123', role: 'admin' },
+      overrideAccess: true,
     })
 
     const endpoint = createBookingEndpoint(resolved)

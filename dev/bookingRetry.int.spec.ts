@@ -25,10 +25,12 @@ describe('booking endpoint under concurrency', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Retry Service', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Retry Resource', active: true, quantity: 1, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -38,6 +40,7 @@ describe('booking endpoint under concurrency', () => {
         lastName: 'User',
         password: 'test1234',
       },
+      overrideAccess: true,
     })
 
     const endpoint = createBookingEndpoint(resolved)
@@ -82,6 +85,7 @@ describe('booking endpoint under concurrency', () => {
 
     const { totalDocs } = await payload.count({
       collection: col('reservations'),
+      overrideAccess: true,
       where: { resource: { equals: resource.id }, startTime: { equals: startTime } },
     })
     expect(totalDocs).toBe(1)

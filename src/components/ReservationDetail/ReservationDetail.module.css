@@ -5,7 +5,7 @@
 }
 
 .header {
-  border-bottom: 1px solid var(--theme-elevation-100);
+  border-bottom: 1px solid var(--color-border);
   padding-bottom: 12px;
 }
 
@@ -16,7 +16,7 @@
 }
 
 .when {
-  color: var(--theme-elevation-500);
+  color: var(--color-text-tertiary);
   margin-top: 3px;
 }
 
@@ -32,7 +32,7 @@
 }
 
 .pill {
-  background: var(--theme-elevation-100);
+  background: var(--color-bg-tertiary);
   border-radius: 5px;
   font-size: 11px;
   padding: 2px 7px;
@@ -50,7 +50,7 @@
    inside its stretched box (a `<button>`'s text baseline isn't its box top). */
 .footer {
   align-items: baseline;
-  border-top: 1px solid var(--theme-elevation-100);
+  border-top: 1px solid var(--color-border);
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
@@ -74,8 +74,8 @@
 }
 
 .editButton {
-  background: var(--theme-elevation-0);
-  border: 1px solid var(--theme-elevation-150);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
@@ -84,6 +84,6 @@
 }
 
 .noActions {
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
   font-size: 12px;
 }

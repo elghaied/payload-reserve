@@ -8,15 +8,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border: 1px solid var(--theme-elevation-150);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  background: var(--theme-input-bg);
+  background: var(--color-bg);
   cursor: pointer;
   transition: border-color 0.15s;
 }
 
 .selected:hover {
-  border-color: var(--theme-elevation-300);
+  border-color: var(--color-border-control-strong);
 }
 
 .selectedInfo {
@@ -28,7 +28,7 @@
 
 .selectedName {
   font-weight: 600;
-  color: var(--theme-text);
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -36,7 +36,7 @@
 
 .selectedMeta {
   font-size: 12px;
-  color: var(--theme-elevation-500);
+  color: var(--color-text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -48,32 +48,32 @@
   padding: 4px 8px;
   border: none;
   border-radius: 3px;
-  background: var(--theme-elevation-100);
-  color: var(--theme-elevation-500);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-tertiary);
   cursor: pointer;
   font-size: 12px;
   transition: background 0.15s, color 0.15s;
 }
 
 .clearButton:hover {
-  background: var(--theme-elevation-200);
-  color: var(--theme-text);
+  background: var(--color-bg-secondary-pressed);
+  color: var(--color-text);
 }
 
 .searchInput {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--theme-elevation-150);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  background: var(--theme-input-bg);
-  color: var(--theme-text);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-size: 14px;
   outline: none;
   transition: border-color 0.15s;
 }
 
 .searchInput:focus {
-  border-color: var(--theme-elevation-400);
+  border-color: var(--color-border-control-strong);
 }
 
 .dropdown {
@@ -84,9 +84,9 @@
   right: 0;
   max-height: 240px;
   margin-top: 2px;
-  border: 1px solid var(--theme-elevation-150);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
-  background: var(--theme-bg);
+  background: var(--color-bg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow-y: auto;
 }
@@ -101,23 +101,23 @@
 }
 
 .option:hover {
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .optionName {
   font-weight: 600;
-  color: var(--theme-text);
+  color: var(--color-text);
 }
 
 .optionMeta {
   font-size: 12px;
-  color: var(--theme-elevation-500);
+  color: var(--color-text-tertiary);
 }
 
 .noResults {
   padding: 12px;
   text-align: center;
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
   font-size: 13px;
 }
 
@@ -128,20 +128,20 @@
   width: 100%;
   padding: 8px 12px;
   border: none;
-  border-top: 1px solid var(--theme-elevation-100);
+  border-top: 1px solid var(--color-border);
   background: transparent;
-  color: var(--theme-text);
+  color: var(--color-text);
   cursor: pointer;
   font-size: 13px;
   transition: background 0.1s;
 }
 
 .createButton:hover {
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .error {
   margin-top: 4px;
-  color: var(--theme-error-500);
+  color: var(--color-text-danger);
   font-size: 12px;
 }

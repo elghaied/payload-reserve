@@ -5,7 +5,6 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig, getPayload } from 'payload'
 import { payloadReserve } from 'payload-reserve'
-import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
 import type { ReservationPluginHooks } from '../../src/types.js'
@@ -82,7 +81,6 @@ export async function buildHooksPayload(): Promise<{
     email: testEmailAdapter,
     plugins: [payloadReserve({ hooks: countingHooks })],
     secret: 'hooks-test-secret',
-    sharp,
     typescript: {
       autoGenerate: false,
     },

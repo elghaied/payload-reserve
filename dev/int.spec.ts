@@ -38,12 +38,13 @@ describe('Reservation plugin - Collections', () => {
     expect(customersConfig!.auth).toBeTruthy()
   })
 
-  test('customers collection blocks admin panel access', () => {
+  test('customers collection blocks admin panel access', async () => {
     const customersConfig = payload.config.collections.find((c) => c.slug === 'customers')
     expect(customersConfig).toBeDefined()
     expect(customersConfig!.access?.admin).toBeDefined()
     // The access.admin function should return false
-    const result = customersConfig!.access.admin({} as Parameters<NonNullable<NonNullable<typeof customersConfig>['access']>['admin']>[0])
+    // Payload 4 wraps sanitized access functions, so the result is a promise.
+    const result = await customersConfig!.access.admin({ req: { payload, user: null } } as never as Parameters<NonNullable<NonNullable<typeof customersConfig>['access']>['admin']>[0])
     expect(result).toBe(false)
   })
 
@@ -79,6 +80,7 @@ describe('Reservation plugin - Collections', () => {
         duration: 60,
         price: 50,
       },
+      overrideAccess: true,
     })
     expect(service.name).toBe('Test Service')
     expect(service.duration).toBe(60)
@@ -88,6 +90,7 @@ describe('Reservation plugin - Collections', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Linked Service', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
@@ -96,6 +99,7 @@ describe('Reservation plugin - Collections', () => {
         active: true,
         services: [service.id],
       },
+      overrideAccess: true,
     })
     expect(resource.name).toBe('Test Resource')
   })
@@ -104,10 +108,12 @@ describe('Reservation plugin - Collections', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Schedule Test Service', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Schedule Test Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const schedule = await payload.create({
       collection: col('schedules'),
@@ -120,6 +126,7 @@ describe('Reservation plugin - Collections', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     expect(schedule.name).toBe('Weekday Schedule')
   })
@@ -134,6 +141,7 @@ describe('Reservation plugin - Collections', () => {
         password: 'testpass123',
         phone: '555-1234',
       },
+      overrideAccess: true,
     })
     expect(customer.firstName).toBe('Test')
     expect(customer.lastName).toBe('Customer')
@@ -146,14 +154,17 @@ describe('Reservation plugin - calculateEndTime hook', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'EndTime Service', active: true, duration: 45 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'EndTime Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: 'endtime@example.com', firstName: 'EndTime', lastName: 'Customer', password: 'testpass123' },
+      overrideAccess: true,
     })
 
     const startTime = new Date('2025-06-15T10:00:00.000Z')
@@ -166,6 +177,7 @@ describe('Reservation plugin - calculateEndTime hook', () => {
         startTime: startTime.toISOString(),
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const endTime = new Date(reservation.endTime as string)
@@ -185,14 +197,17 @@ describe('Reservation plugin - validateConflicts hook', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Conflict Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: 'conflict@example.com', firstName: 'Conflict', lastName: 'Customer', password: 'testpass123' },
+      overrideAccess: true,
     })
 
     await payload.create({
@@ -204,6 +219,7 @@ describe('Reservation plugin - validateConflicts hook', () => {
         startTime: '2025-07-01T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Overlapping reservation should fail
@@ -217,6 +233,7 @@ describe('Reservation plugin - validateConflicts hook', () => {
           startTime: '2025-07-01T10:30:00.000Z',
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -231,18 +248,22 @@ describe('Reservation plugin - validateConflicts hook', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     const resource1 = await payload.create({
       collection: col('resources'),
       data: { name: 'Resource A', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const resource2 = await payload.create({
       collection: col('resources'),
       data: { name: 'Resource B', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: 'noconflict@example.com', firstName: 'No Conflict', lastName: 'Customer', password: 'testpass123' },
+      overrideAccess: true,
     })
 
     await payload.create({
@@ -254,6 +275,7 @@ describe('Reservation plugin - validateConflicts hook', () => {
         startTime: '2025-07-02T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Same time but different resource should succeed
@@ -266,6 +288,7 @@ describe('Reservation plugin - validateConflicts hook', () => {
         startTime: '2025-07-02T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res2.id).toBeDefined()
   })
@@ -280,14 +303,17 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Status Service', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Status Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: 'status@example.com', firstName: 'Status', lastName: 'Customer', password: 'testpass123' },
+      overrideAccess: true,
     })
     serviceId = service.id
     resourceId = resource.id
@@ -305,6 +331,7 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
           startTime: '2025-08-01T10:00:00.000Z',
           status: 'confirmed',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -319,12 +346,14 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
         startTime: '2025-08-02T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const updated = await payload.update({
       id: reservation.id,
       collection: col('reservations'),
       data: { status: 'confirmed' },
+      overrideAccess: true,
     })
     expect(updated.status).toBe('confirmed')
   })
@@ -332,6 +361,7 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
   test('admin user can create reservation as confirmed', async () => {
     const { docs: users } = await payload.find({
       collection: 'users',
+      overrideAccess: true,
       where: { email: { equals: 'dev@payloadcms.com' } },
     })
     const adminUser = users[0]
@@ -345,6 +375,7 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
         startTime: '2025-08-10T10:00:00.000Z',
         status: 'confirmed',
       },
+      overrideAccess: true,
       user: adminUser,
     })
     expect(reservation.status).toBe('confirmed')
@@ -353,6 +384,7 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
   test('admin user cannot create reservation as completed', async () => {
     const { docs: users } = await payload.find({
       collection: 'users',
+      overrideAccess: true,
       where: { email: { equals: 'dev@payloadcms.com' } },
     })
     const adminUser = users[0]
@@ -367,6 +399,7 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
           startTime: '2025-08-11T10:00:00.000Z',
           status: 'completed',
         },
+        overrideAccess: true,
         user: adminUser,
       }),
     ).rejects.toThrow()
@@ -382,6 +415,7 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
         startTime: '2025-08-03T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // pending -> confirmed -> completed
@@ -389,11 +423,13 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
       id: reservation.id,
       collection: col('reservations'),
       data: { status: 'confirmed' },
+      overrideAccess: true,
     })
     await payload.update({
       id: reservation.id,
       collection: col('reservations'),
       data: { status: 'completed' },
+      overrideAccess: true,
     })
 
     // completed -> pending should fail
@@ -402,6 +438,7 @@ describe('Reservation plugin - validateStatusTransition hook', () => {
         id: reservation.id,
         collection: col('reservations'),
         data: { status: 'pending' },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -412,14 +449,17 @@ describe('Reservation plugin - validateCancellation hook', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Cancel Service', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Cancel Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: 'cancel@example.com', firstName: 'Cancel', lastName: 'Customer', password: 'testpass123' },
+      overrideAccess: true,
     })
 
     // Create a reservation starting in 1 hour (less than 24h notice)
@@ -433,6 +473,7 @@ describe('Reservation plugin - validateCancellation hook', () => {
         startTime: soonStart.toISOString(),
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Try to cancel - should fail due to 24h notice period
@@ -441,6 +482,7 @@ describe('Reservation plugin - validateCancellation hook', () => {
         id: reservation.id,
         collection: col('reservations'),
         data: { status: 'cancelled' },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -449,14 +491,17 @@ describe('Reservation plugin - validateCancellation hook', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Cancel OK Service', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Cancel OK Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: 'cancelok@example.com', firstName: 'Cancel OK', lastName: 'Customer', password: 'testpass123' },
+      overrideAccess: true,
     })
 
     // Create a reservation 48 hours from now (more than 24h notice)
@@ -470,12 +515,14 @@ describe('Reservation plugin - validateCancellation hook', () => {
         startTime: futureStart.toISOString(),
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const updated = await payload.update({
       id: reservation.id,
       collection: col('reservations'),
       data: { cancellationReason: 'Changed plans', status: 'cancelled' },
+      overrideAccess: true,
     })
     expect(updated.status).toBe('cancelled')
   })
@@ -505,6 +552,7 @@ describe('Reservation plugin - inventory mode (per-reservation quantity)', () =>
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     // quantity: 3 means three concurrent reservations are allowed
     const resource = await payload.create({
@@ -516,6 +564,7 @@ describe('Reservation plugin - inventory mode (per-reservation quantity)', () =>
         quantity: 3,
         services: [service.id],
       },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -525,6 +574,7 @@ describe('Reservation plugin - inventory mode (per-reservation quantity)', () =>
         lastName: 'Tester',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     serviceId = service.id
     resourceId = resource.id
@@ -541,6 +591,7 @@ describe('Reservation plugin - inventory mode (per-reservation quantity)', () =>
         startTime: BASE_TIME,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
   })
@@ -555,6 +606,7 @@ describe('Reservation plugin - inventory mode (per-reservation quantity)', () =>
         startTime: BASE_TIME,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
   })
@@ -569,6 +621,7 @@ describe('Reservation plugin - inventory mode (per-reservation quantity)', () =>
         startTime: BASE_TIME,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
   })
@@ -584,6 +637,7 @@ describe('Reservation plugin - inventory mode (per-reservation quantity)', () =>
           startTime: BASE_TIME,
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -600,6 +654,7 @@ describe('Reservation plugin - inventory mode (per-reservation quantity)', () =>
         startTime: nonOverlappingTime,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
   })
@@ -626,6 +681,7 @@ describe('Reservation plugin - capacity mode (per-guest)', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     // 20 total guest slots
     const resource = await payload.create({
@@ -637,6 +693,7 @@ describe('Reservation plugin - capacity mode (per-guest)', () => {
         quantity: 20,
         services: [service.id],
       },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -646,6 +703,7 @@ describe('Reservation plugin - capacity mode (per-guest)', () => {
         lastName: 'Tester',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     serviceId = service.id
     resourceId = resource.id
@@ -663,6 +721,7 @@ describe('Reservation plugin - capacity mode (per-guest)', () => {
         startTime: BASE_TIME,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
     expect(res.guestCount).toBe(15)
@@ -680,6 +739,7 @@ describe('Reservation plugin - capacity mode (per-guest)', () => {
           startTime: BASE_TIME,
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -695,6 +755,7 @@ describe('Reservation plugin - capacity mode (per-guest)', () => {
         startTime: BASE_TIME,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
     expect(res.guestCount).toBe(5)
@@ -712,6 +773,7 @@ describe('Reservation plugin - capacity mode (per-guest)', () => {
           startTime: BASE_TIME,
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -735,10 +797,12 @@ describe('Reservation plugin - idempotency key', () => {
         bufferTimeBefore: 0,
         duration: 30,
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Idempotency Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -748,6 +812,7 @@ describe('Reservation plugin - idempotency key', () => {
         lastName: 'Tester',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     serviceId = service.id
     resourceId = resource.id
@@ -765,6 +830,7 @@ describe('Reservation plugin - idempotency key', () => {
         startTime: '2030-03-10T09:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
     expect(res.idempotencyKey).toBe('idem-key-alpha')
@@ -784,6 +850,7 @@ describe('Reservation plugin - idempotency key', () => {
           startTime: '2030-03-10T11:00:00.000Z',
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -799,6 +866,7 @@ describe('Reservation plugin - idempotency key', () => {
         startTime: '2030-03-10T11:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
     expect(res.idempotencyKey).toBe('idem-key-beta')
@@ -814,6 +882,7 @@ describe('Reservation plugin - idempotency key', () => {
         startTime: '2030-03-10T13:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
     // idempotencyKey should be absent or null/undefined when not provided
@@ -833,10 +902,12 @@ describe('Reservation plugin - guestCount field', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'GuestCount Service', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'GuestCount Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -846,6 +917,7 @@ describe('Reservation plugin - guestCount field', () => {
         lastName: 'Tester',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     serviceId = service.id
     resourceId = resource.id
@@ -862,6 +934,7 @@ describe('Reservation plugin - guestCount field', () => {
         startTime: '2030-04-10T09:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.guestCount).toBe(1)
   })
@@ -879,6 +952,7 @@ describe('Reservation plugin - guestCount field', () => {
         startTime: '2030-04-10T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.guestCount).toBe(4)
   })
@@ -899,6 +973,7 @@ describe('Reservation plugin - durationType on Services', () => {
         lastName: 'Tester',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     customerId = customer.id
   })
@@ -912,10 +987,12 @@ describe('Reservation plugin - durationType on Services', () => {
         duration: 45,
         durationType: 'fixed',
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Fixed Duration Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
 
     const start = '2030-05-10T10:00:00.000Z'
@@ -928,6 +1005,7 @@ describe('Reservation plugin - durationType on Services', () => {
         startTime: start,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     const expectedEnd = new Date('2030-05-10T10:45:00.000Z')
     expect(new Date(res.endTime as string).getTime()).toBe(expectedEnd.getTime())
@@ -942,10 +1020,12 @@ describe('Reservation plugin - durationType on Services', () => {
         duration: 1,
         durationType: 'full-day',
       },
+      overrideAccess: true,
     })
     const fullDayResource = await payload.create({
       collection: col('resources'),
       data: { name: 'Full Day Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
 
     // Dev config has no `timezone` set → defaults to UTC.
@@ -959,6 +1039,7 @@ describe('Reservation plugin - durationType on Services', () => {
         startTime: '2030-05-15T08:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const endTime = new Date(res.endTime as string)
@@ -977,10 +1058,12 @@ describe('Reservation plugin - durationType on Services', () => {
         duration: 30,
         durationType: 'flexible',
       },
+      overrideAccess: true,
     })
     const flexResource = await payload.create({
       collection: col('resources'),
       data: { name: 'Flex Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
 
     const start = '2030-05-20T10:00:00.000Z'
@@ -995,6 +1078,7 @@ describe('Reservation plugin - durationType on Services', () => {
         startTime: start,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(new Date(res.endTime as string).getTime()).toBe(new Date(explicitEnd).getTime())
   })
@@ -1008,10 +1092,12 @@ describe('Reservation plugin - durationType on Services', () => {
         duration: 30,
         durationType: 'flexible',
       },
+      overrideAccess: true,
     })
     const flexResource = await payload.create({
       collection: col('resources'),
       data: { name: 'Flex No-EndTime Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
 
     await expect(
@@ -1024,6 +1110,7 @@ describe('Reservation plugin - durationType on Services', () => {
           startTime: '2030-05-20T14:00:00.000Z',
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -1055,10 +1142,12 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
         duration: 60,
         durationType: 'fixed',
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Slots Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     // Create a Monday recurring schedule: 09:00–12:00 local → 3 x 1h slots
     await payload.create({
@@ -1070,6 +1159,7 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -1079,6 +1169,7 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
         lastName: 'Tester',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     serviceId = service.id
     resourceId = resource.id
@@ -1139,6 +1230,7 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
         startTime: firstSlotStart,
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Re-query: should be one fewer slot
@@ -1169,6 +1261,7 @@ describe('Reservation plugin - available slots (getAvailableSlots service)', () 
     const noScheduleResource = await payload.create({
       collection: col('resources'),
       data: { name: 'No-Schedule Resource', active: true, services: [serviceId] },
+      overrideAccess: true,
     })
 
     const { slots } = await getAvailableSlots({
@@ -1210,14 +1303,17 @@ describe('Reservation plugin - multi-resource bookings (items array)', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     const resourceA = await payload.create({
       collection: col('resources'),
       data: { name: 'Multi Resource A', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const resourceB = await payload.create({
       collection: col('resources'),
       data: { name: 'Multi Resource B', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -1227,6 +1323,7 @@ describe('Reservation plugin - multi-resource bookings (items array)', () => {
         lastName: 'Tester',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     serviceId = service.id
     resourceAId = resourceA.id
@@ -1256,6 +1353,7 @@ describe('Reservation plugin - multi-resource bookings (items array)', () => {
         startTime: MULTI_START_1,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
     expect(Array.isArray(res.items)).toBe(true)
@@ -1273,6 +1371,7 @@ describe('Reservation plugin - multi-resource bookings (items array)', () => {
         startTime: MULTI_START_2,
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Now try a multi-resource booking that includes resourceB at the same time
@@ -1298,6 +1397,7 @@ describe('Reservation plugin - multi-resource bookings (items array)', () => {
           startTime: MULTI_START_2,
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -1314,18 +1414,22 @@ describe('Reservation plugin - occupancy counting for items-held resources', () 
     const svc = await payload.create({
       collection: col('services'),
       data: { name: 'Occupancy Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60 },
+      overrideAccess: true,
     })
     const primary = await payload.create({
       collection: col('resources'),
       data: { name: 'Occupancy Primary', active: true, services: [svc.id] },
+      overrideAccess: true,
     })
     const pool = await payload.create({
       collection: col('resources'),
       data: { name: 'Occupancy Pool', active: true, quantity: 1, services: [svc.id] },
+      overrideAccess: true,
     })
     const cust = await payload.create({
       collection: col('customers'),
       data: { email: 'occ@example.com', firstName: 'Occ', lastName: 'Test', password: 'testpass123' },
+      overrideAccess: true,
     })
     svcId = svc.id
     primaryId = primary.id
@@ -1348,6 +1452,7 @@ describe('Reservation plugin - occupancy counting for items-held resources', () 
         startTime: T,
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Booking 2 books poolId standalone at the same time. poolId quantity is 1,
@@ -1356,6 +1461,7 @@ describe('Reservation plugin - occupancy counting for items-held resources', () 
       payload.create({
         collection: col('reservations'),
         data: { customer: custId, resource: poolId, service: svcId, startTime: T, status: 'pending' },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -1373,10 +1479,12 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Skip Hooks Service', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Skip Hooks Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -1386,6 +1494,7 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
         lastName: 'Tester',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     serviceId = service.id
     resourceId = resource.id
@@ -1406,6 +1515,7 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
         startTime: '2025-01-05T10:00:00.000Z',
         status: 'completed',
       },
+      overrideAccess: true,
     })
     expect(res.status).toBe('completed')
   })
@@ -1426,6 +1536,7 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
         startTime: time,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     const res2 = await payload.create({
       collection: col('reservations'),
@@ -1438,6 +1549,7 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
         startTime: time,
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res2.id).toBeDefined()
   })
@@ -1468,6 +1580,7 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
         startTime: '2025-01-08T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // A normal booking on the same resource, far enough from the malformed
@@ -1484,6 +1597,7 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
         startTime: '2025-01-08T14:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
   })
@@ -1513,6 +1627,7 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
         startTime: '2025-01-09T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Overlaps the malformed row's real item window (08:00-08:30) directly.
@@ -1527,6 +1642,7 @@ describe('Reservation plugin - skipReservationHooks context flag', () => {
           startTime: '2025-01-09T08:15:00.000Z',
           status: 'pending',
         },
+        overrideAccess: true,
       })
       .then(
         () => null,
@@ -1557,10 +1673,12 @@ describe('Reservation plugin - validateStatusTransition admin check', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Admin Check Service', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Admin Check Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -1570,6 +1688,7 @@ describe('Reservation plugin - validateStatusTransition admin check', () => {
         lastName: 'Check',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     // Customer trying to create as 'confirmed' should fail
@@ -1593,10 +1712,12 @@ describe('Reservation plugin - validateStatusTransition admin check', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Context Bypass Service', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Context Bypass Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -1606,6 +1727,7 @@ describe('Reservation plugin - validateStatusTransition admin check', () => {
         lastName: 'Bypass',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     // With context flag, non-admin can create confirmed (payment hook flow)
@@ -1619,6 +1741,7 @@ describe('Reservation plugin - validateStatusTransition admin check', () => {
         startTime: '2025-09-01T14:00:00.000Z',
         status: 'confirmed',
       },
+      overrideAccess: true,
     })
     expect(reservation.status).toBe('confirmed')
   })
@@ -1648,23 +1771,28 @@ describe('Reservation plugin - per-item buffer times', () => {
     const noBufferSvc = await payload.create({
       collection: col('services'),
       data: { name: 'No Buffer Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 30 },
+      overrideAccess: true,
     })
     // Service with 60min bufferBefore
     const bigBufferSvc = await payload.create({
       collection: col('services'),
       data: { name: 'Big Buffer Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 60, duration: 30 },
+      overrideAccess: true,
     })
     const resourceX = await payload.create({
       collection: col('resources'),
       data: { name: 'Buffer Resource X', active: true, services: [noBufferSvc.id, bigBufferSvc.id] },
+      overrideAccess: true,
     })
     const resourceY = await payload.create({
       collection: col('resources'),
       data: { name: 'Buffer Resource Y', active: true, services: [noBufferSvc.id, bigBufferSvc.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: 'buffer-test@example.com', firstName: 'Buffer', lastName: 'Test', password: 'testpass123' },
+      overrideAccess: true,
     })
 
     // Existing booking on Resource X at 10:00-10:30
@@ -1677,6 +1805,7 @@ describe('Reservation plugin - per-item buffer times', () => {
         startTime: '2025-11-01T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Multi-resource booking:
@@ -1699,6 +1828,7 @@ describe('Reservation plugin - per-item buffer times', () => {
           startTime: '2025-11-01T11:00:00.000Z',
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -1717,10 +1847,12 @@ describe('Reservation plugin - slot generation with buffers', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Step Size Service', active: true, bufferTimeAfter: 0, bufferTimeBefore: 30, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Step Size Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     // Monday schedule 09:00-13:00 local
     await payload.create({
@@ -1732,10 +1864,12 @@ describe('Reservation plugin - slot generation with buffers', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: 'step-size@example.com', firstName: 'Step', lastName: 'Size', password: 'testpass123' },
+      overrideAccess: true,
     })
 
     const MONDAY_LOCAL = '2030-06-17' // Mon Jun 17 2030 — day-key string, TZ-independent
@@ -1764,6 +1898,7 @@ describe('Reservation plugin - slot generation with buffers', () => {
         startTime: initialSlots[0].start.toISOString(),
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Re-query
@@ -1799,10 +1934,12 @@ describe('Reservation plugin - schedule time validation', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Time Validate Service', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Time Validate Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     resourceId = resource.id
   })
@@ -1818,6 +1955,7 @@ describe('Reservation plugin - schedule time validation', () => {
           resource: resourceId,
           scheduleType: 'recurring',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -1833,6 +1971,7 @@ describe('Reservation plugin - schedule time validation', () => {
           resource: resourceId,
           scheduleType: 'recurring',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -1847,6 +1986,7 @@ describe('Reservation plugin - schedule time validation', () => {
         resource: resourceId,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     expect(schedule.name).toBe('Good Schedule')
   })
@@ -2260,10 +2400,12 @@ describe('Guest bookings - validation hook', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: `GB Service ${guestSetting}`, active: true, allowGuestBooking: guestSetting, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: `GB Resource ${guestSetting}`, active: true, services: [service.id] },
+      overrideAccess: true,
     })
     return { resource, service }
   }
@@ -2278,6 +2420,7 @@ describe('Guest bookings - validation hook', () => {
         service: service.id,
         startTime: future(72),
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
     expect(typeof (res as Record<string, unknown>).cancellationToken).toBe('string')
@@ -2294,6 +2437,7 @@ describe('Guest bookings - validation hook', () => {
           service: service.id,
           startTime: future(72),
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -2304,6 +2448,7 @@ describe('Guest bookings - validation hook', () => {
       payload.create({
         collection: col('reservations'),
         data: { resource: resource.id, service: service.id, startTime: future(72) },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -2319,6 +2464,7 @@ describe('Guest bookings - validation hook', () => {
           service: service.id,
           startTime: future(72),
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -2347,6 +2493,7 @@ describe('Guest bookings - validation hook', () => {
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: `cust-${Date.now()}@example.com`, firstName: 'Cust', lastName: 'Omer', password: 'password123' },
+      overrideAccess: true,
     })
     const res = await payload.create({
       collection: col('reservations'),
@@ -2356,6 +2503,7 @@ describe('Guest bookings - validation hook', () => {
         service: service.id,
         startTime: future(72),
       },
+      overrideAccess: true,
     })
     expect(res.id).toBeDefined()
     expect((res as Record<string, unknown>).cancellationToken).toBeFalsy()
@@ -2366,6 +2514,7 @@ describe('Guest bookings - validation hook', () => {
     const customer = await payload.create({
       collection: col('customers'),
       data: { email: `both-${Date.now()}@example.com`, firstName: 'Both', lastName: 'User', password: 'password123' },
+      overrideAccess: true,
     })
     await expect(
       payload.create({
@@ -2377,6 +2526,7 @@ describe('Guest bookings - validation hook', () => {
           service: service.id,
           startTime: future(72),
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -2389,10 +2539,12 @@ describe('Guest bookings - book endpoint', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Endpoint GB Service', active: true, allowGuestBooking: 'enabled', duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Endpoint GB Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
 
     const ep = createBookingEndpoint(resolveConfig({}))
@@ -2423,10 +2575,12 @@ describe('Guest bookings - cancel endpoint', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Cancel GB Service', active: true, allowGuestBooking: 'enabled', duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Cancel GB Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     // Far-future start so the cancellation notice period does not block it.
     return payload.create({
@@ -2437,6 +2591,7 @@ describe('Guest bookings - cancel endpoint', () => {
         service: service.id,
         startTime: future(24 * 30),
       },
+      overrideAccess: true,
     })
   }
 
@@ -2550,10 +2705,12 @@ describe('Reservation plugin - resourceType field', () => {
     const svc = await payload.create({
       collection: col('services'),
       data: { name: 'RT Svc', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const r = await payload.create({
       collection: col('resources'),
       data: { name: 'Stylist RT', active: true, resourceType: 'staff', services: [svc.id] },
+      overrideAccess: true,
     })
     expect((r as { resourceType?: string }).resourceType).toBe('staff')
   })
@@ -2575,14 +2732,17 @@ describe('Reservation plugin - requiredResources field', () => {
     const pool = await payload.create({
       collection: col('services'),
       data: { name: 'RR pool svc', active: true, duration: 30 },
+      overrideAccess: true,
     })
     const chair = await payload.create({
       collection: col('resources'),
       data: { name: 'RR Chair', active: true, services: [pool.id] },
+      overrideAccess: true,
     })
     const svc = await payload.create({
       collection: col('services'),
       data: { name: 'RR Haircut', active: true, duration: 60, requiredResources: [chair.id] },
+      overrideAccess: true,
     })
     expect((svc as { requiredResources?: unknown[] }).requiredResources).toHaveLength(1)
   })
@@ -2617,22 +2777,27 @@ describe('Reservation plugin - requiredResources auto-expansion', () => {
     const chairSvc = await payload.create({
       collection: col('services'),
       data: { name: 'AX chair svc', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const chair = await payload.create({
       collection: col('resources'),
       data: { name: 'AX Chair Pool', active: true, quantity: 1, services: [chairSvc.id] },
+      overrideAccess: true,
     })
     const svc = await payload.create({
       collection: col('services'),
       data: { name: 'AX Haircut', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60, requiredResources: [chair.id] },
+      overrideAccess: true,
     })
     const stylist = await payload.create({
       collection: col('resources'),
       data: { name: 'AX Stylist', active: true, services: [svc.id] },
+      overrideAccess: true,
     })
     const cust = await payload.create({
       collection: col('customers'),
       data: { email: 'ax@example.com', firstName: 'Ax', lastName: 'Test', password: 'testpass123' },
+      overrideAccess: true,
     })
     svcId = svc.id
     stylistId = stylist.id
@@ -2644,6 +2809,7 @@ describe('Reservation plugin - requiredResources auto-expansion', () => {
     const res = await payload.create({
       collection: col('reservations'),
       data: { customer: custId, resource: stylistId, service: svcId, startTime: T1, status: 'pending' },
+      overrideAccess: true,
     })
     const items = (res as { items?: Array<{ resource: unknown }> }).items ?? []
     const ids = items.map((i) => (typeof i.resource === 'object' ? (i.resource as { id: string }).id : i.resource))
@@ -2655,15 +2821,18 @@ describe('Reservation plugin - requiredResources auto-expansion', () => {
     await payload.create({
       collection: col('reservations'),
       data: { customer: custId, resource: stylistId, service: svcId, startTime: T2, status: 'pending' },
+      overrideAccess: true,
     })
     const stylist2 = await payload.create({
       collection: col('resources'),
       data: { name: 'AX Stylist 2', active: true, services: [svcId] },
+      overrideAccess: true,
     })
     await expect(
       payload.create({
         collection: col('reservations'),
         data: { customer: custId, resource: stylist2.id, service: svcId, startTime: T2, status: 'pending' },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -2672,6 +2841,7 @@ describe('Reservation plugin - requiredResources auto-expansion', () => {
     const created = await payload.create({
       collection: col('reservations'),
       data: { customer: custId, resource: stylistId, service: svcId, startTime: '2032-05-04T13:00:00.000Z', status: 'pending' },
+      overrideAccess: true,
     })
     const createdItemCount = ((created as { items?: unknown[] }).items ?? []).length
 
@@ -2680,6 +2850,7 @@ describe('Reservation plugin - requiredResources auto-expansion', () => {
       id: created.id,
       collection: col('reservations'),
       data: { items: [] },
+      overrideAccess: true,
     })
     expect(((updated as { items?: unknown[] }).items ?? []).length).toBe(0)
     // Sanity: create DID expand (so the test is meaningful)
@@ -2706,27 +2877,33 @@ describe('Reservation plugin - multi-resource slot discovery', () => {
     const chairSvc = await payload.create({
       collection: col('services'),
       data: { name: 'MS chair svc', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const chair = await payload.create({
       collection: col('resources'),
       data: { name: 'MS Chair', active: true, quantity: 1, services: [chairSvc.id] },
+      overrideAccess: true,
     })
     const svc = await payload.create({
       collection: col('services'),
       data: { name: 'MS Haircut', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60, durationType: 'fixed', requiredResources: [chair.id] },
+      overrideAccess: true,
     })
     const stylist = await payload.create({
       collection: col('resources'),
       data: { name: 'MS Stylist', active: true, services: [svc.id] },
+      overrideAccess: true,
     })
     // Stylist has a schedule (constrains time); chair has NO schedule (capacity-only).
     await payload.create({
       collection: col('schedules'),
       data: { name: 'MS Stylist Schedule', active: true, recurringSlots: allDaySlots, resource: stylist.id, scheduleType: 'recurring' },
+      overrideAccess: true,
     })
     const cust = await payload.create({
       collection: col('customers'),
       data: { email: 'ms@example.com', firstName: 'Ms', lastName: 'Test', password: 'testpass123' },
+      overrideAccess: true,
     })
     svcId = svc.id
     stylistId = stylist.id
@@ -2764,6 +2941,7 @@ describe('Reservation plugin - multi-resource slot discovery', () => {
     await payload.create({
       collection: col('reservations'),
       data: { customer: custId, resource: chairId, service: svcId, startTime: target.start.toISOString(), status: 'pending' },
+      overrideAccess: true,
     })
     const after = await callSlots()
     // The booking at target.start blocks any candidate whose window overlaps the booked 09:00–10:00 range.
@@ -2788,10 +2966,12 @@ describe('Reservation plugin - slots endpoint resource resolution', () => {
     const chairSvc = await payload.create({
       collection: col('services'),
       data: { name: 'EP chair svc', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const chair = await payload.create({
       collection: col('resources'),
       data: { name: 'EP Chair', active: true, quantity: 1, services: [chairSvc.id] },
+      overrideAccess: true,
     })
     const svc = await payload.create({
       collection: col('services'),
@@ -2804,10 +2984,12 @@ describe('Reservation plugin - slots endpoint resource resolution', () => {
         durationType: 'fixed',
         requiredResources: [chair.id],
       },
+      overrideAccess: true,
     })
     const stylist = await payload.create({
       collection: col('resources'),
       data: { name: 'EP Stylist', active: true, services: [svc.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -2818,10 +3000,12 @@ describe('Reservation plugin - slots endpoint resource resolution', () => {
         resource: stylist.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     const cust = await payload.create({
       collection: col('customers'),
       data: { email: 'ep@example.com', firstName: 'Ep', lastName: 'Test', password: 'testpass123' },
+      overrideAccess: true,
     })
 
     const endpoint = createGetSlotsEndpoint(resolved)
@@ -2851,6 +3035,7 @@ describe('Reservation plugin - slots endpoint resource resolution', () => {
         startTime: occupyStart.toISOString(),
         status: 'confirmed',
       },
+      overrideAccess: true,
     })
 
     const res2 = await endpoint.handler(makeReq(`date=${date}&service=${svc.id}&resource=${stylist.id}`))
@@ -2874,10 +3059,12 @@ describe('Reservation plugin - enforceActive threads through to endpoints', () =
     const inactiveSvc = await payload.create({
       collection: col('services'),
       data: { name: 'EA Inactive Service', active: false, duration: 60, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'EA Resource', active: true, services: [inactiveSvc.id] },
+      overrideAccess: true,
     })
     const allDaySlots = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({
       day,
@@ -2893,6 +3080,7 @@ describe('Reservation plugin - enforceActive threads through to endpoints', () =
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     const date = '2033-08-01'
 
@@ -2922,10 +3110,12 @@ describe('Reservation plugin - enforceActive threads through to endpoints', () =
     const inactiveSvc = await payload.create({
       collection: col('services'),
       data: { name: 'CA Inactive Service', active: false, duration: 60, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'CA Resource', active: true, services: [inactiveSvc.id] },
+      overrideAccess: true,
     })
     const allDaySlots = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({
       day,
@@ -2941,6 +3131,7 @@ describe('Reservation plugin - enforceActive threads through to endpoints', () =
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
 
     const qs = `date=2033-09-05&resource=${resource.id}&service=${inactiveSvc.id}`
@@ -2975,18 +3166,22 @@ describe('Reservation plugin - multi-resource startTime span', () => {
     const svc = await payload.create({
       collection: col('services'),
       data: { name: 'Span Svc', active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60 },
+      overrideAccess: true,
     })
     const primary = await payload.create({
       collection: col('resources'),
       data: { name: 'Span Primary', active: true, services: [svc.id] },
+      overrideAccess: true,
     })
     const early = await payload.create({
       collection: col('resources'),
       data: { name: 'Span Early Pool', active: true, quantity: 1, services: [svc.id] },
+      overrideAccess: true,
     })
     const cust = await payload.create({
       collection: col('customers'),
       data: { email: 'span@example.com', firstName: 'Span', lastName: 'Test', password: 'testpass123' },
+      overrideAccess: true,
     })
     svcId = svc.id
     primaryId = primary.id
@@ -3009,6 +3204,7 @@ describe('Reservation plugin - multi-resource startTime span', () => {
         startTime: PRIMARY_START,
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Booking 2: standalone on `early` (quantity 1) at 08:00. The early pool is already
@@ -3017,6 +3213,7 @@ describe('Reservation plugin - multi-resource startTime span', () => {
       payload.create({
         collection: col('reservations'),
         data: { customer: custId, resource: earlyId, service: svcId, startTime: EARLY_START, status: 'pending' },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -3113,6 +3310,7 @@ describe('Resources field changes', () => {
     const r = await payload.create({
       collection: col('resources'),
       data: { name: 'Unassigned Staff', active: true },
+      overrideAccess: true,
     })
     expect(r.id).toBeDefined()
   })
@@ -3167,6 +3365,7 @@ describe('Schedule exceptions range fields', () => {
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Sched Range Res', active: true },
+      overrideAccess: true,
     })
     await expect(
       payload.create({
@@ -3177,6 +3376,7 @@ describe('Schedule exceptions range fields', () => {
           resource: resource.id,
           scheduleType: 'recurring',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -3426,10 +3626,12 @@ describe('leave range removes availability end-to-end', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Haircut LR', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Stylist LR', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     // Vacation range 2026-06-08 (Mon) to 2026-06-12 (Fri)
     await payload.create({
@@ -3448,6 +3650,7 @@ describe('leave range removes availability end-to-end', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
 
     // 2026-06-10 (Wed) is inside the vacation range → no slots
@@ -3648,10 +3851,12 @@ describe('resource-availability endpoint logic', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'RA Haircut', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'RA Stylist', active: true, quantity: 1, services: [service.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -3663,6 +3868,7 @@ describe('resource-availability endpoint logic', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -3672,6 +3878,7 @@ describe('resource-availability endpoint logic', () => {
         lastName: 'Customer',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     await (payload.create as never as (a: unknown) => Promise<unknown>)({
       collection: col('reservations'),
@@ -3684,6 +3891,7 @@ describe('resource-availability endpoint logic', () => {
         startTime: '2026-06-08T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const result = await buildResourceAvailability({
@@ -3712,10 +3920,12 @@ describe('resource-availability endpoint logic', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'RA2 Svc', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'RA2 Stylist', active: true, quantity: 1, services: [service.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -3727,6 +3937,7 @@ describe('resource-availability endpoint logic', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     const result = await buildResourceAvailability({
       blockingStatuses: ['pending', 'confirmed'],
@@ -3800,22 +4011,27 @@ describe('resource-availability requiredPools', () => {
     const chair = await payload.create({
       collection: col('resources'),
       data: { name: 'RP Chair', active: true, quantity: 2 },
+      overrideAccess: true,
     })
     const svc = await payload.create({
       collection: col('services'),
       data: { name: 'RP Svc', active: true, duration: 60, requiredResources: [chair.id] },
+      overrideAccess: true,
     })
     const stylist1 = await payload.create({
       collection: col('resources'),
       data: { name: 'RP Stylist 1', active: true, quantity: 1, services: [svc.id] },
+      overrideAccess: true,
     })
     const stylist2 = await payload.create({
       collection: col('resources'),
       data: { name: 'RP Stylist 2', active: true, quantity: 1, services: [svc.id] },
+      overrideAccess: true,
     })
     const cust = await payload.create({
       collection: col('customers'),
       data: { email: 'rp@example.com', firstName: 'Rp', lastName: 'Test', password: 'testpass123' },
+      overrideAccess: true,
     })
     // stylist2 takes the chair at 10:00 — stylist1 stays free, but the shared chair is busy.
     await (payload.create as never as (a: unknown) => Promise<unknown>)({
@@ -3832,6 +4048,7 @@ describe('resource-availability requiredPools', () => {
         startTime: '2026-06-08T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const result = await buildResourceAvailability({
@@ -3947,10 +4164,12 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'A1 Recompute Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -3960,6 +4179,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         lastName: 'Recompute',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     const reservation = await payload.create({
@@ -3971,6 +4191,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         startTime: '2025-08-02T09:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(new Date(reservation.endTime as string).toISOString()).toBe('2025-08-02T10:00:00.000Z')
 
@@ -3979,6 +4200,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
       id: reservation.id,
       collection: col('reservations'),
       data: { startTime: '2025-08-02T13:00:00.000Z' },
+      overrideAccess: true,
     })
     expect(new Date(updated.endTime as string).toISOString()).toBe('2025-08-02T14:00:00.000Z')
   })
@@ -3993,10 +4215,12 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'A1 Move Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -4006,6 +4230,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         lastName: 'Move',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     // Occupies 10:00–11:00
@@ -4018,6 +4243,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         startTime: '2025-08-03T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     // Free slot 14:00–15:00
     const movable = await payload.create({
@@ -4029,6 +4255,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         startTime: '2025-08-03T14:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     await expect(
@@ -4036,6 +4263,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         id: movable.id,
         collection: col('reservations'),
         data: { startTime: '2025-08-03T10:30:00.000Z' },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -4050,6 +4278,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
@@ -4060,6 +4289,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         quantity: 4,
         services: [service.id],
       },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -4069,6 +4299,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         lastName: 'Guest',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     await payload.create({
@@ -4081,6 +4312,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         startTime: '2025-08-04T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     const second = await payload.create({
       collection: col('reservations'),
@@ -4092,6 +4324,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         startTime: '2025-08-04T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // 2 existing + 3 requested = 5 > quantity 4
@@ -4100,6 +4333,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         id: second.id,
         collection: col('reservations'),
         data: { guestCount: 3 },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -4114,10 +4348,12 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'A1 Stale Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -4127,6 +4363,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         lastName: 'Stale',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     // Two valid back-to-back bookings: 10:00–11:00 and 11:00–12:00
@@ -4139,6 +4376,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         startTime: '2025-08-05T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('reservations'),
@@ -4149,6 +4387,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         startTime: '2025-08-05T11:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Buffer added AFTER booking — re-validating either reservation would now
@@ -4158,12 +4397,14 @@ describe('Reservation plugin - partial updates (review A1)', () => {
       id: service.id,
       collection: col('services'),
       data: { bufferTimeAfter: 45 },
+      overrideAccess: true,
     })
 
     const withNotes = await payload.update({
       id: first.id,
       collection: col('reservations'),
       data: { notes: 'customer arrived late' },
+      overrideAccess: true,
     })
     expect(withNotes.notes).toBe('customer arrived late')
 
@@ -4171,6 +4412,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
       id: first.id,
       collection: col('reservations'),
       data: { status: 'confirmed' },
+      overrideAccess: true,
     })
     expect(confirmed.status).toBe('confirmed')
 
@@ -4178,6 +4420,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
       id: first.id,
       collection: col('reservations'),
       data: { status: 'completed' },
+      overrideAccess: true,
     })
     expect(completed.status).toBe('completed')
   })
@@ -4192,10 +4435,12 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'A1 Self Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -4205,6 +4450,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         lastName: 'Self',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     const reservation = await payload.create({
@@ -4216,12 +4462,14 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         startTime: '2025-08-06T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const moved = await payload.update({
       id: reservation.id,
       collection: col('reservations'),
       data: { startTime: '2025-08-06T10:15:00.000Z' },
+      overrideAccess: true,
     })
     expect(new Date(moved.endTime as string).toISOString()).toBe('2025-08-06T11:15:00.000Z')
   })
@@ -4237,10 +4485,12 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         duration: 60,
         durationType: 'flexible',
       },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'A1 Flexible Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -4250,6 +4500,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         lastName: 'Flexible',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     const reservation = await payload.create({
@@ -4262,6 +4513,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         startTime: '2025-08-07T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // New start is after the kept endTime — must be rejected, not silently
@@ -4271,6 +4523,7 @@ describe('Reservation plugin - partial updates (review A1)', () => {
         id: reservation.id,
         collection: col('reservations'),
         data: { startTime: '2025-08-07T13:00:00.000Z' },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -4293,10 +4546,12 @@ describe('Endpoint security (review B1/B2/B3/B6/B8)', () => {
         bufferTimeBefore: 0,
         duration: 60,
       },
+      overrideAccess: true,
     })
     secResource = await payload.create({
       collection: col('resources'),
       data: { name: 'Security Resource', active: true, services: [secService.id] },
+      overrideAccess: true,
     })
     secCustomerA = await payload.create({
       collection: col('customers'),
@@ -4306,6 +4561,7 @@ describe('Endpoint security (review B1/B2/B3/B6/B8)', () => {
         lastName: 'A',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     secCustomerB = await payload.create({
       collection: col('customers'),
@@ -4315,6 +4571,7 @@ describe('Endpoint security (review B1/B2/B3/B6/B8)', () => {
         lastName: 'B',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
   })
 
@@ -4440,6 +4697,7 @@ describe('Endpoint security (review B1/B2/B3/B6/B8)', () => {
       id: json.id as string,
       collection: col('reservations'),
       depth: 0,
+      overrideAccess: true,
     })
     expect(String(created.customer)).toBe(String(secCustomerA.id))
     expect(created.cancellationToken).not.toBe('attacker-chosen-token')
@@ -4468,6 +4726,7 @@ describe('Endpoint security (review B1/B2/B3/B6/B8)', () => {
       id: json.id as string,
       collection: col('reservations'),
       depth: 0,
+      overrideAccess: true,
     })
     expect(String(created.customer)).toBe(String(secCustomerB.id))
   })
@@ -4519,18 +4778,21 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
     return payload.create({
       collection: col('services'),
       data: { name, active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60, ...extra },
+      overrideAccess: true,
     })
   }
   async function mkResource(name: string, extra: Record<string, unknown> = {}) {
     return payload.create({
       collection: col('resources'),
       data: { name, active: true, services: [], ...extra },
+      overrideAccess: true,
     })
   }
   async function mkCustomer(email: string) {
     return payload.create({
       collection: col('customers'),
       data: { email, firstName: 'CD', lastName: 'Test', password: 'testpass123' },
+      overrideAccess: true,
     })
   }
 
@@ -4548,6 +4810,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         startTime: iso('2030-09-01T10:00:00.000Z'),
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // 11:00 is inside the existing booking's 30-min after-buffer (until 11:30)
@@ -4561,6 +4824,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
           startTime: iso('2030-09-01T11:00:00.000Z'),
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
 
@@ -4574,6 +4838,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         startTime: iso('2030-09-01T11:30:00.000Z'),
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(ok.id).toBeDefined()
   })
@@ -4598,6 +4863,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         startTime: iso('2030-09-02T09:00:00.000Z'),
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // room A at 12:00 is free (its item ended 10:00) — must be allowed
@@ -4610,6 +4876,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         startTime: iso('2030-09-02T12:00:00.000Z'),
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(ok.id).toBeDefined()
 
@@ -4624,6 +4891,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
           startTime: iso('2030-09-02T09:30:00.000Z'),
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -4648,6 +4916,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
           startTime: iso('2030-09-03T10:00:00.000Z'),
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
 
@@ -4665,6 +4934,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         startTime: iso('2030-09-04T10:00:00.000Z'),
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(ok.id).toBeDefined()
   })
@@ -4691,6 +4961,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         startTime: iso('2030-09-05T10:00:00.000Z'),
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(ok.id).toBeDefined()
   })
@@ -4709,6 +4980,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         startTime: iso('2030-09-06T10:00:00.000Z'),
         status: 'pending',
       },
+      overrideAccess: true,
     })
     const ok = await payload.create({
       collection: col('reservations'),
@@ -4719,6 +4991,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         startTime: iso('2030-09-06T11:00:00.000Z'),
         status: 'pending',
       },
+      overrideAccess: true,
     })
     expect(ok.id).toBeDefined()
   })
@@ -4738,6 +5011,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     // separate schedule carrying a vacation exception for one Wednesday
     await payload.create({
@@ -4750,6 +5024,7 @@ describe('Conflict detection correctness (review A3/A4/A5/A11/A12)', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
 
     const base = {
@@ -4793,10 +5068,12 @@ describe('Reservation plugin - checkAvailability debug traces', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Dbg Check Service', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Dbg Check Resource', active: true, quantity: 1, services: [service.id] },
+      overrideAccess: true,
     })
     resId = resource.id
   })
@@ -4891,10 +5168,12 @@ describe.skipIf(Boolean(process.env.PG_URL || process.env.SQLITE))(
       const service = await payload.create({
         collection: col('services'),
         data: { name: 'Dbg Buffer Service', active: true, duration: 60 },
+        overrideAccess: true,
       })
       const resource = await payload.create({
         collection: col('resources'),
         data: { name: 'Dbg Buffer Resource', active: true, quantity: 1, services: [service.id] },
+        overrideAccess: true,
       })
       bufResId = resource.id
 
@@ -4910,6 +5189,7 @@ describe.skipIf(Boolean(process.env.PG_URL || process.env.SQLITE))(
           startTime: new Date('2030-06-06T09:00:00.000Z').toISOString(),
           status: 'confirmed',
         },
+        overrideAccess: true,
       })
 
       // Delete the service the reservation still references. bufferFor's
@@ -4921,6 +5201,7 @@ describe.skipIf(Boolean(process.env.PG_URL || process.env.SQLITE))(
         // This test needs the dangling reference as a FIXTURE to prove
         // bufferFor degrades to defaults when its service is gone.
         context: { skipReservationHooks: true },
+        overrideAccess: true,
       })
     })
 
@@ -4982,10 +5263,12 @@ describe('Reservation plugin - getAvailableSlots debug traces', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Dbg Slots Service', active: true, duration: 60, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Dbg Slots Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -4996,6 +5279,7 @@ describe('Reservation plugin - getAvailableSlots debug traces', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     svcId = service.id
     schedResId = resource.id
@@ -5049,6 +5333,7 @@ describe('Reservation plugin - getAvailableSlots debug traces', () => {
     const noSched = await payload.create({
       collection: col('resources'),
       data: { name: 'Dbg No Schedule', active: true, services: [svcId] },
+      overrideAccess: true,
     })
     const info = vi.spyOn(payload.logger, 'info')
     await call({ debug: createReserveDebug(payload.logger, true, 'g_nosched'), resourceId: noSched.id })
@@ -5084,10 +5369,12 @@ describe('Reservation plugin - slots endpoint debug traces', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Dbg Endpoint Service', active: true, duration: 60, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Dbg Endpoint Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -5098,6 +5385,7 @@ describe('Reservation plugin - slots endpoint debug traces', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     svcId = service.id
     resId = resource.id
@@ -5139,10 +5427,12 @@ describe('Reservation plugin - validateConflicts debug traces', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Dbg Conflict Service', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Dbg Conflict Resource', active: true, quantity: 1, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -5152,6 +5442,7 @@ describe('Reservation plugin - validateConflicts debug traces', () => {
         lastName: 'Conflict',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     svcId = service.id
     resId = resource.id
@@ -5170,6 +5461,7 @@ describe('Reservation plugin - validateConflicts debug traces', () => {
         startTime: START,
         status: 'confirmed',
       },
+      overrideAccess: true,
     })
   })
 
@@ -5214,10 +5506,12 @@ describe('Reservation plugin - resourceAvailability debug traces', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Dbg RA Service', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Dbg RA Resource', active: true, quantity: 1, services: [service.id] },
+      overrideAccess: true,
     })
     resId = resource.id
   })

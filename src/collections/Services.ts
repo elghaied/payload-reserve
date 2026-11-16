@@ -54,11 +54,15 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
 
   return {
     slug: config.slugs.services,
+    // Payload 4 turns both on by default; a plugin collection opts out so installing
+    // or upgrading adds no version tables or authorship columns. Hosts opt back in
+    // through collectionOverrides.
     access,
     admin: {
       group: config.adminGroup,
       useAsTitle: 'name',
     },
+    authorship: false,
     fields: [
       {
         name: 'name',
@@ -236,5 +240,6 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
       plural: ({ t }) => (t as PluginT)('reservation:collectionServices'),
       singular: ({ t }) => (t as PluginT)('reservation:collectionServices'),
     },
+    versions: false,
   }
 }

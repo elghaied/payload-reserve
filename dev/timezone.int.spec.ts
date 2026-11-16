@@ -26,10 +26,12 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'TZ Service', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'TZ Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -40,6 +42,7 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
 
     // 2026-06-10 is a Wednesday; Paris is UTC+2 in June.
@@ -67,10 +70,12 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'TZ Exc Service', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'TZ Exc Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -82,6 +87,7 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
 
     const base = {
@@ -109,10 +115,12 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
       collection: col('services'),
       // duration: 1 — field has min: 1; for full-day the value is unused by computeEndTime
       data: { name: 'TZ Full Day', active: true, duration: 1, durationType: 'full-day' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'TZ Full Day Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -122,6 +130,7 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
         lastName: 'FullDay',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
 
     const reservation = await payload.create({
@@ -133,6 +142,7 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
         startTime: '2026-06-10T08:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     // Paris end of June 10 = 21:59:59.999Z (UTC+2)
@@ -147,10 +157,12 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'TZ Grid Service', active: true, duration: 60 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'TZ Grid Resource', active: true, services: [service.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -162,6 +174,7 @@ describe('Business timezone (Europe/Paris) — schedule resolution', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
 
     const result = await buildResourceAvailability({

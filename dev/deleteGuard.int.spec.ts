@@ -19,10 +19,12 @@ async function seed(tag: string) {
   const service = await payload.create({
     collection: col('services'),
     data: { name: `Delete Service ${tag}`, active: true, duration: 60 },
+    overrideAccess: true,
   })
   const resource = await payload.create({
     collection: col('resources'),
     data: { name: `Delete Resource ${tag}`, active: true, services: [service.id] },
+    overrideAccess: true,
   })
   const customer = await payload.create({
     collection: col('customers'),
@@ -32,6 +34,7 @@ async function seed(tag: string) {
       lastName: tag,
       password: 'test1234',
     },
+    overrideAccess: true,
   })
   return { customer, resource, service }
 }
@@ -48,14 +51,15 @@ describe('deleting a referenced service or resource', () => {
         startTime: '2027-05-01T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     await expect(
-      payload.delete({ id: service.id, collection: col('services') }),
+      payload.delete({ id: service.id, collection: col('services'), overrideAccess: true }),
     ).rejects.toThrow(/1 reservation/i)
 
     // Still there — the guard rejected rather than partially applying.
-    const still = await payload.findByID({ id: service.id, collection: col('services') })
+    const still = await payload.findByID({ id: service.id, collection: col('services'), overrideAccess: true })
     expect(still.id).toBe(service.id)
   })
 
@@ -70,16 +74,17 @@ describe('deleting a referenced service or resource', () => {
         startTime: '2027-05-02T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     await expect(
-      payload.delete({ id: resource.id, collection: col('resources') }),
+      payload.delete({ id: resource.id, collection: col('resources'), overrideAccess: true }),
     ).rejects.toThrow(/reservation/i)
   })
 
   test('an UNreferenced service deletes normally', async () => {
     const { service } = await seed('free')
-    const deleted = await payload.delete({ id: service.id, collection: col('services') })
+    const deleted = await payload.delete({ id: service.id, collection: col('services'), overrideAccess: true })
     expect(deleted).toBeDefined()
   })
 
@@ -91,6 +96,7 @@ describe('deleting a referenced service or resource', () => {
     const itemsOnlyResource = await payload.create({
       collection: col('resources'),
       data: { name: 'Delete Resource items-only', active: true, services: [service.id] },
+      overrideAccess: true,
     })
 
     await payload.create({
@@ -109,10 +115,11 @@ describe('deleting a referenced service or resource', () => {
         startTime: '2027-05-03T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     await expect(
-      payload.delete({ id: itemsOnlyResource.id, collection: col('resources') }),
+      payload.delete({ id: itemsOnlyResource.id, collection: col('resources'), overrideAccess: true }),
     ).rejects.toThrow(/reservation/i)
   })
 
@@ -125,14 +132,15 @@ describe('deleting a referenced service or resource', () => {
     await payload.create({
       collection: col('schedules'),
       data: { name: 'Delete Schedule sched', resource: resource.id },
+      overrideAccess: true,
     })
 
     await expect(
-      payload.delete({ id: resource.id, collection: col('resources') }),
+      payload.delete({ id: resource.id, collection: col('resources'), overrideAccess: true }),
     ).rejects.toThrow(/1 schedule/i)
 
     // Still there — the guard rejected rather than partially applying.
-    const still = await payload.findByID({ id: resource.id, collection: col('resources') })
+    const still = await payload.findByID({ id: resource.id, collection: col('resources'), overrideAccess: true })
     expect(still.id).toBe(resource.id)
   })
 })

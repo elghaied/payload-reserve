@@ -25,18 +25,20 @@ beforeAll(async () => {
   payload = built.payload
   stop = built.stop
 
-  const a = await payload.create({ collection: 'tenants', data: { name: 'Tenant A' } })
-  const b = await payload.create({ collection: 'tenants', data: { name: 'Tenant B' } })
+  const a = await payload.create({ collection: 'tenants', data: { name: 'Tenant A' }, overrideAccess: true })
+  const b = await payload.create({ collection: 'tenants', data: { name: 'Tenant B' }, overrideAccess: true })
   tenantA = String(a.id)
   tenantB = String(b.id)
 
   tenantAResource = await payload.create({
     collection: 'resources',
     data: { name: 'A-res', tenant: tenantA } as Record<string, unknown>,
+    overrideAccess: true,
   })
   tenantBResource = await payload.create({
     collection: 'resources',
     data: { name: 'B-res', tenant: tenantB } as Record<string, unknown>,
+    overrideAccess: true,
   })
 
   tenantAService = await payload.create({
@@ -47,6 +49,7 @@ beforeAll(async () => {
       durationType: 'fixed',
       tenant: tenantA,
     } as Record<string, unknown>,
+    overrideAccess: true,
   })
   tenantBService = await payload.create({
     collection: 'services',
@@ -56,6 +59,7 @@ beforeAll(async () => {
       durationType: 'fixed',
       tenant: tenantB,
     } as Record<string, unknown>,
+    overrideAccess: true,
   })
 
   // depth: 0 so `.tenants[0].tenant` comes back as a raw id, not a populated doc.
@@ -75,6 +79,7 @@ beforeAll(async () => {
       tenants: [{ tenant: a.id }],
     } as Record<string, unknown>,
     depth: 0,
+    overrideAccess: true,
   })) as unknown as {
     id: number | string
     tenants: Array<{ tenant: unknown }>
@@ -101,14 +106,14 @@ describe('tenant scoping with the real multi-tenant plugin', () => {
 
   it('scopes payload.find to the selected tenant', async () => {
     const where = tenantWhereClause({ hasField: true, tenantField: 'tenant', tenantId: tenantA })
-    const { docs } = await payload.find({ collection: 'resources', depth: 0, where: where! })
+    const { docs } = await payload.find({ collection: 'resources', depth: 0, overrideAccess: true, where: where! })
     expect(docs).toHaveLength(1)
     expect(String((docs[0] as Record<string, unknown>).tenant)).toBe(tenantA)
   })
 
   it('returns all tenants when no tenant is selected (no cookie)', async () => {
     expect(tenantWhereClause({ hasField: true, tenantField: 'tenant', tenantId: null })).toBeNull()
-    const { docs } = await payload.find({ collection: 'resources', depth: 0 })
+    const { docs } = await payload.find({ collection: 'resources', depth: 0, overrideAccess: true })
     expect(docs.length).toBeGreaterThanOrEqual(2)
   })
 })
@@ -151,6 +156,7 @@ describe('cross-tenant create via /reserve/book', () => {
     expect(res.status).toBe(403)
     const { totalDocs } = await payload.count({
       collection: 'reservations',
+      overrideAccess: true,
       where: { tenant: { equals: tenantB } },
     })
     expect(totalDocs).toBe(0)
@@ -178,6 +184,7 @@ describe('cross-tenant create via /reserve/book', () => {
     expect(res.status).toBe(403)
     const { totalDocs } = await payload.count({
       collection: 'reservations',
+      overrideAccess: true,
       where: { tenant: { equals: tenantB } },
     })
     expect(totalDocs).toBe(0)

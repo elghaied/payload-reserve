@@ -53,6 +53,7 @@ export const validateHoldSlot =
         collection: config.slugs.services,
         depth: 0,
         joins: false,
+        overrideAccess: true,
         req,
       })
 

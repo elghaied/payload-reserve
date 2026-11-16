@@ -44,8 +44,8 @@ beforeAll(async () => {
   }
   handler = ep.handler
 
-  const a = await payload.create({ collection: 'tenants', data: { name: 'Tenant A' } })
-  const b = await payload.create({ collection: 'tenants', data: { name: 'Tenant B' } })
+  const a = await payload.create({ collection: 'tenants', data: { name: 'Tenant A' }, overrideAccess: true })
+  const b = await payload.create({ collection: 'tenants', data: { name: 'Tenant B' }, overrideAccess: true })
   tenantA = String(a.id)
   tenantB = String(b.id)
 
@@ -56,14 +56,17 @@ beforeAll(async () => {
   staffA = (await payload.create({
     collection: 'users',
     data: { email: 'staff-a@test.com', password: 'testpass123', tenants: [{ tenant: tenantA }] },
+    overrideAccess: true,
   })) as unknown as Record<string, unknown>
   staffB = (await payload.create({
     collection: 'users',
     data: { email: 'staff-b@test.com', password: 'testpass123', tenants: [{ tenant: tenantB }] },
+    overrideAccess: true,
   })) as unknown as Record<string, unknown>
   superAdmin = (await payload.create({
     collection: 'users',
     data: { email: 'super@test.com', password: 'testpass123', superAdmin: true },
+    overrideAccess: true,
   })) as unknown as Record<string, unknown>
 
   await payload.create({
@@ -75,6 +78,7 @@ beforeAll(async () => {
       password: 'testpass123',
       tenant: tenantA,
     } as Record<string, unknown>,
+    overrideAccess: true,
   })
   await payload.create({
     collection: 'customers',
@@ -85,6 +89,7 @@ beforeAll(async () => {
       password: 'testpass123',
       tenant: tenantB,
     } as Record<string, unknown>,
+    overrideAccess: true,
   })
 }, 60_000)
 

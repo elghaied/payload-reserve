@@ -41,6 +41,7 @@ async function seed({ quantity = 1, tag }: { quantity?: number; tag: string }) {
   const service = await payload.create({
     collection: col('services'),
     data: { name: `Concurrency Service ${tag}`, active: true, duration: 60 },
+    overrideAccess: true,
   })
 
   const resource = await payload.create({
@@ -51,6 +52,7 @@ async function seed({ quantity = 1, tag }: { quantity?: number; tag: string }) {
       quantity,
       services: [service.id],
     },
+    overrideAccess: true,
   })
 
   const customer = await payload.create({
@@ -61,6 +63,7 @@ async function seed({ quantity = 1, tag }: { quantity?: number; tag: string }) {
       lastName: tag,
       password: 'test1234',
     },
+    overrideAccess: true,
   })
 
   return { customer, resource, service }
@@ -94,6 +97,7 @@ async function raceBookings({
         startTime,
         status: 'pending',
       },
+      overrideAccess: true,
     }),
   )
 
@@ -103,6 +107,7 @@ async function raceBookings({
 
   const { totalDocs: persisted } = await payload.count({
     collection: col('reservations'),
+    overrideAccess: true,
     where: { resource: { equals: resourceId }, startTime: { equals: startTime } },
   })
 
@@ -123,6 +128,7 @@ describe('Booking write path under concurrency', () => {
         startTime,
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     await expect(
@@ -135,11 +141,13 @@ describe('Booking write path under concurrency', () => {
           startTime,
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
 
     const { totalDocs } = await payload.count({
       collection: col('reservations'),
+      overrideAccess: true,
       where: { resource: { equals: resource.id }, startTime: { equals: startTime } },
     })
     expect(totalDocs).toBe(1)
@@ -195,6 +203,7 @@ describe('Booking write path under concurrency', () => {
               startTime,
               status: 'pending',
             },
+            overrideAccess: true,
           }),
         ),
       ),
@@ -202,6 +211,7 @@ describe('Booking write path under concurrency', () => {
 
     const { totalDocs } = await payload.count({
       collection: col('reservations'),
+      overrideAccess: true,
       where: { resource: { equals: resource.id }, startTime: { equals: startTime } },
     })
 
@@ -228,6 +238,7 @@ describe('Booking write path under concurrency', () => {
           startTime: new Date(base + i * 5 * 60_000).toISOString(),
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     )
 
@@ -235,6 +246,7 @@ describe('Booking write path under concurrency', () => {
 
     const { totalDocs } = await payload.count({
       collection: col('reservations'),
+      overrideAccess: true,
       where: {
         resource: { equals: resource.id },
         startTime: { greater_than_equal: new Date(base - 60_000).toISOString() },

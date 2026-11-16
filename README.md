@@ -5,7 +5,7 @@
 [![license](https://img.shields.io/npm/l/payload-reserve.svg)](./LICENSE)
 [![Payload Directory](https://payloaddirectory.dev/badge/1157211530-root.svg)](https://payloaddirectory.dev/plugins/1157211530-root)
 
-A full-featured reservation and booking plugin for Payload CMS 3.x. Adds a scheduling system with conflict detection, a configurable status machine, multi-resource bookings, capacity and inventory tracking, a public REST API, and admin UI components.
+A full-featured reservation and booking plugin for Payload CMS (this branch targets Payload 4; see Compatibility). Adds a scheduling system with conflict detection, a configurable status machine, multi-resource bookings, capacity and inventory tracking, a public REST API, and admin UI components.
 
 Designed for salons, clinics, hotels, restaurants, event venues, and any business that needs appointment scheduling managed through Payload's admin panel.
 
@@ -14,6 +14,13 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 **[Website](https://payloadreserve.com)** · **[Documentation](https://docs.payloadreserve.com)** · **[Live demos](#live-demos)** · **[Demo source code](https://github.com/elghaied/payloadreserve-demos)**
 
 ---
+
+## Compatibility
+
+| payload-reserve | Payload | Notes |
+|---|---|---|
+| 5.x (`next`) | 4.x (currently `^4.0.0-beta.9`) | Node `^24.22.3 \|\| >=26.13.1` |
+| 4.x | 3.x (`^3.86.0`) | Security fixes continue on this line |
 
 ## Features
 

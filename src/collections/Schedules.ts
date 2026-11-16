@@ -38,11 +38,15 @@ export function createSchedulesCollection(
 
   return {
     slug: config.slugs.schedules,
+    // Payload 4 turns both on by default; a plugin collection opts out so installing
+    // or upgrading adds no version tables or authorship columns. Hosts opt back in
+    // through collectionOverrides.
     access,
     admin: {
       group: config.adminGroup,
       useAsTitle: 'name',
     },
+    authorship: false,
     fields: [
       {
         name: 'name',
@@ -217,6 +221,7 @@ export function createSchedulesCollection(
             collection: config.slugs.resources,
             depth: 0,
             disableErrors: true,
+            overrideAccess: true,
             req,
           }).catch(() => null)
           const owner = resource ? extractId(resource[rom.ownerField]) : undefined
@@ -277,5 +282,6 @@ export function createSchedulesCollection(
       plural: ({ t }) => (t as PluginT)('reservation:collectionSchedules'),
       singular: ({ t }) => (t as PluginT)('reservation:collectionSchedules'),
     },
+    versions: false,
   }
 }

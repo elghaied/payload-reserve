@@ -42,10 +42,12 @@ async function seed(tag: string, quantity = 1) {
   const service = await payload.create({
     collection: col('services'),
     data: { name: `Hold Service ${tag}`, active: true, duration: 60 },
+    overrideAccess: true,
   })
   const resource = await payload.create({
     collection: col('resources'),
     data: { name: `Hold Resource ${tag}`, active: true, quantity, services: [service.id] },
+    overrideAccess: true,
   })
   const customer = await payload.create({
     collection: col('customers'),
@@ -55,6 +57,7 @@ async function seed(tag: string, quantity = 1) {
       lastName: tag,
       password: 'test1234',
     },
+    overrideAccess: true,
   })
   return { customer, resource, service }
 }
@@ -95,6 +98,7 @@ describe('Slot holds', () => {
           { customer: customer.id, resource: resource.id, service: service.id },
           startTime,
         ),
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
   })
@@ -123,6 +127,7 @@ describe('Slot holds', () => {
         { customer: customer.id, resource: resource.id, service: service.id },
         startTime,
       ),
+      overrideAccess: true,
     })
 
     expect(booking.id).toBeDefined()
@@ -156,6 +161,7 @@ describe('Slot holds', () => {
         { customer: customer.id, resource: resource.id, service: service.id },
         startTime,
       ),
+      overrideAccess: true,
     })
     expect(booking.id).toBeDefined()
   })
@@ -177,6 +183,7 @@ describe('Slot holds', () => {
         startTime,
         token: 'expired-token-fixture',
       },
+      overrideAccess: true,
     })
 
     const booking = await payload.create({
@@ -185,6 +192,7 @@ describe('Slot holds', () => {
         { customer: customer.id, resource: resource.id, service: service.id },
         startTime,
       ),
+      overrideAccess: true,
     })
     expect(booking.id).toBeDefined()
   })
@@ -207,6 +215,7 @@ describe('Slot holds', () => {
         { customer: customer.id, resource: resource.id, service: service.id },
         '2027-01-08T14:00:00.000Z',
       ),
+      overrideAccess: true,
     })
     expect(booking.id).toBeDefined()
   })
@@ -233,6 +242,7 @@ describe('Slot holds', () => {
 
     const { totalDocs } = await payload.count({
       collection: col('reservation-holds'),
+      overrideAccess: true,
       where: { resource: { equals: resource.id } },
     })
 
@@ -274,6 +284,7 @@ describe('Slot holds', () => {
 
     const { totalDocs } = await payload.count({
       collection: col('reservation-holds'),
+      overrideAccess: true,
       where: { resource: { equals: resource.id } },
     })
 
@@ -302,6 +313,7 @@ describe('Slot holds', () => {
         resource: resource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
 
     const heldStart = `${dayKey}T10:00:00.000Z`
@@ -367,11 +379,11 @@ describe('Slot holds', () => {
     } as unknown as { overrideAccess: false }
 
     await expect(
-      payload.find({ collection: col('reservation-holds'), ...asCustomer }),
+      payload.find({ collection: col('reservation-holds'), overrideAccess: true, ...asCustomer }),
     ).rejects.toThrow(/not allowed to perform this action/i)
 
     await expect(
-      payload.findByID({ id: held.hold.id, collection: col('reservation-holds'), ...asCustomer }),
+      payload.findByID({ id: held.hold.id, collection: col('reservation-holds'), overrideAccess: true, ...asCustomer }),
     ).rejects.toThrow(/not allowed to perform this action/i)
   })
 })
@@ -381,10 +393,12 @@ describe('4.1.2 hold hardening', () => {
     const flex = await payload.create({
       collection: col('services'),
       data: { name: 'Hold Flex', active: true, duration: 30, durationType: 'flexible' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Hold Flex R', active: true, quantity: 1, services: [flex.id] },
+      overrideAccess: true,
     })
     const base = { config: resolved, req: reqFor(), resourceId: resource.id, serviceId: flex.id }
     const past = await takeHold({ ...base, startTime: new Date(Date.now() - 3_600_000) })
@@ -409,13 +423,14 @@ describe('4.1.2 hold hardening', () => {
     })
     expect(live.ok).toBe(true)
     if (!live.ok) {return}
-    await expect(payload.delete({ id: resource.id, collection: col('resources') })).rejects.toThrow(/active hold/)
+    await expect(payload.delete({ id: resource.id, collection: col('resources'), overrideAccess: true })).rejects.toThrow(/active hold/)
     await payload.update({
       id: live.hold.id,
       collection: col(resolved.slugs.holds),
       data: { expiresAt: new Date(Date.now() - 1_000).toISOString() },
+      overrideAccess: true,
     })
-    const deleted = await payload.delete({ id: resource.id, collection: col('resources') })
+    const deleted = await payload.delete({ id: resource.id, collection: col('resources'), overrideAccess: true })
     expect(deleted.id).toBeTruthy()
   })
 })
@@ -467,6 +482,7 @@ describe('4.1.3 hold abuse limits', () => {
       id: again.hold.id,
       collection: col(capped.slugs.holds),
       data: { expiresAt: new Date(Date.now() - 1_000).toISOString() },
+      overrideAccess: true,
     })
     const afterExpiry = await takeHold({ ...base, req: asCustomer(customer), startTime: slot(6) })
     expect(afterExpiry.ok).toBe(true)

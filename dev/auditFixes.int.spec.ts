@@ -50,26 +50,32 @@ beforeAll(async () => {
   customerA = (await payload.create({
     collection: col('customers'),
     data: { email: 'af-a@example.com', firstName: 'A', lastName: 'A', notes: 'STAFF-ONLY', password: 'passA1234' },
+    overrideAccess: true,
   })) as Doc
   customerB = (await payload.create({
     collection: col('customers'),
     data: { email: 'af-b@example.com', firstName: 'B', lastName: 'B', password: 'passB1234' },
+    overrideAccess: true,
   })) as Doc
   service30 = (await payload.create({
     collection: col('services'),
     data: { name: 'AF 30', duration: 30, durationType: 'fixed' },
+    overrideAccess: true,
   })) as Doc
   service60 = (await payload.create({
     collection: col('services'),
     data: { name: 'AF 60', duration: 60, durationType: 'fixed' },
+    overrideAccess: true,
   })) as Doc
   resource = (await payload.create({
     collection: col('resources'),
     data: { name: 'AF Chair', quantity: 10, services: [service30.id, service60.id] },
+    overrideAccess: true,
   })) as Doc
   resource2 = (await payload.create({
     collection: col('resources'),
     data: { name: 'AF Room', quantity: 10, services: [service30.id, service60.id] },
+    overrideAccess: true,
   })) as Doc
   // Mon–Fri 09:00–17:00 (UTC business zone) on the main resource only.
   await payload.create({
@@ -84,6 +90,7 @@ beforeAll(async () => {
       resource: resource.id,
       scheduleType: 'recurring',
     },
+    overrideAccess: true,
   })
 }, 60_000)
 
@@ -104,6 +111,7 @@ const createFor = (customer: Doc, startTime: string, extra: Record<string, unkno
       status: 'pending',
       ...extra,
     },
+    overrideAccess: true,
   }) as Promise<Doc>
 
 describe('catalog collections are staff-only for writes in standalone mode', () => {
@@ -122,7 +130,7 @@ describe('catalog collections are staff-only for writes in standalone mode', () 
     await expect(
       payload.delete({ id: resource.id, collection: col('resources'), overrideAccess: false, user: asCustomer(customerA) }),
     ).rejects.toThrow()
-    const fresh = await payload.findByID({ id: resource.id, collection: col('resources') })
+    const fresh = await payload.findByID({ id: resource.id, collection: col('resources'), overrideAccess: true })
     expect(fresh.active).not.toBe(false)
   })
 
@@ -142,7 +150,7 @@ describe('a customer cannot change status except to cancel', () => {
     await expect(
       payload.update({ id: r.id, collection: col('reservations'), data: { status: 'confirmed' }, overrideAccess: false, user: asCustomer(customerA) }),
     ).rejects.toMatchObject({ data: { errors: [{ message: 'Only staff can change a reservation status' }] } })
-    const fresh = await payload.findByID({ id: r.id, collection: col('reservations') })
+    const fresh = await payload.findByID({ id: r.id, collection: col('reservations'), overrideAccess: true })
     expect(fresh.status).toBe('pending')
   })
 
@@ -153,7 +161,7 @@ describe('a customer cannot change status except to cancel', () => {
     })
     expect(cancelled.status).toBe('cancelled')
     const r2 = await createFor(customerA, nextMonday(3, 12))
-    const confirmed = await payload.update({ id: r2.id, collection: col('reservations'), data: { status: 'confirmed' }, user: asStaff })
+    const confirmed = await payload.update({ id: r2.id, collection: col('reservations'), data: { status: 'confirmed' }, overrideAccess: true, user: asStaff })
     expect(confirmed.status).toBe('confirmed')
   })
 })
@@ -172,7 +180,7 @@ describe('cancellation notice period cannot be dodged', () => {
       // Refused twice over: the notice period reads the STORED start, and a
       // customer may not move a booking into the past at all.
     ).rejects.toMatchObject(validation(/notice|in the past/))
-    const fresh = await payload.findByID({ id: r.id, collection: col('reservations') })
+    const fresh = await payload.findByID({ id: r.id, collection: col('reservations'), overrideAccess: true })
     expect(fresh.status).toBe('pending')
   })
 
@@ -198,14 +206,14 @@ describe('cancellation notice period cannot be dodged', () => {
 
   it('staff are exempt, and userless Local API calls keep the legacy rule', async () => {
     const r = await createFor(customerA, hoursFromNow(2))
-    const byStaff = await payload.update({ id: r.id, collection: col('reservations'), data: { status: 'cancelled' }, user: asStaff })
+    const byStaff = await payload.update({ id: r.id, collection: col('reservations'), data: { status: 'cancelled' }, overrideAccess: true, user: asStaff })
     expect(byStaff.status).toBe('cancelled')
     const started = await createFor(customerA, hoursFromNow(-1))
-    const byServer = await payload.update({ id: started.id, collection: col('reservations'), data: { status: 'cancelled' } })
+    const byServer = await payload.update({ id: started.id, collection: col('reservations'), data: { status: 'cancelled' }, overrideAccess: true })
     expect(byServer.status).toBe('cancelled')
     const soon = await createFor(customerA, hoursFromNow(2))
     await expect(
-      payload.update({ id: soon.id, collection: col('reservations'), data: { status: 'cancelled' } }),
+      payload.update({ id: soon.id, collection: col('reservations'), data: { status: 'cancelled' }, overrideAccess: true }),
     ).rejects.toMatchObject(validation(/notice/))
   })
 })
@@ -216,8 +224,9 @@ describe('flexible windows are bounded', () => {
     flexible = (await payload.create({
       collection: col('services'),
       data: { name: 'AF Flex', duration: 30, durationType: 'flexible' },
+      overrideAccess: true,
     })) as Doc
-    await payload.update({ id: resource2.id, collection: col('resources'), data: { services: [service30.id, service60.id, flexible.id] } })
+    await payload.update({ id: resource2.id, collection: col('resources'), data: { services: [service30.id, service60.id, flexible.id] }, overrideAccess: true })
   })
 
   it('rejects an endTime beyond maxFlexibleDuration (default 24h)', async () => {
@@ -226,6 +235,7 @@ describe('flexible windows are bounded', () => {
       payload.create({
         collection: col('reservations'),
         data: { customer: customerA.id, endTime: '2099-01-01T00:00:00.000Z', resource: resource2.id, service: flexible.id, startTime: start },
+        overrideAccess: true,
       }),
     ).rejects.toMatchObject(validation(/cannot exceed 1440 minutes/))
   })
@@ -236,6 +246,7 @@ describe('flexible windows are bounded', () => {
       payload.create({
         collection: col('reservations'),
         data: { customer: customerA.id, endTime: new Date(Date.parse(start) + 600_000).toISOString(), resource: resource2.id, service: flexible.id, startTime: start },
+        overrideAccess: true,
       }),
     ).rejects.toMatchObject(validation(/at least 30 minutes/))
   })
@@ -245,6 +256,7 @@ describe('flexible windows are bounded', () => {
     const r = await payload.create({
       collection: col('reservations'),
       data: { customer: customerA.id, endTime: new Date(Date.parse(start) + 5_400_000).toISOString(), resource: resource2.id, service: flexible.id, startTime: start },
+      overrideAccess: true,
     })
     expect(r.id).toBeTruthy()
   })
@@ -308,6 +320,7 @@ describe('public bookings respect the past and the schedule', () => {
     const staffBooking = await payload.create({
       collection: col('reservations'),
       data: { customer: customerA.id, resource: resource.id, service: service30.id, startTime: sunday },
+      overrideAccess: true,
       user: asStaff,
     })
     expect(staffBooking.id).toBeTruthy()
@@ -315,7 +328,7 @@ describe('public bookings respect the past and the schedule', () => {
 
   it('an anonymous /reserve/book outside the schedule is refused; inside it is accepted', async () => {
     const ep = createBookingEndpoint(resolveConfig({ allowGuestBooking: true }))
-    await payload.update({ id: service30.id, collection: col('services'), data: { allowGuestBooking: 'enabled' } })
+    await payload.update({ id: service30.id, collection: col('services'), data: { allowGuestBooking: 'enabled' }, overrideAccess: true })
     const monday = new Date(nextMonday(8, 10))
     const sunday = new Date(monday.getTime() - 86_400_000).toISOString()
     const mk = (startTime: string) => ({
@@ -348,6 +361,7 @@ describe('guest gating covers items[] services', () => {
     const gated = await payload.create({
       collection: col('services'),
       data: { name: 'AF Gated', allowGuestBooking: 'disabled', duration: 30 },
+      overrideAccess: true,
     })
     const ep = createBookingEndpoint(resolveConfig({ allowGuestBooking: true }))
     const start = nextMonday(10, 10)
@@ -372,12 +386,13 @@ describe('required resources cannot be dodged', () => {
   let pool: Doc
   let needsPool: Doc
   beforeAll(async () => {
-    pool = (await payload.create({ collection: col('resources'), data: { name: 'AF Pool', quantity: 1 } })) as Doc
+    pool = (await payload.create({ collection: col('resources'), data: { name: 'AF Pool', quantity: 1 }, overrideAccess: true })) as Doc
     needsPool = (await payload.create({
       collection: col('services'),
       data: { name: 'AF Needs Pool', duration: 30, requiredResources: [pool.id] },
+      overrideAccess: true,
     })) as Doc
-    await payload.update({ id: resource2.id, collection: col('resources'), data: { services: [service30.id, service60.id, needsPool.id] } })
+    await payload.update({ id: resource2.id, collection: col('resources'), data: { services: [service30.id, service60.id, needsPool.id] }, overrideAccess: true })
   })
 
   it('listing the pool at an unrelated time still expands it at the real time', async () => {
@@ -392,6 +407,7 @@ describe('required resources cannot be dodged', () => {
         startTime: start,
       },
       depth: 0,
+      overrideAccess: true,
     })
     const items = r.items as Array<{ resource: unknown; startTime: string }>
     const atRealTime = items.filter((i) => String(i.resource) === String(pool.id) && Date.parse(i.startTime) === Date.parse(start))
@@ -404,9 +420,10 @@ describe('required resources cannot be dodged', () => {
       collection: col('reservations'),
       data: { customer: customerA.id, resource: resource2.id, service: service30.id, startTime: start },
       depth: 0,
+      overrideAccess: true,
     })
     expect(r.items ?? []).toHaveLength(0)
-    const updated = await payload.update({ id: r.id, collection: col('reservations'), data: { service: needsPool.id }, depth: 0 })
+    const updated = await payload.update({ id: r.id, collection: col('reservations'), data: { service: needsPool.id }, depth: 0, overrideAccess: true })
     const items = (updated.items ?? []) as Array<{ resource: unknown }>
     expect(items.some((i) => String(i.resource) === String(pool.id))).toBe(true)
   })
@@ -425,6 +442,7 @@ describe('a single items[] entry keeps its own service duration', () => {
         startTime: start,
       },
       depth: 0,
+      overrideAccess: true,
     })
     const item = (r.items as Array<{ endTime: string }>)[0]
     expect(Date.parse(item.endTime) - Date.parse(start)).toBe(3_600_000)

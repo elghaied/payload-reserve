@@ -11,6 +11,11 @@ export function createCustomersCollection(
 ): CollectionConfig {
   return {
     slug: config.slugs.customers,
+    // Payload 4 turns both on by default; a plugin collection opts out so installing
+    // or upgrading adds no version tables or authorship columns. Hosts opt back in
+    // through collectionOverrides.
+    authorship: false,
+    versions: false,
     // composeAccess, not a spread: `read: cond ? fn : undefined` in the
     // override must not replace the scoped default with Payload's open one.
     access: composeAccess(

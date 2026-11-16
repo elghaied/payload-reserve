@@ -106,6 +106,7 @@ export const validateActive =
           id,
           collection: slug,
           depth: 0,
+          overrideAccess: true,
           // Missing is null (not this hook's job); a FAILED read throws rather
           // than being treated as "active".
           disableErrors: true,

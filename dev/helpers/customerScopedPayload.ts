@@ -6,7 +6,6 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig, getPayload } from 'payload'
 import { payloadReserve } from 'payload-reserve'
-import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
 import { testDbUri } from './testDbUri.js'
@@ -77,7 +76,6 @@ export async function buildCustomerScopedPayload(): Promise<{
       }),
     ],
     secret: 'cs-test-secret',
-    sharp,
     typescript: { autoGenerate: false },
   })
 

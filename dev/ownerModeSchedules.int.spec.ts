@@ -28,10 +28,10 @@ beforeAll(async () => {
   const built = await buildServiceResourcesAccessPayload()
   payload = built.payload
   stop = built.stop
-  admin = (await payload.create({ collection: 'users', data: { email: 'oms-admin@example.com', password: 'testpass123', role: 'admin' } })) as Doc
-  staffA = (await payload.create({ collection: 'users', data: { email: 'oms-a@example.com', password: 'testpass123', role: 'staff' } })) as Doc
-  staffB = (await payload.create({ collection: 'users', data: { email: 'oms-b@example.com', password: 'testpass123', role: 'staff' } })) as Doc
-  const service = await payload.create({ collection: 'services', data: { name: 'OMS Cut', duration: 30 } })
+  admin = (await payload.create({ collection: 'users', data: { email: 'oms-admin@example.com', password: 'testpass123', role: 'admin' }, overrideAccess: true })) as Doc
+  staffA = (await payload.create({ collection: 'users', data: { email: 'oms-a@example.com', password: 'testpass123', role: 'staff' }, overrideAccess: true })) as Doc
+  staffB = (await payload.create({ collection: 'users', data: { email: 'oms-b@example.com', password: 'testpass123', role: 'staff' }, overrideAccess: true })) as Doc
+  const service = await payload.create({ collection: 'services', data: { name: 'OMS Cut', duration: 30 }, overrideAccess: true })
   resourceA = (await payload.create({ collection: 'resources', data: { name: 'OMS A', services: [service.id] }, overrideAccess: false, user: staffA as never })) as Doc
   resourceB = (await payload.create({ collection: 'resources', data: { name: 'OMS B', services: [service.id] }, overrideAccess: false, user: staffB as never })) as Doc
 }, 60_000)

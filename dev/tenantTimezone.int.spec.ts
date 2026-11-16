@@ -19,12 +19,14 @@ beforeAll(async () => {
   const paris = await payload.create({
     collection: 'tenants',
     data: { name: 'Paris Co', timezone: 'Europe/Paris' },
+    overrideAccess: true,
   })
   const ny = await payload.create({
     collection: 'tenants',
     data: { name: 'NY Co', timezone: 'America/New_York' },
+    overrideAccess: true,
   })
-  const noTz = await payload.create({ collection: 'tenants', data: { name: 'No TZ Co' } })
+  const noTz = await payload.create({ collection: 'tenants', data: { name: 'No TZ Co' }, overrideAccess: true })
   tenantParis = String(paris.id)
   tenantNY = String(ny.id)
   tenantNoTz = String(noTz.id)

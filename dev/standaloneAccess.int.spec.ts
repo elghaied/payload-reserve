@@ -51,20 +51,24 @@ beforeAll(async () => {
       password: 'passA1234',
       phone: '111',
     },
+    overrideAccess: true,
   })) as Doc
   customerB = (await payload.create({
     collection: 'customers',
     data: { email: 'sa-b@example.com', firstName: 'Bob', lastName: 'B', password: 'passB1234' },
+    overrideAccess: true,
   })) as Doc
 
   const service = await payload.create({
     collection: 'services',
     data: { name: 'SA Cut', duration: 30, durationType: 'fixed' },
+    overrideAccess: true,
   })
   serviceId = service.id
   const resource = await payload.create({
     collection: 'resources',
     data: { name: 'SA Chair', quantity: 5, services: [serviceId] },
+    overrideAccess: true,
   })
   resourceId = resource.id
 
@@ -79,6 +83,7 @@ beforeAll(async () => {
       startTime: futureIso(7, 9),
       status: 'pending',
     },
+    overrideAccess: true,
   })) as Doc
   guestReservation = (await payload.create({
     collection: 'reservations',
@@ -91,6 +96,7 @@ beforeAll(async () => {
       startTime: futureIso(7, 11),
       status: 'pending',
     },
+    overrideAccess: true,
   })) as Doc
 }, 60_000)
 
@@ -125,7 +131,7 @@ describe('standalone Reservations access', () => {
         user: asCustomer(customerB),
       }),
     ).rejects.toThrow()
-    const fresh = await payload.findByID({ id: reservationA.id, collection: 'reservations' })
+    const fresh = await payload.findByID({ id: reservationA.id, collection: 'reservations', overrideAccess: true })
     expect(fresh.notes).not.toBe('hacked')
   })
 
@@ -138,7 +144,7 @@ describe('standalone Reservations access', () => {
       user: asCustomer(customerA),
     })
     expect(updated.notes).toBe('mine')
-    const fresh = await payload.findByID({ id: reservationA.id, collection: 'reservations', depth: 0 })
+    const fresh = await payload.findByID({ id: reservationA.id, collection: 'reservations', depth: 0, overrideAccess: true })
     expect(String(fresh.customer)).toBe(String(customerA.id))
   })
 
@@ -149,7 +155,7 @@ describe('standalone Reservations access', () => {
     await expect(
       payload.delete({ id: reservationA.id, collection: 'reservations', overrideAccess: false, user: asCustomer(customerA) }),
     ).rejects.toThrow()
-    const still = await payload.count({ collection: 'reservations', where: { id: { equals: reservationA.id } } })
+    const still = await payload.count({ collection: 'reservations', overrideAccess: true, where: { id: { equals: reservationA.id } } })
     expect(still.totalDocs).toBe(1)
   })
 
@@ -184,7 +190,8 @@ describe('standalone Reservations access', () => {
     expect(col.access?.read).toBe(openRead)
     expect(typeof col.access?.update).toBe('function')
     expect(typeof col.access?.delete).toBe('function')
-    expect(col.access?.create).toBeUndefined()
+    // Explicit since Payload 4, whose default no longer admits customers.
+    expect(typeof col.access?.create).toBe('function')
   })
 
   it('userCollection mode is left on Payload\'s default (documented, warned at boot)', async () => {
@@ -215,9 +222,9 @@ describe('standalone Customers access', () => {
       }),
     ).rejects.toThrow()
     await expect(
-      payload.login({ collection: 'customers', data: { email: 'sa-a@example.com', password: 'owned9999' } }),
+      payload.login({ collection: 'customers', data: { email: 'sa-a@example.com', password: 'owned9999' }, overrideAccess: true }),
     ).rejects.toThrow()
-    const stillA = await payload.login({ collection: 'customers', data: { email: 'sa-a@example.com', password: 'passA1234' } })
+    const stillA = await payload.login({ collection: 'customers', data: { email: 'sa-a@example.com', password: 'passA1234' }, overrideAccess: true })
     expect(stillA.token).toBeTruthy()
   })
 
@@ -268,6 +275,7 @@ describe('guestCount must be a whole number', () => {
       payload.create({
         collection: 'reservations',
         data: { customer: customerA.id, guestCount: 1.5, resource: resourceId, service: serviceId, startTime: futureIso(9) },
+        overrideAccess: true,
       }),
     ).rejects.toMatchObject({ data: { errors: [{ message: 'guestCount must be a whole number', path: 'guestCount' }] } })
   })
@@ -283,6 +291,7 @@ describe('guestCount must be a whole number', () => {
           service: serviceId,
           startTime: futureIso(10),
         },
+        overrideAccess: true,
       }),
     ).rejects.toMatchObject({ data: { errors: [{ message: 'guestCount must be a whole number' }] } })
   })
@@ -291,6 +300,7 @@ describe('guestCount must be a whole number', () => {
     const r = await payload.create({
       collection: 'reservations',
       data: { customer: customerA.id, guestCount: 2, resource: resourceId, service: serviceId, startTime: futureIso(11) },
+      overrideAccess: true,
     })
     expect(r.guestCount).toBe(2)
   })

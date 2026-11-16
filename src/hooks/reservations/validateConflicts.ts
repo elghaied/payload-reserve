@@ -88,6 +88,7 @@ export const validateConflicts =
           collection: config.slugs.services,
           depth: 0,
           disableErrors: true,
+          overrideAccess: true,
           // Skip the resources join — internal logic never reads it, and without this
           // every service read becomes an aggregation with a $lookup.
           joins: false,
@@ -111,7 +112,9 @@ export const validateConflicts =
         endTime: new Date(item.endTime),
         excludeHoldToken:
           typeof context?.holdToken === 'string' ? context.holdToken : undefined,
-        excludeReservationId: isUpdate ? originalDoc?.id : undefined,
+        // Also on Payload 4's `validate` of an existing doc, which must not
+        // conflict with itself. Undefined on create.
+        excludeReservationId: originalDoc?.id,
         getExternalBusy: config.getExternalBusy,
         guestCount: item.guestCount,
         holdsSlug: config.slotHolds.enabled ? config.slugs.holds : undefined,

@@ -519,6 +519,7 @@ export const payloadReserve =
           try {
             anonymousCreate =
               (await createRule({
+                slug: resolved.slugs.reservations,
                 req: { payload, user: null } as unknown as PayloadRequest,
               })) === true
           } catch {

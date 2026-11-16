@@ -82,6 +82,7 @@ async function busyFor(args: {
     collection: reservationSlug,
     depth: 0,
     limit: 0,
+    overrideAccess: true,
     where,
   })
   const busy: Busy = (docs as Array<Record<string, unknown>>)
@@ -102,6 +103,7 @@ async function busyFor(args: {
       collection: holdsSlug,
       depth: 0,
       limit: 0,
+      overrideAccess: true,
       where: {
         and: [
           { resource: { equals: resourceId } },
@@ -165,6 +167,7 @@ export async function buildResourceAvailability(params: {
     id: resourceId,
     collection: resourceSlug,
     depth: 1,
+    overrideAccess: true,
   }).catch(() => null)
   if (!resource) {
     return null
@@ -178,6 +181,7 @@ export async function buildResourceAvailability(params: {
     collection: scheduleSlug,
     depth: 0,
     limit: 100,
+    overrideAccess: true,
     where: { and: [{ active: { equals: true } }, { resource: { equals: resourceId } }] },
   })
 
@@ -275,6 +279,7 @@ export async function buildResourceAvailability(params: {
       id: poolId,
       collection: resourceSlug,
       depth: 0,
+      overrideAccess: true,
     }).catch(() => null)
     if (!pool) {
       continue

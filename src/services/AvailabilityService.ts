@@ -371,6 +371,7 @@ export async function loadOccupancy(params: {
     id: resourceId,
     collection: resourceSlug,
     depth: 0,
+    overrideAccess: true,
     req,
   })
   const quantity = (resource.quantity as number) ?? 1
@@ -389,6 +390,7 @@ export async function loadOccupancy(params: {
     collection: reservationSlug,
     depth: 0,
     limit: 0,
+    overrideAccess: true,
     req,
     where: coarseWhere,
   })
@@ -435,6 +437,7 @@ export async function loadOccupancy(params: {
           collection: servicesSlug,
           depth: 0,
           disableErrors: true,
+          overrideAccess: true,
           // Skip the resources join — internal logic never reads it, and without this
           // every service read becomes an aggregation with a $lookup.
           joins: false,
@@ -545,6 +548,7 @@ export async function loadOccupancy(params: {
       collection: holdsSlug,
       depth: 0,
       limit: 0,
+      overrideAccess: true,
       req,
       where: holdWhere,
     })
@@ -698,6 +702,7 @@ export async function getAvailableSlots(params: {
     id: serviceId,
     collection: serviceSlug,
     depth: 0,
+    overrideAccess: true,
     // Skip the resources join — internal logic never reads it, and without this
     // every service read becomes an aggregation with a $lookup.
     joins: false,
@@ -729,6 +734,7 @@ export async function getAvailableSlots(params: {
         id: rid,
         collection: resourceSlug,
         depth: 0,
+        overrideAccess: true,
         // Skip joins — internal logic never reads them, and without this every
         // resource read becomes an aggregation with a $lookup.
         joins: false,
@@ -746,6 +752,7 @@ export async function getAvailableSlots(params: {
       collection: scheduleSlug,
       depth: 0,
       limit: 100,
+      overrideAccess: true,
       req,
       where: scheduleWhere,
     })

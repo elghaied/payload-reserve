@@ -26,9 +26,16 @@ export const CalendarViewServer: React.FC<ListViewServerProps> = (props) => {
 
   const detail = custom?.reservationDetailComponent
 
+  // Payload 4 adapters inject their own renderer into server props so plugins
+  // need not import a framework-specific one; it is not on the list view's
+  // type (yet), so read it defensively and fall back to the UI package's.
+  const render =
+    (props as { renderComponent?: typeof RenderServerComponent }).renderComponent ??
+    RenderServerComponent
+
   const detailSlot =
     typeof detail === 'string'
-      ? RenderServerComponent({ Component: detail, importMap: payload.importMap })
+      ? render({ Component: detail, importMap: payload.importMap })
       : null
 
   // Do NOT spread `props`. ListViewServerProps carries non-serializable values

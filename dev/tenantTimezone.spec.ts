@@ -78,7 +78,12 @@ describe('getEffectiveTenantTimezone (DB-backed)', () => {
       timezoneField: 'timezone',
     })
     expect(tz).toBe('Europe/Paris')
-    expect(payload.findByID).toHaveBeenCalledWith({ id: 't1', collection: 'tenants', depth: 0 })
+    expect(payload.findByID).toHaveBeenCalledWith({
+      id: 't1',
+      collection: 'tenants',
+      depth: 0,
+      overrideAccess: true,
+    })
   })
 
   it('falls back to the global zone when no tenant is selected (no DB read)', async () => {

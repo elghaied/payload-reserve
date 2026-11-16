@@ -6,6 +6,9 @@ import { isPrivilegedUser } from './userRoles.js'
 
 type CollectionAccess = NonNullable<CollectionConfig['access']>
 
+/** Payload 3's default rule, spelled out: Payload 4's default is admin-collection only. */
+const anyUser: Access = ({ req }: { req: PayloadRequest }) => Boolean(req.user)
+
 /**
  * Overlay app-provided access overrides onto a base (owner-mode) access object,
  * per operation. Specifying only `read` keeps the base's create/update/delete
@@ -187,8 +190,8 @@ export function makeServiceOwnerAccess(
  * `/api/<reservations>` REST API. `enforceCustomerOwnership` only ever guarded
  * `create`. Reported privately by an external researcher against 4.1.0.
  *
- * - `create` is left alone (Payload's default: any authenticated user); the
- *   `enforceCustomerOwnership` hook pins the `customer` to the caller.
+ * - `create`: any authenticated user; the `enforceCustomerOwnership` hook pins
+ *   the `customer` to the caller.
  * - `read`/`update`: staff/admin see everything; a customer sees only rows whose
  *   `customer` is themselves. Guest bookings have no `customer`, so no customer
  *   can reach them.
@@ -213,6 +216,11 @@ export function makeStandaloneReservationAccess(
     isPrivilegedUser(req.user, config)
 
   return {
+    // Explicit since Payload 4, whose default admits only the admin user
+    // collection (Payload 3's was `Boolean(user)`): a customer may create
+    // their own booking through the collection API, and
+    // enforceCustomerOwnership pins the `customer` to them.
+    create: anyUser,
     delete: privilegedOnly,
     read: ownOrPrivileged,
     update: ownOrPrivileged,
@@ -264,9 +272,8 @@ export function makeStandaloneCustomerAccess(
  * service's buffers, delete a schedule or post a ten-year exception onto any
  * resource through `/api/<slug>`.
  *
- * `read` is deliberately left alone (Payload's default, any authenticated user,
- * and consumers commonly open it to `() => true` for public availability);
- * only the writes are staff/admin-only.
+ * `read` is any authenticated user (consumers commonly open it to `() => true`
+ * for public availability); only the writes are staff/admin-only.
  */
 export function makeStandaloneCatalogAccess(
   config: ResolvedReservationPluginConfig,
@@ -276,6 +283,9 @@ export function makeStandaloneCatalogAccess(
   return {
     create: privilegedOnly,
     delete: privilegedOnly,
+    // Explicit since Payload 4 (see makeStandaloneReservationAccess): any
+    // signed-in user, customers included, may read the catalog.
+    read: anyUser,
     update: privilegedOnly,
   }
 }

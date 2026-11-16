@@ -39,24 +39,28 @@ beforeAll(async () => {
       lastName: 'Tester',
       password: 'testpass123',
     },
+    overrideAccess: true,
   })
   customerId = customer.id
 
   const service = await payload.create({
     collection: col('services'),
     data: { name: 'AR Service', active: true, duration: 60, durationType: 'fixed' },
+    overrideAccess: true,
   })
   serviceId = service.id
 
   const inactiveService = await payload.create({
     collection: col('services'),
     data: { name: 'AR Inactive Service', active: false, duration: 60, durationType: 'fixed' },
+    overrideAccess: true,
   })
   inactiveServiceId = inactiveService.id
 
   const resource = await payload.create({
     collection: col('resources'),
     data: { name: 'AR Resource', active: true, services: [serviceId] },
+    overrideAccess: true,
   })
   resourceId = resource.id
   await payload.create({
@@ -68,23 +72,27 @@ beforeAll(async () => {
       resource: resourceId,
       scheduleType: 'recurring',
     },
+    overrideAccess: true,
   })
 
   const inactiveResource = await payload.create({
     collection: col('resources'),
     data: { name: 'AR Inactive Resource', active: false, services: [serviceId] },
+    overrideAccess: true,
   })
   inactiveResourceId = inactiveResource.id
 
   const noScheduleResource = await payload.create({
     collection: col('resources'),
     data: { name: 'AR No Schedule Resource', active: true, services: [serviceId] },
+    overrideAccess: true,
   })
   noScheduleResourceId = noScheduleResource.id
 
   const morningOnly = await payload.create({
     collection: col('resources'),
     data: { name: 'AR Morning Only', active: true, services: [serviceId] },
+    overrideAccess: true,
   })
   morningOnlyId = morningOnly.id
   await payload.create({
@@ -96,11 +104,13 @@ beforeAll(async () => {
       resource: morningOnlyId,
       scheduleType: 'recurring',
     },
+    overrideAccess: true,
   })
 
   const eveningOnly = await payload.create({
     collection: col('resources'),
     data: { name: 'AR Evening Only', active: true, services: [serviceId] },
+    overrideAccess: true,
   })
   eveningOnlyId = eveningOnly.id
   await payload.create({
@@ -112,11 +122,13 @@ beforeAll(async () => {
       resource: eveningOnlyId,
       scheduleType: 'recurring',
     },
+    overrideAccess: true,
   })
 
   const fullyBookedResource = await payload.create({
     collection: col('resources'),
     data: { name: 'AR Fully Booked Resource', active: true, services: [serviceId] },
+    overrideAccess: true,
   })
   fullyBookedResourceId = fullyBookedResource.id
   await payload.create({
@@ -128,6 +140,7 @@ beforeAll(async () => {
       resource: fullyBookedResourceId,
       scheduleType: 'recurring',
     },
+    overrideAccess: true,
   })
   // The resource's only 60-min candidate slot (09:00-10:00) - book it solid.
   await payload.create({
@@ -139,6 +152,7 @@ beforeAll(async () => {
       startTime: `${MONDAY}T09:00:00.000Z`,
       status: 'pending',
     },
+    overrideAccess: true,
   })
 
   base = {
@@ -200,10 +214,12 @@ describe('getAvailableSlots - EmptyReason', () => {
     const fullDayService = await payload.create({
       collection: col('services'),
       data: { name: 'AR Full Day Service', active: true, duration: 1, durationType: 'full-day' },
+      overrideAccess: true,
     })
     const fullDayResource = await payload.create({
       collection: col('resources'),
       data: { name: 'AR Full Day Resource', active: true, services: [fullDayService.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -214,6 +230,7 @@ describe('getAvailableSlots - EmptyReason', () => {
         resource: fullDayResource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('reservations'),
@@ -224,6 +241,7 @@ describe('getAvailableSlots - EmptyReason', () => {
         startTime: `${MONDAY}T09:00:00.000Z`,
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const r = await getAvailableSlots({
@@ -238,10 +256,12 @@ describe('getAvailableSlots - EmptyReason', () => {
     const longService = await payload.create({
       collection: col('services'),
       data: { name: 'AR Long Service', active: true, duration: 90, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const shortShiftResource = await payload.create({
       collection: col('resources'),
       data: { name: 'AR Short Shift Resource', active: true, services: [longService.id] },
+      overrideAccess: true,
     })
     await payload.create({
       collection: col('schedules'),
@@ -252,6 +272,7 @@ describe('getAvailableSlots - EmptyReason', () => {
         resource: shortShiftResource.id,
         scheduleType: 'recurring',
       },
+      overrideAccess: true,
     })
 
     // A 90-minute service never fits a 60-minute window, so no candidate slot
@@ -288,8 +309,9 @@ describe('getAvailableSlots - EmptyReason', () => {
     const deletable = await payload.create({
       collection: col('resources'),
       data: { name: 'AR Deletable Resource', active: true, services: [serviceId] },
+      overrideAccess: true,
     })
-    await payload.delete({ id: deletable.id, collection: col('resources') })
+    await payload.delete({ id: deletable.id, collection: col('resources'), overrideAccess: true })
 
     const r = await getAvailableSlots({ ...base, resourceIds: [deletable.id] })
     expect(r.reason).toBe('no_windows')

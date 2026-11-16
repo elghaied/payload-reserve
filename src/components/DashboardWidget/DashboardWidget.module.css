@@ -20,7 +20,7 @@
   flex-direction: column;
   align-items: center;
   padding: 12px;
-  border: 1px solid var(--theme-elevation-100);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
 }
 
@@ -32,14 +32,14 @@
 
 .statLabel {
   font-size: 0.75rem;
-  color: var(--theme-elevation-500);
+  color: var(--color-text-tertiary);
   margin-top: 4px;
   text-transform: uppercase;
 }
 
 .nextAppointment {
   padding: 12px;
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
   border-radius: 4px;
 }
 
@@ -48,6 +48,6 @@
 }
 
 .noData {
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
   font-style: italic;
 }

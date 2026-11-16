@@ -53,6 +53,7 @@ async function seed(tag: string, durationType: 'fixed' | 'flexible') {
   const pool = await payload.create({
     collection: col('resources'),
     data: { name: `Pool ${tag}`, active: true, quantity: 1 },
+    overrideAccess: true,
   })
   const service = await payload.create({
     collection: col('services'),
@@ -63,10 +64,12 @@ async function seed(tag: string, durationType: 'fixed' | 'flexible') {
       durationType,
       requiredResources: [pool.id],
     },
+    overrideAccess: true,
   })
   const resource = await payload.create({
     collection: col('resources'),
     data: { name: `Resource ${tag}`, active: true, quantity: 1, services: [service.id] },
+    overrideAccess: true,
   })
   const customer = await payload.create({
     collection: col('customers'),
@@ -76,6 +79,7 @@ async function seed(tag: string, durationType: 'fixed' | 'flexible') {
       lastName: tag,
       password: 'test1234',
     },
+    overrideAccess: true,
   })
   return { customer, pool, resource, service }
 }
@@ -109,6 +113,7 @@ async function reservationsFor(customerId: number | string) {
     collection: col('reservations'),
     depth: 0,
     limit: 100,
+    overrideAccess: true,
     where: { customer: { equals: customerId } },
   })
   return docs as Array<Record<string, unknown>>
@@ -128,6 +133,7 @@ describe('flexible services must never store an unbounded window', () => {
           startTime: '2027-03-01T10:00:00.000Z',
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     )
 
@@ -146,10 +152,12 @@ describe('flexible services must never store an unbounded window', () => {
     const service = await payload.create({
       collection: col('services'),
       data: { name: 'Service solo', active: true, duration: 60, durationType: 'flexible' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: col('resources'),
       data: { name: 'Resource solo', active: true, quantity: 1, services: [service.id] },
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: col('customers'),
@@ -159,6 +167,7 @@ describe('flexible services must never store an unbounded window', () => {
         lastName: 'solo',
         password: 'test1234',
       },
+      overrideAccess: true,
     })
 
     const errors = await validationErrors(() =>
@@ -171,6 +180,7 @@ describe('flexible services must never store an unbounded window', () => {
           startTime: '2027-03-01T10:00:00.000Z',
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     )
 
@@ -199,6 +209,7 @@ describe('flexible services must never store an unbounded window', () => {
           startTime: '2027-03-02T12:00:00.000Z',
           status: 'confirmed',
         },
+        overrideAccess: true,
       })
 
     await expect(attempt()).rejects.toThrow()
@@ -225,6 +236,7 @@ describe('flexible services must never store an unbounded window', () => {
           startTime: '2027-03-03T10:00:00.000Z',
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     )
 
@@ -250,6 +262,7 @@ describe('flexible services must never store an unbounded window', () => {
         quantity: 1,
         services: [service.id],
       },
+      overrideAccess: true,
     })
 
     const errors = await validationErrors(() =>
@@ -264,6 +277,7 @@ describe('flexible services must never store an unbounded window', () => {
           startTime: '2027-03-08T10:00:00.000Z',
           status: 'pending',
         },
+        overrideAccess: true,
       }),
     )
 
@@ -289,6 +303,7 @@ describe('flexible services must never store an unbounded window', () => {
         startTime: '2027-03-04T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })) as unknown as Record<string, unknown>
 
     // The caller's end is honoured, not overwritten with startTime + duration.
@@ -323,6 +338,7 @@ describe('flexible services must never store an unbounded window', () => {
         startTime: '2027-03-05T10:00:00.000Z',
         status: 'confirmed',
       },
+      overrideAccess: true,
     })
 
     // A second service sharing the same required pool: a different bookable
@@ -336,6 +352,7 @@ describe('flexible services must never store an unbounded window', () => {
         durationType: 'flexible',
         requiredResources: [pool.id],
       },
+      overrideAccess: true,
     })
     const otherResource = await payload.create({
       collection: col('resources'),
@@ -345,6 +362,7 @@ describe('flexible services must never store an unbounded window', () => {
         quantity: 1,
         services: [otherService.id],
       },
+      overrideAccess: true,
     })
 
     await expect(
@@ -359,6 +377,7 @@ describe('flexible services must never store an unbounded window', () => {
           startTime: '2027-03-05T10:00:00.000Z',
           status: 'confirmed',
         },
+        overrideAccess: true,
       }),
     ).rejects.toThrow()
 
@@ -379,6 +398,7 @@ describe('flexible services must never store an unbounded window', () => {
         startTime: '2027-03-06T10:00:00.000Z',
         status: 'pending',
       },
+      overrideAccess: true,
     })) as unknown as Record<string, unknown>
 
     // duration 60 -> every item ends at 11:00, and the top-level span with it.

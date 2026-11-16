@@ -58,7 +58,8 @@ export function preventDeleteWhenReferenced({
     const countFn = req.payload.count as any
 
     const reservations = (await countFn({
-      collection: config.slugs.reservations,
+          collection: config.slugs.reservations,
+      overrideAccess: true,
       req,
       where: {
         or: [{ [field]: { equals: id } }, { [`items.${field}`]: { equals: id } }],
@@ -74,6 +75,7 @@ export function preventDeleteWhenReferenced({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (req.payload.delete as any)({
           collection: check.collection,
+          overrideAccess: true,
           req,
           where: {
             and: [
@@ -86,6 +88,7 @@ export function preventDeleteWhenReferenced({
       extras.push(
         (await countFn({
           collection: check.collection,
+          overrideAccess: true,
           req,
           where: { [check.field]: { equals: id } },
         })) as { totalDocs: number },

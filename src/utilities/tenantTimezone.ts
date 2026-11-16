@@ -89,7 +89,10 @@ export async function getEffectiveTenantTimezone(args: {
       id: tenantId,
       collection: tenantSlug,
       depth: 0,
-      ...(req ? { overrideAccess: false, req } : {}),
+      // Access-checked whenever a request is passed (the id comes from a
+      // client cookie); privileged, and explicitly so, without one.
+      overrideAccess: !req,
+      ...(req ? { req } : {}),
     })
     const raw = (tenant as null | Record<string, unknown>)?.[timezoneField]
     tenantTimezone = typeof raw === 'string' ? raw : null

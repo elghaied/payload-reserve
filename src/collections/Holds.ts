@@ -22,6 +22,9 @@ import { validateHoldSlot } from '../hooks/holds/validateHoldSlot.js'
 export function createHoldsCollection(config: ResolvedReservationPluginConfig): CollectionConfig {
   return {
     slug: config.slugs.holds,
+    // Payload 4 turns both on by default; a plugin collection opts out so installing
+    // or upgrading adds no version tables or authorship columns. Hosts opt back in
+    // through collectionOverrides.
     access: {
       // Every operation is closed, `read` included. `admin.hidden` only hides
       // the nav link — Payload still mounts `GET /api/<slug>` — and `token`
@@ -45,6 +48,7 @@ export function createHoldsCollection(config: ResolvedReservationPluginConfig): 
       hidden: true,
       useAsTitle: 'token',
     },
+    authorship: false,
     fields: [
       {
         name: 'resource',
@@ -108,5 +112,6 @@ export function createHoldsCollection(config: ResolvedReservationPluginConfig): 
       singular: 'Slot Hold',
     },
     timestamps: true,
+    versions: false,
   }
 }

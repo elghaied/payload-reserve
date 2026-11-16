@@ -156,6 +156,7 @@ export const validateBookingWindow =
               depth: 0,
               disableErrors: true,
               joins: false,
+              overrideAccess: true,
               req,
             }).catch(() => null),
           )
@@ -180,6 +181,7 @@ export const validateBookingWindow =
               depth: 0,
               disableErrors: true,
               joins: false,
+              overrideAccess: true,
               req,
             }).catch(() => null),
           )

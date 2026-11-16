@@ -1,5 +1,5 @@
 'use client'
-import type { DateFieldClientComponent } from 'payload'
+import type { DateFieldClientProps } from 'payload'
 
 import { FieldLabel, useConfig, useField, useFormFields, useTranslation } from '@payloadcms/ui'
 import React, { useEffect, useState } from 'react'
@@ -29,7 +29,7 @@ const toLocalDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${p
 /** Local YYYY-MM-DDTHH:mm for a `datetime-local` input (browsers treat it as local). */
 const toLocalInput = (d: Date) => `${toLocalDay(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 
-export const AvailabilityTimeField: DateFieldClientComponent = ({ field, path: pathProp }) => {
+export const AvailabilityTimeField: React.FC<DateFieldClientProps> = ({ field, path: pathProp }) => {
   const fieldPath = pathProp ?? field?.name ?? 'startTime'
   const { config } = useConfig()
   const { i18n, t: _t } = useTranslation()

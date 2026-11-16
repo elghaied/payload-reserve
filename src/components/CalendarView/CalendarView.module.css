@@ -22,21 +22,21 @@
   background: transparent;
   border: none;
   border-radius: 3px;
-  box-shadow: inset 0 0 0 1px var(--theme-elevation-250);
+  box-shadow: inset 0 0 0 1px var(--color-border-control-strong);
   padding: 6px 12px;
   cursor: pointer;
   font-family: inherit;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.875);
-  color: var(--theme-text);
+  color: var(--color-text);
   transition: box-shadow 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
 .navButton:hover {
-  box-shadow: inset 0 0 0 1px var(--theme-elevation-400);
+  box-shadow: inset 0 0 0 1px var(--color-border-control-strong);
 }
 
 .navButton:focus-visible {
-  outline: 2px solid var(--theme-text);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
@@ -51,8 +51,8 @@
 }
 
 .createButton {
-  background: var(--theme-elevation-800);
-  color: var(--theme-elevation-0);
+  background: var(--color-bg-inverse);
+  color: var(--color-bg);
   border: none;
   border-radius: 3px;
   padding: 6px 12px;
@@ -65,17 +65,17 @@
 }
 
 .createButton:hover {
-  background: var(--theme-elevation-600);
+  background: var(--color-bg-inverse);
 }
 
 .createButton:focus-visible {
-  outline: 2px solid var(--theme-text);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
 .viewToggleButton {
-  background: var(--theme-elevation-150);
-  color: var(--theme-elevation-800);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
   border: none;
   border-radius: 0;
   padding: 6px 12px;
@@ -90,7 +90,7 @@
 }
 
 .viewToggleButton + .viewToggleButton {
-  box-shadow: inset 1px 0 0 var(--theme-elevation-200);
+  box-shadow: inset 1px 0 0 var(--color-border);
 }
 
 .viewToggleButton:last-child {
@@ -98,20 +98,20 @@
 }
 
 .viewToggleButton:hover {
-  background: var(--theme-elevation-100);
+  background: var(--color-bg-tertiary);
 }
 
 .viewToggleButton.viewToggleButtonActive {
-  background: var(--theme-elevation-800);
-  color: var(--theme-elevation-0);
+  background: var(--color-bg-inverse);
+  color: var(--color-bg);
 }
 
 .viewToggleButton.viewToggleButtonActive:hover {
-  background: var(--theme-elevation-800);
+  background: var(--color-bg-inverse);
 }
 
 .viewToggleButton:focus-visible {
-  outline: 2px solid var(--theme-text);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
@@ -119,8 +119,8 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
-  background: var(--theme-elevation-150);
-  border: 1px solid var(--theme-elevation-150);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
 }
 
 .dayHeader {
@@ -129,7 +129,7 @@
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   font-weight: 600;
   text-transform: uppercase;
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .dayCell {
@@ -137,13 +137,13 @@
   /* Let the column shrink below a nowrap pill's text; the pill ellipsizes. */
   min-width: 0;
   padding: 4px;
-  background: var(--theme-bg);
+  background: var(--color-bg);
   vertical-align: top;
   cursor: pointer;
 }
 
 .dayCell:hover {
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .dayCellOtherMonth {
@@ -151,7 +151,7 @@
 }
 
 .dayCellToday {
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .dayNumber {
@@ -174,12 +174,12 @@
 .eventItemExternal.eventItemExternal {
   background: repeating-linear-gradient(
     45deg,
-    var(--theme-elevation-100),
-    var(--theme-elevation-100) 6px,
-    var(--theme-error-50) 6px,
-    var(--theme-error-50) 12px
+    var(--color-bg-tertiary),
+    var(--color-bg-tertiary) 6px,
+    var(--color-bg-danger-tertiary) 6px,
+    var(--color-bg-danger-tertiary) 12px
   );
-  color: var(--theme-elevation-800);
+  color: var(--color-text-secondary);
   cursor: default;
 }
 
@@ -191,55 +191,55 @@
   display: grid;
   grid-template-columns: 60px repeat(7, minmax(0, 1fr));
   gap: 1px;
-  background: var(--theme-elevation-150);
-  border: 1px solid var(--theme-elevation-150);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
 }
 
 .timeLabel {
   padding: 4px;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   text-align: right;
-  background: var(--theme-bg);
+  background: var(--color-bg);
   min-height: 40px;
 }
 
 .weekCell {
   min-width: 0;
   padding: 2px;
-  background: var(--theme-bg);
+  background: var(--color-bg);
   min-height: 40px;
   position: relative;
   cursor: pointer;
 }
 
 .weekCell:hover {
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .dayView {
   display: grid;
   grid-template-columns: 60px 1fr;
   gap: 1px;
-  background: var(--theme-elevation-150);
-  border: 1px solid var(--theme-elevation-150);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
 }
 
 .dayViewCell {
   padding: 4px;
-  background: var(--theme-bg);
+  background: var(--color-bg);
   min-height: 48px;
   position: relative;
   cursor: pointer;
 }
 
 .dayViewCell:hover {
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .loading {
   text-align: center;
   padding: 40px;
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
 }
 
 .statusLegend {
@@ -370,17 +370,17 @@
   font-weight: 600;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   text-transform: uppercase;
-  color: var(--theme-elevation-500);
-  border-bottom: 2px solid var(--theme-elevation-150);
+  color: var(--color-text-tertiary);
+  border-bottom: 2px solid var(--color-border);
 }
 
 .pendingRow {
-  border-bottom: 1px solid var(--theme-elevation-100);
+  border-bottom: 1px solid var(--color-border);
   transition: background-color 100ms ease;
 }
 
 .pendingRow:hover {
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .pendingTd {
@@ -390,7 +390,7 @@
 
 .pendingCustomerLink {
   cursor: pointer;
-  color: var(--theme-text);
+  color: var(--color-text);
   text-decoration: none;
 }
 
@@ -440,7 +440,7 @@
 .pendingEmpty {
   text-align: center;
   padding: 48px 20px;
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9375);
 }
 
@@ -456,22 +456,22 @@
   margin-bottom: 12px;
   padding: 8px 12px;
   border-radius: 4px;
-  background: var(--theme-warning-100, #fef3c7);
-  color: var(--theme-warning-700, #92400e);
+  background: var(--color-bg-warning-tertiary, #fef3c7);
+  color: var(--color-text-warning, #92400e);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.85);
 }
 
 .resourceFilter {
   appearance: none;
-  background: var(--theme-bg);
+  background: var(--color-bg);
   border: none;
   border-radius: 3px;
-  box-shadow: inset 0 0 0 1px var(--theme-elevation-250);
+  box-shadow: inset 0 0 0 1px var(--color-border-control-strong);
   padding: 6px 28px 6px 10px;
   cursor: pointer;
   font-family: inherit;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
-  color: var(--theme-text);
+  color: var(--color-text);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
@@ -480,17 +480,17 @@
 }
 
 .resourceFilter:hover {
-  box-shadow: inset 0 0 0 1px var(--theme-elevation-400);
+  box-shadow: inset 0 0 0 1px var(--color-border-control-strong);
 }
 
 .resourceFilter:focus-visible {
-  outline: 2px solid var(--theme-text);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
 /* Availability shading (week/day views, resource selected) */
 .slotOffShift {
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
   opacity: 0.5;
   pointer-events: none;
 }
@@ -498,26 +498,26 @@
 .slotTimeOff {
   background: repeating-linear-gradient(
     45deg,
-    var(--theme-elevation-50),
-    var(--theme-elevation-50) 6px,
-    var(--theme-elevation-100) 6px,
-    var(--theme-elevation-100) 12px
+    var(--color-bg-secondary),
+    var(--color-bg-secondary) 6px,
+    var(--color-bg-tertiary) 6px,
+    var(--color-bg-tertiary) 12px
   );
   pointer-events: none;
 }
 
 .slotFull {
-  background: var(--theme-error-100);
+  background: var(--color-bg-danger-tertiary);
   cursor: not-allowed;
 }
 
 .slotExternal {
   background: repeating-linear-gradient(
     45deg,
-    var(--theme-elevation-100),
-    var(--theme-elevation-100) 6px,
-    var(--theme-error-50) 6px,
-    var(--theme-error-50) 12px
+    var(--color-bg-tertiary),
+    var(--color-bg-tertiary) 6px,
+    var(--color-bg-danger-tertiary) 6px,
+    var(--color-bg-danger-tertiary) 12px
   );
   cursor: not-allowed;
 }
@@ -567,7 +567,7 @@
 }
 
 .laneCell {
-  border: 1px solid var(--theme-elevation-100);
+  border: 1px solid var(--color-border);
   min-height: 32px;
 }
 
@@ -578,14 +578,14 @@
 }
 
 .laneTime {
-  border-left: 1px solid var(--theme-elevation-100);
-  color: var(--theme-elevation-500);
+  border-left: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   padding: 2px 0 2px 3px;
 }
 
 .hint {
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9231);
 }
 
@@ -649,15 +649,16 @@
 .detailDrawerHeader {
   display: flex;
   justify-content: flex-end;
-  padding-top: 12px;
+  /* Payload 4's Drawer no longer pads its children; it only defines --gutter-h. */
+  padding: 12px var(--gutter-h) 0;
 }
 
 .detailDrawerClose {
   align-items: center;
   background: transparent;
-  border: 1px solid var(--theme-elevation-150);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  color: var(--theme-elevation-800);
+  color: var(--color-text-secondary);
   cursor: pointer;
   display: inline-flex;
   height: 32px;
@@ -667,11 +668,11 @@
 }
 
 .detailDrawerClose:hover {
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .detailDrawerClose:focus-visible {
-  outline: 2px solid var(--theme-text);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
@@ -679,7 +680,7 @@
   /* Slightly under the panel cap above, minus Payload's gutters, so the rows
      stay bounded even if a consumer's detailSlot renders something wider. */
   max-width: 600px;
-  padding: 16px 0 8px;
+  padding: 16px var(--gutter-h) 8px;
 }
 
 /* Visually-hidden accessible name for the detail Drawer. ReservationDetail (or a
@@ -707,12 +708,12 @@
 
 .fab {
   align-items: center;
-  background: var(--theme-elevation-800);
+  background: var(--color-bg-inverse);
   border: none;
   border-radius: 50%;
   bottom: calc(20px + env(safe-area-inset-bottom));
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  color: var(--theme-elevation-0);
+  color: var(--color-bg);
   cursor: pointer;
   display: flex;
   font-family: inherit;
@@ -727,7 +728,7 @@
 }
 
 .fab:focus-visible {
-  outline: 2px solid var(--theme-text);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
@@ -750,12 +751,12 @@
 }
 
 .dayCellSelected {
-  box-shadow: inset 0 0 0 2px var(--theme-elevation-800);
+  box-shadow: inset 0 0 0 2px var(--color-border-strong);
 }
 
 .dayCellMobile:focus-visible,
 .dayListAdd:focus-visible {
-  outline: 2px solid var(--theme-text);
+  outline: 2px solid var(--color-text);
   outline-offset: -2px;
 }
 
@@ -769,7 +770,7 @@
 }
 
 .dot {
-  background: var(--theme-elevation-400);
+  background: var(--color-text-tertiary);
   border-radius: 50%;
   flex: 0 0 auto;
   height: 7px;
@@ -777,17 +778,17 @@
 }
 
 .dotExternal {
-  background: var(--theme-elevation-300);
+  background: var(--color-bg-secondary-pressed);
 }
 
 .dotOverflow {
-  color: var(--theme-elevation-500);
+  color: var(--color-text-tertiary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   line-height: 1;
 }
 
 .dayList {
-  border-top: 1px solid var(--theme-elevation-150);
+  border-top: 1px solid var(--color-border);
   margin-top: 12px;
 }
 
@@ -803,8 +804,8 @@
   background: transparent;
   border: none;
   border-radius: 3px;
-  box-shadow: inset 0 0 0 1px var(--theme-elevation-250);
-  color: var(--theme-text);
+  box-shadow: inset 0 0 0 1px var(--color-border-control-strong);
+  color: var(--color-text);
   cursor: pointer;
   font-family: inherit;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 1.25);
@@ -815,7 +816,7 @@
 
 .dayListRow {
   align-items: center;
-  border-bottom: 1px solid var(--theme-elevation-100);
+  border-bottom: 1px solid var(--color-border);
   cursor: pointer;
   display: flex;
   gap: 10px;
@@ -824,12 +825,12 @@
 }
 
 .dayListRowExternal {
-  color: var(--theme-elevation-500);
+  color: var(--color-text-tertiary);
   cursor: default;
 }
 
 .dayListTime {
-  color: var(--theme-elevation-600);
+  color: var(--color-text-secondary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
   font-variant-numeric: tabular-nums;
   min-width: 44px;
@@ -845,7 +846,7 @@
 }
 
 .dayListEmpty {
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
   margin: 0;
   padding: 12px 4px;
@@ -863,8 +864,8 @@
   align-items: center;
   /* A visible edge and surface: without them the chips read as a static
      weekday header, not seven buttons. */
-  background: var(--theme-elevation-50);
-  border: 1px solid var(--theme-elevation-150);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   color: inherit;
   cursor: pointer;
@@ -877,23 +878,23 @@
 }
 
 .dayStripChipToday {
-  box-shadow: inset 0 0 0 1px var(--theme-elevation-800);
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
 }
 
 .dayStripChipSelected {
-  background: var(--theme-elevation-800);
-  border-color: var(--theme-elevation-800);
-  color: var(--theme-elevation-0);
+  background: var(--color-bg-inverse);
+  border-color: var(--color-border-strong);
+  color: var(--color-bg);
 }
 
 /* Status dots keep their colour on the dark selected chip; the "+N" and the
    external-busy dot inherit/lighten so they stay legible. */
 .dayStripChipSelected .dotOverflow {
-  color: var(--theme-elevation-200);
+  color: var(--color-text-disabled);
 }
 
 .dayStripChipSelected .dotExternal {
-  background: var(--theme-elevation-400);
+  background: var(--color-text-tertiary);
 }
 
 .dayStripChip .dotRow {
@@ -901,7 +902,7 @@
 }
 
 .dayStripChip:focus-visible {
-  outline: 2px solid var(--theme-text);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
@@ -1046,7 +1047,7 @@
   }
 
   .laneLabel {
-    background: var(--theme-bg);
+    background: var(--color-bg);
     flex-basis: 88px;
     font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9231);
     inset-inline-start: 0;
@@ -1072,7 +1073,7 @@
   }
 
   .pendingRow {
-    border: 1px solid var(--theme-elevation-150);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
     margin-bottom: 8px;
     padding: 4px 0;
@@ -1087,7 +1088,7 @@
   }
 
   .pendingTd[data-label]::before {
-    color: var(--theme-elevation-500);
+    color: var(--color-text-tertiary);
     content: attr(data-label);
     flex: 0 0 auto;
     font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);

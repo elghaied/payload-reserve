@@ -50,6 +50,7 @@ export const provisionStaffResource =
         collection: config.slugs.resources as unknown as CollectionSlug,
         depth: 0,
         limit: 1,
+        overrideAccess: true,
         req,
         where: { [ownerField]: { equals: d.id } },
       })
@@ -73,6 +74,7 @@ export const provisionStaffResource =
       await req.payload.create({
         collection: config.slugs.resources as unknown as CollectionSlug,
         data,
+        overrideAccess: true,
         req: { ...req, user: { ...d, collection: sp.userCollection } } as typeof req,
       })
     } catch (err) {

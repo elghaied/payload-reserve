@@ -28,10 +28,12 @@ async function seed(tag: string) {
   const service = await payload.create({
     collection: col('services'),
     data: { name: `Hold EP Service ${tag}`, active: true, duration: 60 },
+    overrideAccess: true,
   })
   const resource = await payload.create({
     collection: col('resources'),
     data: { name: `Hold EP Resource ${tag}`, active: true, services: [service.id] },
+    overrideAccess: true,
   })
   const customer = await payload.create({
     collection: col('customers'),
@@ -41,6 +43,7 @@ async function seed(tag: string) {
       lastName: tag,
       password: 'test1234',
     },
+    overrideAccess: true,
   })
   return { customer, resource, service }
 }
@@ -123,6 +126,7 @@ describe('slot-hold endpoints', () => {
     // The hold is consumed, not left behind to block the next booking.
     const { totalDocs } = await payload.count({
       collection: col('reservation-holds'),
+      overrideAccess: true,
       where: { token: { equals: token } },
     })
     expect(totalDocs).toBe(0)
@@ -199,6 +203,7 @@ describe('slot-hold endpoints', () => {
         startTime,
         status: 'pending',
       },
+      overrideAccess: true,
     })
 
     const res = await call(createHoldSlotEndpoint(resolved), {

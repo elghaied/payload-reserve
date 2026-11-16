@@ -22,13 +22,15 @@ describe('Services.resources join', () => {
     const svc = await payload.create({
       collection: 'services',
       data: { name: 'Haircut', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const res = await payload.create({
       collection: 'resources',
       data: { name: 'Chair A', quantity: 1, services: [svc.id] },
+      overrideAccess: true,
     })
 
-    const read = await payload.findByID({ id: svc.id, collection: 'services', depth: 0 })
+    const read = await payload.findByID({ id: svc.id, collection: 'services', depth: 0, overrideAccess: true })
     const ids = (read.resources as { docs: Array<{ id: unknown } | string> }).docs.map((d) =>
       String(typeof d === 'object' ? d.id : d),
     )
@@ -39,8 +41,9 @@ describe('Services.resources join', () => {
     const svc = await payload.create({
       collection: 'services',
       data: { name: 'Lonely', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
-    const read = await payload.findByID({ id: svc.id, collection: 'services', depth: 0 })
+    const read = await payload.findByID({ id: svc.id, collection: 'services', depth: 0, overrideAccess: true })
     expect((read.resources as { docs: unknown[] }).docs).toEqual([])
   })
 
@@ -52,14 +55,16 @@ describe('Services.resources join', () => {
       const svc = await payload.create({
         collection: 'services',
         data: { name: 'Popular', duration: 30, durationType: 'fixed' },
+        overrideAccess: true,
       })
       for (let i = 0; i < 13; i++) {
         await payload.create({
           collection: 'resources',
           data: { name: `R${i}`, quantity: 1, services: [svc.id] },
+          overrideAccess: true,
         })
       }
-      const read = await payload.findByID({ id: svc.id, collection: 'services', depth: 0 })
+      const read = await payload.findByID({ id: svc.id, collection: 'services', depth: 0, overrideAccess: true })
       expect((read.resources as { docs: unknown[] }).docs.length).toBe(13)
     },
     30_000,
@@ -69,6 +74,7 @@ describe('Services.resources join', () => {
     const svc = await payload.create({
       collection: 'services',
       data: { name: 'Unchanged', bufferTimeBefore: 5, duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     expect(svc.name).toBe('Unchanged')
     expect(svc.bufferTimeBefore).toBe(5)

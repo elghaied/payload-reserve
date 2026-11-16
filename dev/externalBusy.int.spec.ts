@@ -24,10 +24,12 @@ async function fixtures(tag: string, quantity = 1) {
   const service = await payload.create({
     collection: col('services'),
     data: { name: `Ext Service ${tag}`, active: true, duration: 30, price: 10 },
+    overrideAccess: true,
   })
   const resource = await payload.create({
     collection: col('resources'),
     data: { name: `Ext Resource ${tag}`, active: true, quantity, services: [service.id] },
+    overrideAccess: true,
   })
   const customer = await payload.create({
     collection: col('customers'),
@@ -37,6 +39,7 @@ async function fixtures(tag: string, quantity = 1) {
       lastName: tag,
       password: 'testpass123',
     },
+    overrideAccess: true,
   })
   return { customer, resource, service }
 }
@@ -53,6 +56,7 @@ const createReservation = (f: Awaited<ReturnType<typeof fixtures>>, startTime: s
       startTime,
       status: 'pending',
     },
+    overrideAccess: true,
   })
 
 describe('getExternalBusy enforcement (checkAvailability via validateConflicts)', () => {

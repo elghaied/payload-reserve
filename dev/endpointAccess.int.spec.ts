@@ -39,23 +39,26 @@ beforeAll(async () => {
   stop = built.stop
   availabilityHandler = endpoint('/reserve/resource-availability')
 
-  const a = await payload.create({ collection: 'tenants', data: { name: 'Tenant A' } })
-  const b = await payload.create({ collection: 'tenants', data: { name: 'Tenant B' } })
+  const a = await payload.create({ collection: 'tenants', data: { name: 'Tenant A' }, overrideAccess: true })
+  const b = await payload.create({ collection: 'tenants', data: { name: 'Tenant B' }, overrideAccess: true })
   tenantA = String(a.id)
   tenantB = String(b.id)
 
   staffA = (await payload.create({
     collection: 'users',
     data: { email: 'ra-a@test.com', password: 'testpass123', tenants: [{ tenant: tenantA }] },
+    overrideAccess: true,
   })) as unknown as Record<string, unknown>
   staffB = (await payload.create({
     collection: 'users',
     data: { email: 'ra-b@test.com', password: 'testpass123', tenants: [{ tenant: tenantB }] },
+    overrideAccess: true,
   })) as unknown as Record<string, unknown>
 
   resourceA = await payload.create({
     collection: 'resources',
     data: { name: 'Chair A', quantity: 1, tenant: tenantA } as Record<string, unknown>,
+    overrideAccess: true,
   })
 }, 60_000)
 
@@ -104,6 +107,7 @@ describe('cancel — privileged non-owner delegates to access control (A5)', () 
         string,
         unknown
       >,
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: 'customers',
@@ -114,6 +118,7 @@ describe('cancel — privileged non-owner delegates to access control (A5)', () 
         password: 'testpass123',
         tenant: tenantA,
       } as Record<string, unknown>,
+      overrideAccess: true,
     })
     const reservation = await payload.create({
       collection: 'reservations',
@@ -124,6 +129,7 @@ describe('cancel — privileged non-owner delegates to access control (A5)', () 
         startTime: new Date(Date.now() + 96 * 3600_000).toISOString(),
         tenant: tenantA,
       } as Record<string, unknown>,
+      overrideAccess: true,
     })
     reservationId = reservation.id
   }, 60_000)
@@ -159,6 +165,7 @@ describe('effective-timezone — tenant membership is enforced (A7)', () => {
       id: tenantB,
       collection: 'tenants',
       data: { timezone: 'Pacific/Auckland' } as Record<string, unknown>,
+      overrideAccess: true,
     })
   }, 60_000)
 
@@ -206,6 +213,7 @@ describe('dashboard stats — aggregates scope to the caller (A6)', () => {
         string,
         unknown
       >,
+      overrideAccess: true,
     })
     const customer = await payload.create({
       collection: 'customers',
@@ -216,6 +224,7 @@ describe('dashboard stats — aggregates scope to the caller (A6)', () => {
         password: 'testpass123',
         tenant: tenantA,
       } as Record<string, unknown>,
+      overrideAccess: true,
     })
     await payload.create({
       collection: 'reservations',
@@ -226,6 +235,7 @@ describe('dashboard stats — aggregates scope to the caller (A6)', () => {
         startTime: START,
         tenant: tenantA,
       } as Record<string, unknown>,
+      overrideAccess: true,
     })
 
     base = {
@@ -273,6 +283,7 @@ describe('dashboard stats — aggregates scope to the caller (A6)', () => {
     const tenantless = (await payload.create({
       collection: 'users',
       data: { email: 'stats-none@test.com', password: 'testpass123' },
+      overrideAccess: true,
     })) as unknown as Record<string, unknown>
 
     const stats = await statsFor(tenantless)

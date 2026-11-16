@@ -15,8 +15,8 @@
 }
 
 .navButton {
-  background: var(--theme-elevation-100);
-  border: 1px solid var(--theme-elevation-200);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   padding: 6px 12px;
   cursor: pointer;
@@ -24,7 +24,7 @@
 }
 
 .navButton:hover {
-  background: var(--theme-elevation-200);
+  background: var(--color-bg-secondary-pressed);
 }
 
 .weekLabel {
@@ -34,8 +34,8 @@
 .grid {
   display: grid;
   gap: 1px;
-  background: var(--theme-elevation-150);
-  border: 1px solid var(--theme-elevation-150);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
 }
 
 .headerCell {
@@ -43,21 +43,21 @@
   text-align: center;
   font-size: 0.75rem;
   font-weight: 600;
-  background: var(--theme-elevation-50);
+  background: var(--color-bg-secondary);
 }
 
 .resourceName {
   padding: 8px;
   font-weight: 600;
   font-size: 0.8125rem;
-  background: var(--theme-bg);
+  background: var(--color-bg);
   display: flex;
   align-items: center;
 }
 
 .cell {
   padding: 4px;
-  background: var(--theme-bg);
+  background: var(--color-bg);
   min-height: 60px;
 }
 
@@ -123,12 +123,12 @@
 .loading {
   text-align: center;
   padding: 40px;
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
 }
 
 .noResources {
   text-align: center;
   padding: 40px;
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
   font-style: italic;
 }

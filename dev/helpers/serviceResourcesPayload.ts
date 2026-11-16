@@ -5,7 +5,6 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig, getPayload } from 'payload'
 import { payloadReserve } from 'payload-reserve'
-import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
 import { testDbUri } from './testDbUri.js'
@@ -40,7 +39,6 @@ export async function buildServiceResourcesPayload(): Promise<{
     email: testEmailAdapter,
     plugins: [payloadReserve({})],
     secret: 'service-resources-test-secret',
-    sharp,
     typescript: {
       autoGenerate: false,
     },

@@ -60,6 +60,7 @@ export const expandRequiredResources =
       collection: config.slugs.services,
       depth: 0,
       disableErrors: true,
+      overrideAccess: true,
       // Skip the resources join — internal logic never reads it, and without this
       // every service read becomes an aggregation with a $lookup.
       joins: false,

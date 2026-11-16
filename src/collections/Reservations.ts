@@ -103,6 +103,9 @@ export function createReservationsCollection(
 
   return {
     slug: config.slugs.reservations,
+    // Payload 4 turns both on by default; a plugin collection opts out so installing
+    // or upgrading adds no version tables or authorship columns. Hosts opt back in
+    // through collectionOverrides.
     access,
     admin: {
       ...(listComponent
@@ -112,6 +115,7 @@ export function createReservationsCollection(
       listSearchableFields: ['status'],
       useAsTitle: 'startTime',
     },
+    authorship: false,
     fields: [
       {
         name: 'service',
@@ -330,5 +334,6 @@ export function createReservationsCollection(
       plural: ({ t }) => (t as PluginT)('reservation:collectionReservations'),
       singular: ({ t }) => (t as PluginT)('reservation:collectionReservations'),
     },
+    versions: false,
   }
 }

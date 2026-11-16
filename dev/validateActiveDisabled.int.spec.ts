@@ -27,14 +27,17 @@ describe('validateActive hook (enforceActive: false)', () => {
         lastName: 'Switch',
         password: 'testpass123',
       },
+      overrideAccess: true,
     })
     const inactiveService = await payload.create({
       collection: 'services',
       data: { name: 'Retired Off', active: false, duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Off', quantity: 1 },
+      overrideAccess: true,
     })
 
     const r = await payload.create({
@@ -45,6 +48,7 @@ describe('validateActive hook (enforceActive: false)', () => {
         service: inactiveService.id,
         startTime: new Date(Date.now() + 48 * 3600_000).toISOString(),
       },
+      overrideAccess: true,
     })
     expect(r.id).toBeDefined()
   })

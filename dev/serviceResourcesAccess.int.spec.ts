@@ -36,19 +36,23 @@ describe('Services.resources join — owner isolation (resourceOwnerMode)', () =
     adminUser = await payload.create({
       collection: 'users',
       data: { email: 'owner-admin@example.com', password: 'testpass123', role: 'admin' },
+      overrideAccess: true,
     })
     staffA = await payload.create({
       collection: 'users',
       data: { email: 'owner-staff-a@example.com', password: 'testpass123', role: 'staff' },
+      overrideAccess: true,
     })
     const staffB = await payload.create({
       collection: 'users',
       data: { email: 'owner-staff-b@example.com', password: 'testpass123', role: 'staff' },
+      overrideAccess: true,
     })
 
     const sharedService = await payload.create({
       collection: 'services',
       data: { name: 'Shared Cut', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     sharedServiceId = sharedService.id
 

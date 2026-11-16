@@ -83,11 +83,15 @@ export function createResourcesCollection(
 
   return {
     slug: config.slugs.resources,
+    // Payload 4 turns both on by default; a plugin collection opts out so installing
+    // or upgrading adds no version tables or authorship columns. Hosts opt back in
+    // through collectionOverrides.
     access,
     admin: {
       group: config.adminGroup,
       useAsTitle: 'name',
     },
+    authorship: false,
     fields: [
       {
         name: 'name',
@@ -223,5 +227,6 @@ export function createResourcesCollection(
       plural: ({ t }) => (t as PluginT)('reservation:collectionResources'),
       singular: ({ t }) => (t as PluginT)('reservation:collectionResources'),
     },
+    versions: false,
   }
 }

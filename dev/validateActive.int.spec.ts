@@ -50,6 +50,7 @@ beforeAll(async () => {
       lastName: 'Enforcement',
       password: 'testpass123',
     },
+    overrideAccess: true,
   })
   customerId = customer.id
 }, 60_000)
@@ -63,14 +64,16 @@ describe('validateActive hook', () => {
     const svc = await payload.create({
       collection: 'services',
       data: { name: 'Retired A', active: false, duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Active A', quantity: 1 },
+      overrideAccess: true,
     })
 
     await expectValidationMessage(
-      payload.create({ collection: 'reservations', data: bookingFor(svc, resource) }),
+      payload.create({ collection: 'reservations', data: bookingFor(svc, resource), overrideAccess: true }),
       /not active/i,
     )
   })
@@ -79,14 +82,16 @@ describe('validateActive hook', () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'Standard B', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const res = await payload.create({
       collection: 'resources',
       data: { name: 'Broken Chair B', active: false, quantity: 1 },
+      overrideAccess: true,
     })
 
     await expectValidationMessage(
-      payload.create({ collection: 'reservations', data: bookingFor(service, res) }),
+      payload.create({ collection: 'reservations', data: bookingFor(service, res), overrideAccess: true }),
       /not active/i,
     )
   })
@@ -95,14 +100,16 @@ describe('validateActive hook', () => {
     const inactiveService = await payload.create({
       collection: 'services',
       data: { name: 'Retired', active: false, duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Active C', quantity: 1 },
+      overrideAccess: true,
     })
 
     await expectValidationMessage(
-      payload.create({ collection: 'reservations', data: bookingFor(inactiveService, resource) }),
+      payload.create({ collection: 'reservations', data: bookingFor(inactiveService, resource), overrideAccess: true }),
       /Retired/,
     )
   })
@@ -111,14 +118,17 @@ describe('validateActive hook', () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'Standard D', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resourceOne = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Active D1', quantity: 1 },
+      overrideAccess: true,
     })
     const resourceTwo = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Inactive D2', active: false, quantity: 1 },
+      overrideAccess: true,
     })
     const startTime = future(48)
 
@@ -135,6 +145,7 @@ describe('validateActive hook', () => {
           service: service.id,
           startTime,
         },
+        overrideAccess: true,
       })
       .catch((e) => e)
 
@@ -145,17 +156,20 @@ describe('validateActive hook', () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'Cancel-me Service', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Active E', quantity: 1 },
+      overrideAccess: true,
     })
     const r = await payload.create({
       collection: 'reservations',
       data: bookingFor(service, resource),
+      overrideAccess: true,
     })
 
-    await payload.update({ id: service.id, collection: 'services', data: { active: false } })
+    await payload.update({ id: service.id, collection: 'services', data: { active: false }, overrideAccess: true })
 
     // Must NOT throw — otherwise a discontinued service's bookings become
     // permanently uneditable, including uncancellable.
@@ -163,6 +177,7 @@ describe('validateActive hook', () => {
       id: r.id,
       collection: 'reservations',
       data: { status: 'cancelled' },
+      overrideAccess: true,
     })
     expect(cancelled.status).toBe('cancelled')
   })
@@ -173,10 +188,12 @@ describe('validateActive hook', () => {
     const pool = await payload.create({
       collection: 'resources',
       data: { name: 'Inactive Pool F', active: false, quantity: 1 },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Active F', quantity: 1 },
+      overrideAccess: true,
     })
     const service = await payload.create({
       collection: 'services',
@@ -186,10 +203,11 @@ describe('validateActive hook', () => {
         durationType: 'fixed',
         requiredResources: [pool.id],
       },
+      overrideAccess: true,
     })
 
     await expectValidationMessage(
-      payload.create({ collection: 'reservations', data: bookingFor(service, resource) }),
+      payload.create({ collection: 'reservations', data: bookingFor(service, resource), overrideAccess: true }),
       /not active/i,
     )
   })
@@ -198,17 +216,20 @@ describe('validateActive hook', () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'Reschedule Service G', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Active G', quantity: 1 },
+      overrideAccess: true,
     })
     const r = await payload.create({
       collection: 'reservations',
       data: bookingFor(service, resource),
+      overrideAccess: true,
     })
 
-    await payload.update({ id: resource.id, collection: 'resources', data: { active: false } })
+    await payload.update({ id: resource.id, collection: 'resources', data: { active: false }, overrideAccess: true })
 
     // The (service, resource) pair is unchanged, so the pair-only skip would
     // wave this through — but availability offers no slot on an inactive
@@ -218,6 +239,7 @@ describe('validateActive hook', () => {
         id: r.id,
         collection: 'reservations',
         data: { startTime: future(72) },
+        overrideAccess: true,
       }),
       /not active/i,
     )
@@ -227,17 +249,20 @@ describe('validateActive hook', () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'Notes Service H', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Active H', quantity: 1 },
+      overrideAccess: true,
     })
     const r = await payload.create({
       collection: 'reservations',
       data: bookingFor(service, resource),
+      overrideAccess: true,
     })
 
-    await payload.update({ id: resource.id, collection: 'resources', data: { active: false } })
+    await payload.update({ id: resource.id, collection: 'resources', data: { active: false }, overrideAccess: true })
 
     // Confirming is a status-only change. This is exactly why the call site in
     // Step 7 omits blockingStatuses: with them, schedulingFieldsChanged reports
@@ -248,6 +273,7 @@ describe('validateActive hook', () => {
       id: r.id,
       collection: 'reservations',
       data: { status: 'confirmed' },
+      overrideAccess: true,
     })
     expect(confirmed.status).toBe('confirmed')
 
@@ -255,6 +281,7 @@ describe('validateActive hook', () => {
       id: r.id,
       collection: 'reservations',
       data: { notes: 'called ahead' },
+      overrideAccess: true,
     })
     expect(updated.notes).toBe('called ahead')
   })
@@ -263,18 +290,22 @@ describe('validateActive hook', () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'Original Service I', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const inactiveService = await payload.create({
       collection: 'services',
       data: { name: 'Retired Service I', active: false, duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Active I', quantity: 1 },
+      overrideAccess: true,
     })
     const r = await payload.create({
       collection: 'reservations',
       data: bookingFor(service, resource),
+      overrideAccess: true,
     })
 
     // A pair the booking never had before, so previousKeys cannot skip it.
@@ -283,6 +314,7 @@ describe('validateActive hook', () => {
         id: r.id,
         collection: 'reservations',
         data: { service: inactiveService.id },
+        overrideAccess: true,
       }),
       /not active/i,
     )
@@ -295,14 +327,17 @@ describe('validateActive hook', () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'Malformed Items Service J', duration: 30, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Active J', quantity: 1 },
+      overrideAccess: true,
     })
     const r = await payload.create({
       collection: 'reservations',
       data: bookingFor(service, resource),
+      overrideAccess: true,
     })
 
     const duplicatedStartTime = future(48)
@@ -319,6 +354,7 @@ describe('validateActive hook', () => {
           { resource: resource.id, startTime: duplicatedStartTime },
         ],
       },
+      overrideAccess: true,
     })
 
     // A notes-only edit must still succeed — validateActive must decline to
@@ -329,6 +365,7 @@ describe('validateActive hook', () => {
       id: r.id,
       collection: 'reservations',
       data: { notes: 'benign edit on a malformed row' },
+      overrideAccess: true,
     })
     expect(updated.notes).toBe('benign edit on a malformed row')
   })
@@ -337,14 +374,17 @@ describe('validateActive hook', () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'Primary Check K', duration: 60, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const primary = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Primary K', quantity: 1 },
+      overrideAccess: true,
     })
     const secondary = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Secondary K', quantity: 1 },
+      overrideAccess: true,
     })
     const startTime = future(120)
 
@@ -352,6 +392,7 @@ describe('validateActive hook', () => {
     await payload.create({
       collection: 'reservations',
       data: bookingFor(service, primary, { startTime }),
+      overrideAccess: true,
     })
 
     // items[] names only `secondary`, but the row still stores resource=primary
@@ -366,6 +407,7 @@ describe('validateActive hook', () => {
           service: service.id,
           startTime,
         },
+        overrideAccess: true,
       }),
       // The actual rejection message is checkAvailability's capacity-exceeded
       // wording ("All units are booked for this time" — AvailabilityService.ts),
@@ -378,10 +420,12 @@ describe('validateActive hook', () => {
     const service = await payload.create({
       collection: 'services',
       data: { name: 'EndTime Branch L', duration: 45, durationType: 'fixed' },
+      overrideAccess: true,
     })
     const resource = await payload.create({
       collection: 'resources',
       data: { name: 'Chair Branch L', quantity: 1 },
+      overrideAccess: true,
     })
     const startTime = future(200)
 
@@ -394,6 +438,7 @@ describe('validateActive hook', () => {
         service: service.id,
         startTime,
       },
+      overrideAccess: true,
     })
 
     // 45-minute fixed service: endTime must be start + 45m, exactly as before B1.

@@ -54,6 +54,7 @@ export async function isWithinSchedule({
     collection: config.slugs.schedules,
     depth: 0,
     limit: 100,
+    overrideAccess: true,
     pagination: false,
     req,
     where: { resource: { equals: resourceId } },

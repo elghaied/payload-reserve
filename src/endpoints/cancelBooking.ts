@@ -137,6 +137,7 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         collection: config.slugs.reservations,
         depth: 0,
         disableErrors: true,
+        overrideAccess: true,
         req,
       }).catch(() => null)) as null | Record<string, unknown>
       const { cancellationToken: _cancellationToken, ...safeReservation } =

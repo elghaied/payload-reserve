@@ -52,16 +52,18 @@ const svc = (name: string, extra: Record<string, unknown> = {}) =>
   payload.create({
     collection: col('services'),
     data: { name, active: true, bufferTimeAfter: 0, bufferTimeBefore: 0, duration: 60, ...extra } as never,
+    overrideAccess: true,
   })
 const res = (name: string, extra: Record<string, unknown> = {}) =>
-  payload.create({ collection: col('resources'), data: { name, active: true, ...extra } as never })
+  payload.create({ collection: col('resources'), data: { name, active: true, ...extra } as never, overrideAccess: true })
 const customerOf = (tag: string) =>
   payload.create({
     collection: col('customers'),
     data: { email: `audit-${tag}-${Date.now()}@example.com`, firstName: 'A', lastName: tag, password: 'test1234' } as never,
+    overrideAccess: true,
   })
 const book = (data: Record<string, unknown>) =>
-  payload.create({ collection: col('reservations'), data: data as never }) as unknown as Promise<
+  payload.create({ collection: col('reservations'), data: data as never, overrideAccess: true }) as unknown as Promise<
     Record<string, unknown>
   >
 
@@ -80,7 +82,7 @@ describe('guest cancellation token (GHSA-qpqp-37cp-f422)', () => {
       token: b.cancellationToken,
     })
     expect(out.status).toBe(400)
-    const after = await payload.findByID({ id: b.id as string, collection: col('reservations') })
+    const after = await payload.findByID({ id: b.id as string, collection: col('reservations'), overrideAccess: true })
     expect((after as unknown as { status: string }).status).toBe('pending')
   })
 
@@ -225,7 +227,7 @@ describe('service/resource pairing (GHSA-fv46-ch5v-5wcm)', () => {
     const pool = await res('pair pool', { quantity: 3 })
     const unrelated = await svc('pair unrelated')
     // The pool lists a different service, so only the exemption lets it through.
-    await payload.update({ id: pool.id, collection: col('resources'), data: { services: [unrelated.id] } as never })
+    await payload.update({ id: pool.id, collection: col('resources'), data: { services: [unrelated.id] } as never, overrideAccess: true })
     const s = await svc('pair with pool', { requiredResources: [pool.id] })
     const r = await res('pair primary', { services: [s.id] })
     const out = await call(createBookingEndpoint(resolved), {
@@ -302,6 +304,7 @@ describe('slots load occupancy once per resource (#11)', () => {
         resource: r.id,
         scheduleType: 'recurring',
       } as never,
+      overrideAccess: true,
     })
     await book({ guest, resource: r.id, service: s.id, startTime: '2031-03-03T10:00:00.000Z' })
 

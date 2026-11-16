@@ -1,5 +1,5 @@
 .row {
-  border-bottom: 1px solid var(--theme-elevation-100);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   gap: 12px;
   justify-content: space-between;
@@ -11,7 +11,7 @@
 }
 
 .key {
-  color: var(--theme-elevation-500);
+  color: var(--color-text-tertiary);
   flex: 0 0 auto;
 }
 

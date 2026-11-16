@@ -45,17 +45,20 @@ beforeAll(async () => {
       lastName: 'Tester',
       password: 'testpass123',
     },
+    overrideAccess: true,
   })
 
   const service = await payload.create({
     collection: col('services'),
     data: { name: 'EX Service', active: true, duration: 120, durationType: 'fixed' },
+    overrideAccess: true,
   })
   serviceId = service.id
 
   const resource = await payload.create({
     collection: col('resources'),
     data: { name: 'EX Resource', active: true, services: [serviceId] },
+    overrideAccess: true,
   })
   resourceId = resource.id
   await payload.create({
@@ -67,6 +70,7 @@ beforeAll(async () => {
       resource: resourceId,
       scheduleType: 'recurring',
     },
+    overrideAccess: true,
   })
 
   // The booking being moved: 09:00–11:00.
@@ -79,6 +83,7 @@ beforeAll(async () => {
       startTime: `${MONDAY}T09:00:00.000Z`,
       status: 'pending',
     },
+    overrideAccess: true,
   })
   ownId = own.id
 
@@ -92,6 +97,7 @@ beforeAll(async () => {
       startTime: `${MONDAY}T13:00:00.000Z`,
       status: 'pending',
     },
+    overrideAccess: true,
   })
   otherId = other.id
 
