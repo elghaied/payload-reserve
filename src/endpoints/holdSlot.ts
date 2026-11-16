@@ -23,6 +23,7 @@ const REFUSAL_STATUS: Record<HoldRefusalReason, number> = {
   resource_not_found: 404,
   service_inactive: 409,
   service_not_found: 404,
+  service_not_offered: 409,
   slot_taken: 409,
 }
 

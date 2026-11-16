@@ -15,7 +15,7 @@ import { enforceCustomerOwnership } from '../hooks/reservations/enforceCustomerO
 import { expandRequiredResources } from '../hooks/reservations/expandRequiredResources.js'
 import { onStatusChange } from '../hooks/reservations/onStatusChange.js'
 import { validateActive } from '../hooks/reservations/validateActive.js'
-import { validateBookingWindow } from '../hooks/reservations/validateBookingWindow.js'
+import { limitPublicItems, validateBookingWindow } from '../hooks/reservations/validateBookingWindow.js'
 import { validateCancellation } from '../hooks/reservations/validateCancellation.js'
 import { validateConflicts } from '../hooks/reservations/validateConflicts.js'
 import { validateGuestBooking } from '../hooks/reservations/validateGuestBooking.js'
@@ -299,6 +299,9 @@ export function createReservationsCollection(
         onStatusChange(config),
       ],
       beforeChange: [
+        // Before everything, host hooks included: reject an oversized public
+        // request before any per-item work is done for it.
+        limitPublicItems(config),
         createPluginHooksBeforeCreate(config.hooks),
         enforceCustomerOwnership(config),
         checkIdempotency(config),

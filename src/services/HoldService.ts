@@ -4,6 +4,7 @@ import { ValidationError } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
+import { resourceOffersService } from '../hooks/reservations/validateBookingWindow.js'
 import { flexibleWindowProblem } from '../utilities/flexibleWindow.js'
 import { isTransientWriteConflict } from '../utilities/retryOnWriteConflict.js'
 import { isWithinSchedule } from '../utilities/scheduleWindow.js'
@@ -30,6 +31,7 @@ export type HoldRefusalReason =
   | 'resource_not_found'
   | 'service_inactive'
   | 'service_not_found'
+  | 'service_not_offered'
   | 'slot_taken'
 
 export type TakeHoldResult =
@@ -143,6 +145,15 @@ export async function takeHold(params: {
 
   if (!resource) {
     return { ok: false, reason: 'resource_not_found' }
+  }
+
+  // Same pairing rule a public booking gets (validateBookingWindow).
+  if (
+    config.enforceServiceMatch &&
+    !isPrivilegedUser(req.user, config) &&
+    !resourceOffersService(resource, serviceId)
+  ) {
+    return { ok: false, reason: 'service_not_offered' }
   }
 
   const { endTime } = computeEndTime({

@@ -29,7 +29,7 @@ export function createSchedulesCollection(
   const access =
     composeAccess(
       rom
-        ? makeScheduleOwnerAccess(rom)
+        ? makeScheduleOwnerAccess(rom, config)
         : config.userCollection
           ? {}
           : makeStandaloneCatalogAccess(config),

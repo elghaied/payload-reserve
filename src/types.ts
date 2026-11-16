@@ -294,6 +294,13 @@ export type ReservationPluginConfig = {
    * so imports, seeds and walk-ins keep working. Default `true`.
    */
   enforceSchedule?: boolean
+  /**
+   * For PUBLIC actors (same definition as `enforceSchedule`) and slot holds: when
+   * a resource lists `services`, a booking on it must use one of them. A resource
+   * with an empty `services` list is unconstrained, and the pools a service names
+   * in `requiredResources` are exempt. Default `true`.
+   */
+  enforceServiceMatch?: boolean
   /** @deprecated Use `collectionOverrides.reservations.fields` instead. Extra fields appended to Reservations. */
   extraReservationFields?: Field[]
   /** Resolve external busy intervals (calendar sync etc.) folded into availability + calendar display. */
@@ -308,6 +315,11 @@ export type ReservationPluginConfig = {
    * Without a bound one request could occupy a resource for decades.
    */
   maxFlexibleDuration?: number
+  /**
+   * Most `items[]` entries a PUBLIC actor may send in one booking (staff and
+   * userless Local API calls are not limited). Default 10.
+   */
+  maxPublicItems?: number
   /** Tenant scoping for the custom admin views (calendar, availability, dashboard). Applied only when the scoped collection has the tenant field AND the tenant cookie is set. */
   multiTenant?: {
     /** Cookie written by the tenant-selector (default 'payload-tenant'). */
@@ -397,6 +409,7 @@ export type ResolvedReservationPluginConfig = {
   disabled: boolean
   enforceActive: boolean
   enforceSchedule: boolean
+  enforceServiceMatch: boolean
   extraReservationFields: Field[]
   getExternalBusy: GetExternalBusy | undefined
   /** Whether the media collection (`slugs.media`) exists — set by the plugin; gates the image upload fields. */
@@ -408,6 +421,7 @@ export type ResolvedReservationPluginConfig = {
   leaveTypes: string[]
   localized: boolean
   maxFlexibleDuration: number
+  maxPublicItems: number
   multiTenant: {
     cookieName: string
     tenantField: string

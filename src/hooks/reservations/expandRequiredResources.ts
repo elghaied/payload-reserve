@@ -51,24 +51,23 @@ export const expandRequiredResources =
       }
     }
 
-    let required: Array<number | string> = []
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const service = await (req.payload.findByID as any)({
-        id: serviceId,
-        collection: config.slugs.services,
-        depth: 0,
-        // Skip the resources join — internal logic never reads it, and without this
-        // every service read becomes an aggregation with a $lookup.
-        joins: false,
-        req,
-      })
-      required = ((service?.requiredResources as unknown[]) ?? [])
-        .map((r) => extractId(r))
-        .filter((r): r is number | string => r !== undefined)
-    } catch {
-      return data
-    }
+    // Fail closed: a missing service is null (nothing to expand, later hooks
+    // reject it), but a read that FAILS throws — swallowing it stored the
+    // booking without its required pools.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const service = await (req.payload.findByID as any)({
+      id: serviceId,
+      collection: config.slugs.services,
+      depth: 0,
+      disableErrors: true,
+      // Skip the resources join — internal logic never reads it, and without this
+      // every service read becomes an aggregation with a $lookup.
+      joins: false,
+      req,
+    })
+    const required = ((service?.requiredResources as unknown[]) ?? [])
+      .map((r) => extractId(r))
+      .filter((r): r is number | string => r !== undefined)
 
     if (required.length === 0) {return data}
 

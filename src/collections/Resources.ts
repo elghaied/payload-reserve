@@ -74,7 +74,7 @@ export function createResourcesCollection(
   const access =
     composeAccess(
       rom
-        ? makeResourceOwnerAccess(rom)
+        ? makeResourceOwnerAccess(rom, config)
         : config.userCollection
           ? {}
           : makeStandaloneCatalogAccess(config),

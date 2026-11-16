@@ -3,7 +3,7 @@ import type { CollectionConfig, CollectionSlug } from 'payload'
 import type { PluginT } from '../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
-import { makeStandaloneCustomerAccess } from '../utilities/ownerAccess.js'
+import { composeAccess, makeStandaloneCustomerAccess } from '../utilities/ownerAccess.js'
 import { isPrivilegedUser } from '../utilities/userRoles.js'
 
 export function createCustomersCollection(
@@ -11,11 +11,12 @@ export function createCustomersCollection(
 ): CollectionConfig {
   return {
     slug: config.slugs.customers,
-    access: {
-      admin: () => false,
-      ...makeStandaloneCustomerAccess(config),
-      ...config.access.customers,
-    },
+    // composeAccess, not a spread: `read: cond ? fn : undefined` in the
+    // override must not replace the scoped default with Payload's open one.
+    access: composeAccess(
+      { admin: () => false, ...makeStandaloneCustomerAccess(config) },
+      config.access.customers,
+    ),
     admin: {
       group: config.adminGroup,
       listSearchableFields: ['firstName', 'lastName', 'phone', 'email'],
@@ -51,6 +52,7 @@ export function createCustomersCollection(
         // from /api/<customers>/me. Standalone only — under userCollection the
         // host owns the field and isPrivilegedUser is role-based there.
         access: {
+          create: ({ req }) => isPrivilegedUser(req.user, config),
           read: ({ req }) => isPrivilegedUser(req.user, config),
           update: ({ req }) => isPrivilegedUser(req.user, config),
         },

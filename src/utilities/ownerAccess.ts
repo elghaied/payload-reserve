@@ -51,10 +51,34 @@ function isAdmin(user: Record<string, unknown>, adminRoles: string[], roleField:
 }
 
 /**
+ * `create` rule for the owner-mode catalog collections: any authenticated user,
+ * EXCEPT a customer when owners live in a different collection. It used to be
+ * `Boolean(req.user)`, so with standalone Customers plus an `ownerCollection`
+ * (or staff provisioning) every customer login could create Resources — and
+ * Services under `ownedServices` — in the public catalog. When owners ARE the
+ * customers collection (no `ownerCollection`, or `userCollection` mode) the
+ * plugin cannot tell the two apart and the rule stays open.
+ */
+export function makeOwnerModeCreate(config?: ResolvedReservationPluginConfig): Access {
+  const ownerCollection =
+    config?.resourceOwnerMode?.ownerCollection ??
+    config?.staffProvisioning?.userCollection ??
+    config?.slugs.customers
+  const customersAreOwners = !config || ownerCollection === config.slugs.customers
+  return ({ req }: { req: PayloadRequest }) => {
+    if (!req.user) {return false}
+    return customersAreOwners || req.user.collection !== config.slugs.customers
+  }
+}
+
+/**
  * Access factories for Resources collection.
  * Owners may read/update/delete their own resources; anyone authenticated may create.
  */
-export function makeResourceOwnerAccess(rom: ResolvedResourceOwnerModeConfig): CollectionAccess {
+export function makeResourceOwnerAccess(
+  rom: ResolvedResourceOwnerModeConfig,
+  config?: ResolvedReservationPluginConfig,
+): CollectionAccess {
   const { adminRoles, ownerField, roleField } = rom
 
   const ownerOrAdmin: Access = ({ req }: { req: PayloadRequest }) => {
@@ -65,7 +89,7 @@ export function makeResourceOwnerAccess(rom: ResolvedResourceOwnerModeConfig): C
   }
 
   return {
-    create: ({ req }: { req: PayloadRequest }) => Boolean(req.user),
+    create: makeOwnerModeCreate(config),
     delete: ownerOrAdmin,
     read: ownerOrAdmin,
     update: ownerOrAdmin,
@@ -76,7 +100,10 @@ export function makeResourceOwnerAccess(rom: ResolvedResourceOwnerModeConfig): C
  * Access factories for Schedules collection.
  * A schedule's ownership is determined through its `resource.owner` relationship.
  */
-export function makeScheduleOwnerAccess(rom: ResolvedResourceOwnerModeConfig): CollectionAccess {
+export function makeScheduleOwnerAccess(
+  rom: ResolvedResourceOwnerModeConfig,
+  config?: ResolvedReservationPluginConfig,
+): CollectionAccess {
   const { adminRoles, ownerField, roleField } = rom
 
   const ownerOrAdmin: Access = ({ req }: { req: PayloadRequest }) => {
@@ -87,7 +114,7 @@ export function makeScheduleOwnerAccess(rom: ResolvedResourceOwnerModeConfig): C
   }
 
   return {
-    create: ({ req }: { req: PayloadRequest }) => Boolean(req.user),
+    create: makeOwnerModeCreate(config),
     delete: ownerOrAdmin,
     read: ownerOrAdmin,
     update: ownerOrAdmin,
@@ -131,6 +158,7 @@ export function makeReservationOwnerAccess(
 export function makeServiceOwnerAccess(
   rom: ResolvedResourceOwnerModeConfig,
   ownerField: string,
+  config?: ResolvedReservationPluginConfig,
 ): CollectionAccess {
   const { adminRoles, roleField } = rom
 
@@ -142,7 +170,7 @@ export function makeServiceOwnerAccess(
   }
 
   return {
-    create: ({ req }: { req: PayloadRequest }) => Boolean(req.user),
+    create: makeOwnerModeCreate(config),
     delete: ownerOrAdmin,
     read: ownerOrAdmin,
     update: ownerOrAdmin,
@@ -198,8 +226,8 @@ export function makeStandaloneReservationAccess(
  * `update` covers the `password` field on an auth collection — set another
  * customer's password and log in as them.
  *
- * - `create` is left alone (Payload's default); consumers opening
- *   self-registration set `create: () => true`, as the docs show.
+ * - `create`: staff/admin only; consumers opening self-registration set
+ *   `create: () => true`, as the docs show.
  * - `read`/`update`: staff/admin see everything; a customer sees only their own
  *   document (`id equals self`). That also scopes the `bookings` join, which
  *   runs the reservations `read` access when access checks are on.
@@ -218,6 +246,10 @@ export function makeStandaloneCustomerAccess(
     isPrivilegedUser(req.user, config)
 
   return {
+    // Privileged only. Payload's default let any logged-in customer create
+    // accounts for other people's addresses; hosts opening self-registration
+    // already override this with `create: () => true`.
+    create: privilegedOnly,
     delete: privilegedOnly,
     read: selfOrPrivileged,
     update: selfOrPrivileged,

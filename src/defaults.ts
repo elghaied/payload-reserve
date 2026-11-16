@@ -194,6 +194,7 @@ export function resolveConfig(
     disabled: pluginOptions.disabled ?? false,
     enforceActive: pluginOptions.enforceActive ?? true,
     enforceSchedule: pluginOptions.enforceSchedule ?? true,
+    enforceServiceMatch: pluginOptions.enforceServiceMatch ?? true,
     extraReservationFields: pluginOptions.extraReservationFields ?? [],
     getExternalBusy: pluginOptions.getExternalBusy,
     // Real value is set by the plugin once config.collections is known (C8)
@@ -205,6 +206,7 @@ export function resolveConfig(
     leaveTypes: pluginOptions.leaveTypes ?? DEFAULT_LEAVE_TYPES,
     localized: false,
     maxFlexibleDuration: pluginOptions.maxFlexibleDuration ?? DEFAULT_MAX_FLEXIBLE_DURATION,
+    maxPublicItems: pluginOptions.maxPublicItems ?? 10,
     multiTenant: {
       cookieName: pluginOptions.multiTenant?.cookieName ?? 'payload-tenant',
       tenantField: pluginOptions.multiTenant?.tenantField ?? 'tenant',
@@ -265,6 +267,9 @@ export function resolveConfig(
     validateCalendarConfig(resolved.calendar)
     if (!(resolved.maxFlexibleDuration > 0)) {
       throw new Error('maxFlexibleDuration must be a positive number of minutes')
+    }
+    if (!Number.isInteger(resolved.maxPublicItems) || resolved.maxPublicItems < 1) {
+      throw new Error('maxPublicItems must be a positive integer')
     }
     const cap = resolved.slotHolds.maxActivePerCustomer
     if (cap !== Infinity && !(Number.isInteger(cap) && cap > 0)) {

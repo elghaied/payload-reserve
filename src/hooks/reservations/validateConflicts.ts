@@ -79,29 +79,29 @@ export const validateConflicts =
       let bufferAfter = config.defaultBufferTime
 
       if (itemServiceId) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const service = await (req.payload.findByID as any)({
-            id: itemServiceId,
-            collection: config.slugs.services,
-            depth: 0,
-            // Skip the resources join — internal logic never reads it, and without this
-            // every service read becomes an aggregation with a $lookup.
-            joins: false,
-            req,
-          })
-          if (service) {
-            bufferBefore = (service.bufferTimeBefore as number) ?? config.defaultBufferTime
-            bufferAfter = (service.bufferTimeAfter as number) ?? config.defaultBufferTime
-          }
-        } catch {
-          // Use defaults if service lookup fails
+        // Fail closed: `disableErrors` turns "no such service" into null (defaults
+        // apply), while a read that FAILS throws — checking with default buffers
+        // instead let a booking through the gap the real buffers should block.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const service = await (req.payload.findByID as any)({
+          id: itemServiceId,
+          collection: config.slugs.services,
+          depth: 0,
+          disableErrors: true,
+          // Skip the resources join — internal logic never reads it, and without this
+          // every service read becomes an aggregation with a $lookup.
+          joins: false,
+          req,
+        })
+        if (service) {
+          bufferBefore = (service.bufferTimeBefore as number) ?? config.defaultBufferTime
+          bufferAfter = (service.bufferTimeAfter as number) ?? config.defaultBufferTime
         }
       }
 
       // Other items of this same booking on the same resource count as occupancy
       // so two items can't double-book one resource within one create (review A5).
-      const siblingItems = items.filter((other, j) => j !== i && other.resource === item.resource)
+      const siblingItems = items.filter((other, j) => j !== i && String(other.resource) === String(item.resource))
 
       const result = await checkAvailability({
         blockingStatuses: config.statusMachine.blockingStatuses,

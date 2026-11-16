@@ -5,9 +5,57 @@ import { ValidationError } from 'payload'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { mergeReservationData, schedulingFieldsChanged } from '../../utilities/reservationChanges.js'
-import { resolveReservationItems } from '../../utilities/resolveReservationItems.js'
+import { extractId, resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 import { isWithinSchedule } from '../../utilities/scheduleWindow.js'
 import { isPrivilegedUser } from '../../utilities/userRoles.js'
+
+const idList = (value: unknown): string[] =>
+  (Array.isArray(value) ? value : [])
+    .map((v) => extractId(v))
+    .filter((v) => v !== undefined)
+    .map(String)
+
+/** True when the resource lists no services at all, or lists this one. */
+export function resourceOffersService(
+  resource: null | Record<string, unknown> | undefined,
+  serviceId: number | string,
+): boolean {
+  const offered = idList(resource?.services)
+  return offered.length === 0 || offered.includes(String(serviceId))
+}
+
+/**
+ * Cap on `items[]` for public actors, first in the chain: every item costs
+ * several reads, a lock write and a conflict check in the hooks after it, and
+ * one anonymous request could carry hundreds.
+ */
+export const limitPublicItems =
+  (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
+  ({ context, data, originalDoc, req }) => {
+    if (context?.skipReservationHooks) {return data}
+    const items = data?.items
+    if (!Array.isArray(items) || items.length <= config.maxPublicItems) {return data}
+    const publicActor =
+      context?.publicBooking === true || (req.user != null && !isPrivilegedUser(req.user, config))
+    // An unchanged items[] (a cancel on a larger staff-made booking) passes.
+    if (
+      !publicActor ||
+      !schedulingFieldsChanged({
+        data: { items },
+        originalDoc: originalDoc as Record<string, unknown> | undefined,
+      })
+    ) {
+      return data
+    }
+    throw new ValidationError({
+      errors: [
+        {
+          message: `A booking can have at most ${config.maxPublicItems} items`,
+          path: 'items',
+        },
+      ],
+    })
+  }
 
 /**
  * Policy checks for PUBLIC actors — an anonymous `/reserve/book` or
@@ -57,6 +105,7 @@ export const validateBookingWindow =
     const items = resolveReservationItems(source)
     const now = Date.now()
     const serviceCache = new Map<string, null | Record<string, unknown>>()
+    const resourceCache = new Map<string, null | Record<string, unknown>>()
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
@@ -70,9 +119,31 @@ export const validateBookingWindow =
         })
       }
 
-      if (!config.enforceSchedule) {continue}
+      const endRaw = item.endTime ? new Date(item.endTime) : undefined
+      const end = endRaw && !Number.isNaN(endRaw.getTime()) ? endRaw : undefined
 
-      let fullDay = false
+      // A top-level resource the caller left out of items[] is occupied for the
+      // whole span of the items. Two items a month apart used to block it for
+      // that month with a 60-minute service — the unbounded occupancy
+      // `maxFlexibleDuration` exists to prevent, reached without `flexible`.
+      if (
+        item.fromParent &&
+        end &&
+        end.getTime() - start.getTime() > config.maxFlexibleDuration * 60_000
+      ) {
+        throw new ValidationError({
+          errors: [
+            {
+              message: `items[] span more than ${config.maxFlexibleDuration} minutes; list the top-level resource in items[] with its own startTime`,
+              path: 'items',
+            },
+          ],
+        })
+      }
+
+      if (!config.enforceSchedule && !config.enforceServiceMatch) {continue}
+
+      let service: null | Record<string, unknown> | undefined
       if (item.service !== undefined) {
         const key = String(item.service)
         if (!serviceCache.has(key)) {
@@ -89,13 +160,50 @@ export const validateBookingWindow =
             }).catch(() => null),
           )
         }
-        fullDay = serviceCache.get(key)?.durationType === 'full-day'
+        service = serviceCache.get(key)
+      }
+      const fullDay = service?.durationType === 'full-day'
+
+      // The resource must offer the service. Nothing checked the pair, so a
+      // guest could book any guest-enabled (or shortest, or cheapest) service
+      // on any resource. An empty `services` list is unconstrained, and a pool
+      // the service itself requires is exempt (pools rarely list the service).
+      if (config.enforceServiceMatch && item.service !== undefined) {
+        const key = String(item.resource)
+        if (!resourceCache.has(key)) {
+          resourceCache.set(
+            key,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (req.payload.findByID as any)({
+              id: item.resource,
+              collection: config.slugs.resources,
+              depth: 0,
+              disableErrors: true,
+              joins: false,
+              req,
+            }).catch(() => null),
+          )
+        }
+        if (
+          !resourceOffersService(resourceCache.get(key), item.service) &&
+          !idList(service?.requiredResources).includes(key)
+        ) {
+          throw new ValidationError({
+            errors: [
+              {
+                message: 'This resource does not offer the selected service',
+                path: item.fromParent || items.length === 1 ? 'service' : `items.${i}.service`,
+              },
+            ],
+          })
+        }
       }
 
-      const end = item.endTime ? new Date(item.endTime) : undefined
+      if (!config.enforceSchedule) {continue}
+
       const inside = await isWithinSchedule({
         config,
-        end: end && !Number.isNaN(end.getTime()) ? end : undefined,
+        end,
         fullDay,
         req,
         resourceId: item.resource,

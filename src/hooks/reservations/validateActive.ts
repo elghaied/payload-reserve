@@ -106,11 +106,14 @@ export const validateActive =
           id,
           collection: slug,
           depth: 0,
+          // Missing is null (not this hook's job); a FAILED read throws rather
+          // than being treated as "active".
+          disableErrors: true,
           // Skip joins — internal logic never reads them, and without this
           // every read becomes an aggregation with a $lookup.
           joins: false,
           req,
-        }).catch(() => null)
+        })
 
         if (doc && doc.active === false) {
           throw new ValidationError({

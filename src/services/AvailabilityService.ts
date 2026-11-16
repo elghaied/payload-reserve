@@ -222,6 +222,8 @@ export async function checkAvailability(params: {
   /** Slug of the slot-holds collection; omit to ignore holds entirely. */
   holdsSlug?: string
   payload: Payload
+  /** Occupancy already loaded for a window covering this candidate (read path). */
+  preloaded?: LoadedOccupancy
   req: PayloadRequest
   reservationSlug: string
   resourceId: number | string
@@ -236,16 +238,120 @@ export async function checkAvailability(params: {
   reason?: string
   totalCapacity: number
 }> {
+  const { bufferAfter, bufferBefore, debug, endTime, guestCount, resourceId, startTime } = params
+
+  const trace = debug ?? NOOP_RESERVE_DEBUG
+
+  // Candidate window expanded by its own buffers
+  const { effectiveEnd: candidateEnd, effectiveStart: candidateStart } = computeBlockedWindow(
+    startTime,
+    endTime,
+    bufferBefore,
+    bufferAfter,
+  )
+
+  const { capacityMode, occupancies, quantity, sources } =
+    params.preloaded ??
+    (await loadOccupancy({
+      ...params,
+      debug: trace,
+      windowEnd: candidateEnd,
+      windowStart: candidateStart,
+    }))
+
+  // PEAK concurrency inside the candidate window, not the sum of everything
+  // that overlaps it: two back-to-back bookings never hold two units at once.
+  const currentUnits = peakUnits(occupancies, candidateStart, candidateEnd)
+
+  const candidateUnits = capacityMode === 'per-guest' ? guestCount : 1
+  const available = currentUnits + candidateUnits <= quantity
+
+  trace.dbg('check_result', {
+    available,
+    candidateUnits,
+    currentUnits,
+    occupancySources: sources,
+    quantity,
+    resourceId,
+  })
+
+  return {
+    available,
+    currentCount: currentUnits,
+    reason: available
+      ? undefined
+      : capacityMode === 'per-guest'
+        ? 'Guest capacity exceeded'
+        : 'All units are booked for this time',
+    totalCapacity: quantity,
+  }
+}
+
+/**
+ * Highest number of units in use at any instant of `[start, end)`. Occupancy
+ * windows are half-open, so one ending exactly when another starts frees its
+ * units first.
+ */
+export function peakUnits(occupancies: Occupancy[], start: Date, end: Date): number {
+  const events: Array<[number, number]> = []
+  for (const occ of occupancies) {
+    if (!doRangesOverlap(start, end, occ.blockedStart, occ.blockedEnd)) {
+      continue
+    }
+    events.push(
+      [Math.max(occ.blockedStart.getTime(), start.getTime()), occ.units],
+      [Math.min(occ.blockedEnd.getTime(), end.getTime()), -occ.units],
+    )
+  }
+  events.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  let current = 0
+  let peak = 0
+  for (const [, delta] of events) {
+    current += delta
+    if (current > peak) {
+      peak = current
+    }
+  }
+  return peak
+}
+
+/** Everything occupying a resource near a window, fetched once. */
+export type LoadedOccupancy = {
+  capacityMode: CapacityMode
+  occupancies: Occupancy[]
+  quantity: number
+  sources: { external: number; fetched: number; holds: number; sibling: number }
+}
+
+/**
+ * Read a resource's capacity and every occupancy that can touch
+ * `[windowStart, windowEnd)` (already buffer-expanded by the caller). The write
+ * path loads per candidate; `getAvailableSlots` loads ONCE per resource for the
+ * whole day and evaluates each candidate in memory — it used to repeat all of
+ * these reads for every 15-minute candidate.
+ */
+export async function loadOccupancy(params: {
+  blockingStatuses: string[]
+  debug?: ReserveDebug
+  excludeHoldToken?: string
+  excludeReservationId?: number | string
+  getExternalBusy?: GetExternalBusy
+  holdsSlug?: string
+  payload: Payload
+  req: PayloadRequest
+  reservationSlug: string
+  resourceId: number | string
+  resourceSlug: string
+  servicesSlug: string
+  siblingItems?: ResolvedItem[]
+  windowEnd: Date
+  windowStart: Date
+}): Promise<LoadedOccupancy> {
   const {
     blockingStatuses,
-    bufferAfter,
-    bufferBefore,
-    debug,
-    endTime,
     excludeHoldToken,
     excludeReservationId,
     getExternalBusy,
-    guestCount,
     holdsSlug,
     payload,
     req,
@@ -254,10 +360,10 @@ export async function checkAvailability(params: {
     resourceSlug,
     servicesSlug,
     siblingItems,
-    startTime,
+    windowEnd,
+    windowStart,
   } = params
-
-  const trace = debug ?? NOOP_RESERVE_DEBUG
+  const trace = params.debug ?? NOOP_RESERVE_DEBUG
 
   // Fetch resource for quantity and capacity mode
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -270,19 +376,11 @@ export async function checkAvailability(params: {
   const quantity = (resource.quantity as number) ?? 1
   const capacityMode = ((resource.capacityMode as string) ?? 'per-reservation') as CapacityMode
 
-  // Candidate window expanded by its own buffers
-  const { effectiveEnd: candidateEnd, effectiveStart: candidateStart } = computeBlockedWindow(
-    startTime,
-    endTime,
-    bufferBefore,
-    bufferAfter,
-  )
-
   // Coarse superset fetch — precise per-item overlap is computed in memory below
   const coarseWhere = buildCoarseOverlapQuery({
     blockingStatuses,
-    candidateEnd,
-    candidateStart,
+    candidateEnd: windowEnd,
+    candidateStart: windowStart,
     excludeReservationId,
     resourceId,
   })
@@ -297,8 +395,8 @@ export async function checkAvailability(params: {
 
   trace.dbg('check', {
     blockingReservations: (docs as unknown[]).length,
-    candidateEnd: candidateEnd.toISOString(),
-    candidateStart: candidateStart.toISOString(),
+    candidateEnd: windowEnd.toISOString(),
+    candidateStart: windowStart.toISOString(),
     capacityMode,
     coarseWhere,
     quantity,
@@ -401,10 +499,10 @@ export async function checkAvailability(params: {
   if (getExternalBusy) {
     try {
       const intervals = await getExternalBusy({
-        end: candidateEnd,
+        end: windowEnd,
         req,
         resourceId,
-        start: candidateStart,
+        start: windowStart,
       })
       externalOccupancies = intervals
         .map((iv) => ({
@@ -415,6 +513,12 @@ export async function checkAvailability(params: {
         .filter((o) => !isNaN(o.blockedStart.getTime()) && !isNaN(o.blockedEnd.getTime()))
     } catch (err) {
       trace.dbg('error', { err, resourceId, where: 'getExternalBusy' })
+      // Still fail-open by design, but never silently: a broken calendar sync
+      // has to be visible before it causes a double booking.
+      payload.logger.warn({
+        err,
+        msg: `payload-reserve: getExternalBusy failed for resource ${String(resourceId)}; external busy intervals are being ignored for this check`,
+      })
       externalOccupancies = []
     }
   }
@@ -430,8 +534,8 @@ export async function checkAvailability(params: {
       and: [
         { resource: { equals: resourceId } },
         { expiresAt: { greater_than: new Date().toISOString() } },
-        { startTime: { less_than: candidateEnd.toISOString() } },
-        { endTime: { greater_than: candidateStart.toISOString() } },
+        { startTime: { less_than: windowEnd.toISOString() } },
+        { endTime: { greater_than: windowStart.toISOString() } },
         ...(excludeHoldToken ? [{ token: { not_equals: excludeHoldToken } }] : []),
       ],
     }
@@ -468,47 +572,21 @@ export async function checkAvailability(params: {
     trace.dbg('check_holds', { activeHolds: holdOccupancies.length, resourceId })
   }
 
-  const occupancies = [
-    ...fetchedOccupancies,
-    ...siblingOccupancies,
-    ...externalOccupancies,
-    ...holdOccupancies,
-  ]
-
-  // Sum the units of every occupancy whose buffered window overlaps the candidate
-  const currentUnits = occupancies.reduce(
-    (sum, occ) =>
-      doRangesOverlap(candidateStart, candidateEnd, occ.blockedStart, occ.blockedEnd)
-        ? sum + occ.units
-        : sum,
-    0,
-  )
-
-  const candidateUnits = capacityMode === 'per-guest' ? guestCount : 1
-  const available = currentUnits + candidateUnits <= quantity
-
-  trace.dbg('check_result', {
-    available,
-    candidateUnits,
-    currentUnits,
-    occupancySources: {
+  return {
+    capacityMode,
+    occupancies: [
+      ...fetchedOccupancies,
+      ...siblingOccupancies,
+      ...externalOccupancies,
+      ...holdOccupancies,
+    ],
+    quantity,
+    sources: {
       external: externalOccupancies.length,
       fetched: fetchedOccupancies.length,
+      holds: holdOccupancies.length,
       sibling: siblingOccupancies.length,
     },
-    quantity,
-    resourceId,
-  })
-
-  return {
-    available,
-    currentCount: currentUnits,
-    reason: available
-      ? undefined
-      : capacityMode === 'per-guest'
-        ? 'Guest capacity exceeded'
-        : 'All units are booked for this time',
-    totalCapacity: quantity,
   }
 }
 
@@ -759,6 +837,42 @@ export async function getAvailableSlots(params: {
     stepSize: Math.min(effectiveDuration, 15),
   })
 
+  // One load per resource for the whole day; every candidate below is then
+  // evaluated in memory. The window is the day's ranges widened by the largest
+  // buffer a candidate can carry, so it covers every candidate's blocked window.
+  const dayStart = addMinutes(
+    new Date(Math.min(...timeRanges.map((r) => r.start.getTime()))),
+    -bufferBefore,
+  )
+  const dayEnd = addMinutes(
+    new Date(Math.max(...timeRanges.map((r) => r.end.getTime()))),
+    bufferAfter,
+  )
+  const loaded = new Map<string, LoadedOccupancy>()
+  const preload = async (rid: number | string): Promise<LoadedOccupancy> => {
+    const key = String(rid)
+    let hit = loaded.get(key)
+    if (!hit) {
+      hit = await loadOccupancy({
+        blockingStatuses,
+        debug: trace,
+        excludeReservationId,
+        getExternalBusy,
+        holdsSlug,
+        payload,
+        req,
+        reservationSlug,
+        resourceId: rid,
+        resourceSlug,
+        servicesSlug: serviceSlug,
+        windowEnd: dayEnd,
+        windowStart: dayStart,
+      })
+      loaded.set(key, hit)
+    }
+    return hit
+  }
+
   // Helper: a window is available only if EVERY required resource is free
   const allAvailable = async (
     start: Date,
@@ -778,6 +892,7 @@ export async function getAvailableSlots(params: {
         guestCount: guestCount ?? 1,
         holdsSlug,
         payload,
+        preloaded: await preload(rid),
         req,
         reservationSlug,
         resourceId: rid,

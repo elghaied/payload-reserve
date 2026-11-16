@@ -35,7 +35,10 @@ export const validateCancellation =
 
     const cancelStatus = config.statusMachine.cancelStatus
     const cancelling = data?.status === cancelStatus && originalDoc?.status !== cancelStatus
-    const customerActor = req.user != null
+    // `publicCancel`: a guest cancelling by token through /reserve/cancel has no
+    // user but is a customer all the same — treating them as host code let a
+    // guest cancel (and trigger refunds) after the booking had started.
+    const customerActor = req.user != null || context?.publicCancel === true
 
     const storedStart = originalDoc?.startTime as string | undefined
     if (!storedStart) {return data}

@@ -18,9 +18,10 @@ export function createReleaseSlotEndpoint(config: ResolvedReservationPluginConfi
       } catch {
         return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
       }
-      const token = body && typeof body === 'object' ? (body.token as string | undefined) : undefined
+      const token = body && typeof body === 'object' ? body.token : undefined
 
-      if (!token) {
+      // Non-strings reached the adapter as a query value and came back as a 500.
+      if (typeof token !== 'string' || !token) {
         return Response.json({ error: 'token is required' }, { status: 400 })
       }
 

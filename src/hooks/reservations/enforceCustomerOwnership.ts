@@ -28,6 +28,12 @@ export const enforceCustomerOwnership =
     if (isPrivilegedUser(req.user, config)) {
       return data
     }
+    // /reserve/cancel on the guest-token path, used by someone who happens to
+    // be signed in: the token authorized this write and its data is fixed by
+    // the endpoint, so the booking must stay a guest booking.
+    if (context?.publicCancel === true) {
+      return data
+    }
 
     const customer = data?.customer
     if (customer != null && customer !== '') {

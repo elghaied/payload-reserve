@@ -48,7 +48,7 @@ export function createServicesCollection(config: ResolvedReservationPluginConfig
   // on Payload's default and the boot diagnostic says so.
   const catalogBase = config.userCollection ? {} : makeStandaloneCatalogAccess(config)
   const access = composeAccess(
-    rom && ownedServices ? makeServiceOwnerAccess(rom, ownerField) : catalogBase,
+    rom && ownedServices ? makeServiceOwnerAccess(rom, ownerField, config) : catalogBase,
     config.access.services,
   )
 
