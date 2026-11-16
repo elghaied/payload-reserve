@@ -239,7 +239,7 @@ Creates a new reservation. All Payload collection hooks (guest validation, requi
 
 **Response:** `201` with the created reservation document **at depth 0** (relationships as ids — since 4.1.2; the populated document leaked the customer's staff-only `notes` and, under `resourceOwnerMode`, the resource owner's user record), or `400`/`409` if validation fails. A body that is not a JSON object is `400`. An anonymous caller that supplies a `customer` gets `403 { "error": "Anonymous bookings cannot set a customer" }`. The `cancellationToken` field is **stripped** from the response — it is never echoed over HTTP, and is delivered to the guest by the host project via the `afterBookingCreate` hook.
 
-This endpoint is the public booking surface: for every caller that is not staff it also enforces `enforceSchedule` (no past start; inside the resource's schedule when it has one) and the per-service guest gate on every service the booking touches, `items[]` included.
+This endpoint is the public booking surface: for every caller that is not staff it also enforces `enforceSchedule` (no past start; inside the resource's schedule when it has one) and the per-service guest gate on every service the booking touches, `items[]` included. Since 4.4.3 it also applies `enforceServiceMatch` (a resource that lists `services` can only be booked with one of them), caps `items[]` at `maxPublicItems` (default 10), and rejects a booking whose `items[]` leave out the top-level resource while spanning more than `maxFlexibleDuration` minutes.
 
 **Example fetch:**
 
