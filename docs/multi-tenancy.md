@@ -61,7 +61,9 @@ plugins: [
 At `payloadReserve`'s own plugin-time no tenant field exists on any collection yet (multi-tenant hasn't run), and multi-tenant only ever scopes the collections named in its own `collections` option — it never discovers them. So if you enable multi-tenant elsewhere in your config but forget to list payload-reserve's collections there, those documents silently stay readable across every tenant. The plugin now detects this at boot and logs a warning naming the unscoped slugs:
 
 ```
-payload-reserve: these collections are NOT tenant-scoped: reservations, resources, schedules, services, customers. This config looks like it enables multi-tenancy (another collection carries a "tenant" field, or an auth collection carries a "tenants" membership array) — detection is a heuristic, so disregard this if you are not using multi-tenancy. Otherwise add these slugs to the multi-tenant plugin's "collections" option, or their documents stay readable across tenants.
+payload-reserve setup check: 1 thing needs attention.
+
+1. these collections are NOT tenant-scoped: reservations, resources, schedules, services, customers. This config looks like it enables multi-tenancy (another collection carries a "tenant" field, or an auth collection carries a "tenants" membership array) — detection is a heuristic, so disregard this if you are not using multi-tenancy. Otherwise add these slugs to the multi-tenant plugin's "collections" option, or their documents stay readable across tenants.
 ```
 
 Detection is a **heuristic** — the multi-tenant plugin exposes nothing at init to check directly — so the warning arms on either of two independent signals: some collection in your config carries a top-level tenant field, or an auth collection carries multi-tenant's `tenants` membership array. Each covers the other's blind spot (scoping *only* these collections and forgetting them all leaves nothing else carrying the field; `tenantsArrayField.includeDefaultField: false` removes the array). Neither is exact, so the warning can fire on a config that merely looks tenant-shaped — it is only ever a warning and never blocks boot.

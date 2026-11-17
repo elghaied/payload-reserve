@@ -108,6 +108,7 @@ src/
     effectiveTimezone.ts      # GET /api/reserve/effective-timezone
     holdSlot.ts               # POST /api/reserve/hold (slotHolds)
     releaseSlot.ts            # POST /api/reserve/hold/release (slotHolds)
+    heldSlots.ts              # GET /api/reserve/held (slotHolds; admin availability grid)
 
   utilities/
     slotUtils.ts              # addMinutes, doRangesOverlap, computeBlockedWindow, hoursUntil, localDayKey
@@ -138,6 +139,7 @@ src/
   exports/
     client.ts                 # Calendar, fields, detail drawer, primitives, hooks, formatters
     rsc.ts                    # CalendarViewServer, DashboardWidgetServer
+    sdk.ts                    # Frontend client (payload-reserve/sdk) — no Payload/React imports
 
 dev/
   payload.config.ts           # Dev Payload config (MongoDB Memory Server)

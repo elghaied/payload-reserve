@@ -327,7 +327,7 @@ payloadReserve({
 })
 ```
 
-Two more boot warnings live next to these: one when `access.reservations.create` admits a userless request (an anonymous `POST /api/reservations` could then name any customer — public booking belongs on `/api/reserve/book`, which refuses that), and one when `userCollection` leaves the catalog writes open.
+All of these appear in the single [setup check](./getting-started.md#the-boot-setup-check) block at boot. Two more items live next to them: one when `access.reservations.create` admits a userless request (an anonymous `POST /api/reservations` could then name any customer — public booking belongs on `/api/reserve/book`, which refuses that), and one when `userCollection` leaves the catalog writes open.
 
 Your `users` collection's own `access` governs who can read or update other users (and their passwords) — the plugin never changes it. `resourceOwnerMode` brings its own reservation rules (admin-only mutations, owners read their resources' reservations) and does not need this.
 

@@ -102,6 +102,22 @@ For your booking frontend, [`payload-reserve/sdk`](./sdk.md) wraps these in a ty
 
 > For multi-tenant setups where staff own their own resources, see [`resourceOwnerMode` and `staffProvisioning`](./configuration.md). The admin UI is fully translatable — see [Internationalization](./i18n.md).
 
+## The boot setup check
+
+At startup the plugin checks your config for the problems it can detect — a database without transactions, access rules that leave customers too open or locked out, collections the multi-tenant plugin is not scoping, admin component options that cancel each other out. Everything it finds is printed as **one** warning:
+
+```
+payload-reserve setup check: 2 things need attention.
+
+1. this database does not support transactions, so concurrent bookings for the same slot can double-book. ...
+
+2. "userCollection" is set but no "access.reservations" rule narrows reads, ...
+
+Checked and fine: services–resources join, admin components.
+```
+
+Nothing is printed when there is nothing to fix. The checks are warnings only and never stop the app from booting. Some are heuristics (multi-tenancy cannot be detected exactly), and the message says so when that applies.
+
 ## Using Your Existing Users Collection
 
 By default the plugin creates a standalone `customers` auth collection. To extend your own users collection instead, set the `userCollection` option:

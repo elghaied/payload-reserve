@@ -367,6 +367,10 @@ config.admin.custom.reservationTimezone
 config.admin.custom.reservationCalendar
 // { defaultView, mobileDefaultView, hiddenViews, statusPresentation, weekStartsOn }
 
+// Whether slotHolds is enabled (the availability grid then shows held slots)
+config.admin.custom.reservationHoldsEnabled
+// true | false
+
 // Tenant scoping (when multiTenant is configured)
 config.admin.custom.reservationTenant
 // { tenantField, cookieName, timezoneField }

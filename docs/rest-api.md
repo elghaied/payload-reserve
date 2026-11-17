@@ -36,7 +36,7 @@ Returns available time slots for a resource and service on a given date. Slots a
 The resolved resource set is the union of the caller resource(s) and the service's `requiredResources` — a slot is only returned if **all** required resources are free.
 
 **Errors:**
-- `400 { "message": "Missing required query params: resource, date, service" }` when a required param is missing.
+- `400 { "error": "Missing required query params: resource, date, service" }` when a required param is missing.
 - `400 { "error": "Invalid date format. Expected YYYY-MM-DD" }` when `date` is unparseable or an impossible calendar date (e.g. `2026-13-45`).
 - `400 { "error": "Invalid guestCount" }` when `guestCount` is non-numeric.
 - `400 { "error": "resources accepts at most 20 ids" }` when `resources` lists more than 20.
@@ -293,11 +293,11 @@ Cancels a reservation. Works in two modes:
 
 **Response:** `200` with the updated reservation document at depth 0 (relationships as ids, `cancellationToken` stripped). The reservation's status is set to the configured `statusMachine.cancelStatus` (default `'cancelled'`), not a hardcoded value — so custom status vocabularies cancel correctly.
 
-**Errors:**
-- `400 { "message": "reservationId is required" }` when `reservationId` is missing; `400 { "message": "Invalid JSON body" }` for an unparseable body; `400 { "message": "token and reason must be strings" }` for a non-string `token` or `reason`.
-- `404 { "message": "Reservation not found" }` for an unknown or malformed id (previously a 500 on Postgres/SQLite).
-- `403 { "message": "Forbidden" }` when an authenticated user is neither the owner nor privileged, when a guest supplies a missing/invalid `token`, or when a staff user's cancel is refused by the collection's access rules.
-- `409 { "error": "That booking is being modified. Please try again.", "retryable": true }` when a concurrent write outlasts the retries (note the key is `error`).
+**Errors** (each also repeats the text under `message`, the key these responses used before 5.0):
+- `400 { "error": "reservationId is required" }` when `reservationId` is missing; `400 { "error": "Invalid JSON body" }` for an unparseable body; `400 { "error": "token and reason must be strings" }` for a non-string `token` or `reason`.
+- `404 { "error": "Reservation not found" }` for an unknown or malformed id (previously a 500 on Postgres/SQLite).
+- `403 { "error": "Forbidden" }` when an authenticated user is neither the owner nor privileged, when a guest supplies a missing/invalid `token`, or when a staff user's cancel is refused by the collection's access rules.
+- `409 { "error": "That booking is being modified. Please try again.", "retryable": true }` when a concurrent write outlasts the retries .
 
 There is no `401` response — guest cancellation is supported. The `validateCancellation` hook enforces the minimum notice period configured in `cancellationNoticePeriod`. A guest cancelling by token is treated as a customer: the notice period applies and a booking that has already started cannot be cancelled.
 
