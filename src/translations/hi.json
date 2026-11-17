@@ -83,6 +83,7 @@
   "availabilityNoResources": "कोई सक्रिय संसाधन नहीं मिला।",
   "availabilityNotConfigured": "आरक्षण प्लगइन कॉन्फ़िगर नहीं किया गया है।",
   "availabilityBooked": "बुक किया गया",
+  "availabilityHeld": "होल्ड पर",
   "availabilityXofYBooked": "{{booked}}/{{total}} बुक किए गए",
   "availabilityUnavailable": "अनुपलब्ध",
   "availabilityResource": "संसाधन",

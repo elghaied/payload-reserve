@@ -83,6 +83,7 @@
   "availabilityNoResources": "Активные ресурсы не найдены.",
   "availabilityNotConfigured": "Плагин бронирования не настроен.",
   "availabilityBooked": "Забронировано",
+  "availabilityHeld": "Удерживается",
   "availabilityXofYBooked": "{{booked}}/{{total}} забронировано",
   "availabilityUnavailable": "Недоступно",
   "availabilityResource": "Ресурс",

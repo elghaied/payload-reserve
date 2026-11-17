@@ -55,7 +55,7 @@ Three things to know before going live:
 - **Slot holds** — reserve a slot for a few minutes while the customer pays
 - **Lifecycle hooks** — seven hooks for email, payments and webhooks
 - **Admin UI** — month/week/day/lanes calendar, pending list, reservation detail drawer, availability grid, dashboard widget; every piece replaceable
-- **Public REST API** — availability, slots, book, cancel, holds
+- **Public REST API and typed client** — availability, slots, book, cancel, holds; `payload-reserve/sdk` for your frontend
 - **Multi-tenancy** — resource-owner mode, and support for `@payloadcms/plugin-multi-tenant` with per-tenant timezones
 - **External calendars** — fold busy time from Google/Outlook sync or a legacy system into availability
 - **12 languages**, fully typed, MongoDB / Postgres / SQLite
@@ -98,6 +98,7 @@ Also published at **[docs.payloadreserve.com](https://docs.payloadreserve.com)**
 
 | Integrating | |
 |---|---|
+| [Frontend SDK](./docs/sdk.md) | Typed client for slots, holds, booking and cancelling |
 | [REST API](./docs/rest-api.md) | Endpoints, parameters, responses |
 | [Hooks API](./docs/hooks-api.md) | The seven lifecycle hooks and when they fire |
 | [Admin UI](./docs/admin-ui.md) | Calendar, detail drawer, replacing components, styling |

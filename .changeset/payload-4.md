@@ -16,6 +16,13 @@ Payload 4 support. This major requires `payload`, `@payloadcms/ui` and `@payload
 - The boot warning for `userCollection` mode now tells you when its users are locked out of the collection REST API (the collection is not the admin collection) instead of claiming everything is open.
 - `CustomerField` and `AvailabilityTimeField` are typed with Payload 4's field props types.
 
+**Added**
+
+- `payload-reserve/sdk` — a typed client for the booking endpoints (`getSlots`, `hold`, `releaseHold`, `book`, `cancel`) with one `ReserveError` carrying `status`, `message`, `code`, `path` and `retryable`. No Payload or React import, so it runs in any frontend.
+- The admin Availability grid shows slot holds ("Held"), read from a new staff-only `GET /api/reserve/held` endpoint that never returns tokens.
+- Boot diagnostics are printed as one "payload-reserve setup check" block listing what needs attention and what was checked and is fine, instead of separate warning lines.
+- Endpoint errors that used `message` (`/reserve/cancel`, customer search, one `/reserve/availability` case) now also carry `error`, the key every other endpoint uses. `message` is kept.
+
 **Upgrading**
 
 - If you call the Local API on the plugin's collections from your own code, add `overrideAccess: true` where you relied on the old default (`npx @payloadcms/codemod` does this).

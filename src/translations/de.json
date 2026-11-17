@@ -83,6 +83,7 @@
   "availabilityNoResources": "Keine aktiven Ressourcen gefunden.",
   "availabilityNotConfigured": "Reservierungs-Plugin nicht konfiguriert.",
   "availabilityBooked": "Gebucht",
+  "availabilityHeld": "Gehalten",
   "availabilityXofYBooked": "{{booked}}/{{total}} gebucht",
   "availabilityUnavailable": "Nicht verfügbar",
   "availabilityResource": "Ressource",

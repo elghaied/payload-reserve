@@ -18,7 +18,7 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
       try {
         body = await req.json?.()
       } catch {
-        return Response.json({ message: 'Invalid JSON body' }, { status: 400 })
+        return Response.json({ error: 'Invalid JSON body', message: 'Invalid JSON body' }, { status: 400 })
       }
       const { reason, reservationId, token } = (body ?? {}) as Record<string, unknown>
 
@@ -28,13 +28,13 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         (typeof reservationId !== 'string' && typeof reservationId !== 'number') ||
         reservationId === ''
       ) {
-        return Response.json({ message: 'reservationId is required' }, { status: 400 })
+        return Response.json({ error: 'reservationId is required', message: 'reservationId is required' }, { status: 400 })
       }
       if (
         (token !== undefined && token !== null && typeof token !== 'string') ||
         (reason !== undefined && reason !== null && typeof reason !== 'string')
       ) {
-        return Response.json({ message: 'token and reason must be strings' }, { status: 400 })
+        return Response.json({ error: 'token and reason must be strings', message: 'token and reason must be strings' }, { status: 400 })
       }
 
       // Fetch the reservation to check ownership / token.
@@ -51,7 +51,7 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         req,
       }).catch(() => null)
       if (!existing) {
-        return Response.json({ message: 'Reservation not found' }, { status: 404 })
+        return Response.json({ error: 'Reservation not found', message: 'Reservation not found' }, { status: 404 })
       }
 
       // Chosen per authorization path, then applied to the update below:
@@ -87,7 +87,7 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         const a = Buffer.from(typeof token === 'string' ? token : '')
         const b = Buffer.from(stored ?? '')
         if (!stored || a.length !== b.length || !timingSafeEqual(a, b)) {
-          return Response.json({ message: 'Forbidden' }, { status: 403 })
+          return Response.json({ error: 'Forbidden', message: 'Forbidden' }, { status: 403 })
         }
         viaGuestToken = true
       }
@@ -121,7 +121,7 @@ export function createCancelBookingEndpoint(config: ResolvedReservationPluginCon
         }
         // A denied delegate write is an authorization failure, not a 500.
         if ((err as { status?: number })?.status === 403) {
-          return Response.json({ message: 'Forbidden' }, { status: 403 })
+          return Response.json({ error: 'Forbidden', message: 'Forbidden' }, { status: 403 })
         }
         throw err
       }

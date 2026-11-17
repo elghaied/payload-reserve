@@ -83,6 +83,7 @@
   "availabilityNoResources": "未找到启用的资源。",
   "availabilityNotConfigured": "预约插件尚未配置。",
   "availabilityBooked": "已预约",
+  "availabilityHeld": "保留中",
   "availabilityXofYBooked": "已预约 {{booked}}/{{total}}",
   "availabilityUnavailable": "不可用",
   "availabilityResource": "资源",

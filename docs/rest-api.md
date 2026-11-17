@@ -13,6 +13,9 @@ The plugin mounts seven endpoints, plus two more when `slotHolds` is enabled. Al
 | GET | `/api/reservation-customer-search` | Search customers by name/email/phone; privileged staff/admin only |
 | POST | `/api/reserve/hold` | Only with `slotHolds.enabled`: hold a slot during checkout — see [Slot Holds](./slot-holds.md) |
 | POST | `/api/reserve/hold/release` | Only with `slotHolds.enabled`: release a hold by token |
+| GET | `/api/reserve/held` | Only with `slotHolds.enabled`: unexpired holds for the admin availability grid; staff only, no tokens |
+
+**Errors.** Every error the plugin's endpoints produce themselves carries a human-readable or machine-readable string under `error` (a few older ones also repeat it under `message`). A validation error thrown by a booking rule uses Payload's own `{ errors: [...] }` shape. The [SDK](./sdk.md) reads all three for you and throws one `ReserveError`.
 
 ---
 

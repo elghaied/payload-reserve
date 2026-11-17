@@ -46,6 +46,9 @@ type Reservation = {
   status: string
 }
 
+/** An unexpired slot hold — occupies its slot like a booking until it lapses. */
+type Hold = { resource: number | string; startTime: string }
+
 const DAY_MAP: Record<string, number> = {
   fri: 5,
   mon: 1,
@@ -79,6 +82,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     | ReservationCalendarConfig
     | undefined
   const weekStartsOn = calendarConfig?.weekStartsOn ?? 0
+  const holdsEnabled = config.admin?.custom?.reservationHoldsEnabled === true
 
   const resourcesTenantParams = useTenantFilter(slugs?.resources ?? 'resources')
   const schedulesTenantParams = useTenantFilter(slugs?.schedules ?? 'schedules')
@@ -128,6 +132,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
   const [resources, setResources] = useState<Resource[]>([])
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [reservations, setReservations] = useState<Reservation[]>([])
+  const [holds, setHolds] = useState<Hold[]>([])
   const [loading, setLoading] = useState(true)
 
   // Cells are browser-local midnights by design; every key derived from them
@@ -193,15 +198,38 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
           reservationsRes.json(),
         ])
 
+        // The holds collection is closed to REST (its token is a secret), so
+        // held slots come from a staff-only endpoint. A failure here only costs
+        // the "Held" markers, never the grid.
+        let held: Hold[] = []
+        const resourceIds = ((rData.docs ?? []) as Resource[]).map((r) => r.id)
+        if (holdsEnabled && resourceIds.length > 0) {
+          try {
+            const heldParams = new URLSearchParams({
+              end: weekEnd.toISOString(),
+              resources: resourceIds.join(','),
+              start: weekStart.toISOString(),
+            })
+            const heldRes = await fetch(`${apiBase}/reserve/held?${heldParams}`)
+            if (heldRes.ok) {
+              held = (await heldRes.json()).holds ?? []
+            }
+          } catch {
+            held = []
+          }
+        }
+
         if (stale) {return}
         setResources(rData.docs ?? [])
         setSchedules(sData.docs ?? [])
         setReservations(resData.docs ?? [])
+        setHolds(held)
       } catch {
         if (stale) {return}
         setResources([])
         setSchedules([])
         setReservations([])
+        setHolds([])
       }
       if (!stale) {setLoading(false)}
     }
@@ -213,7 +241,7 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     // blockingStatuses is derived from config which is stable; stringify to
     // avoid object-reference churn causing infinite loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekStart, weekEnd, config.routes.api, config.serverURL, slugs, blockingStatuses.join(','), resourcesTenantParams, schedulesTenantParams, reservationsTenantParams])
+  }, [weekStart, weekEnd, config.routes.api, config.serverURL, slugs, blockingStatuses.join(','), holdsEnabled, resourcesTenantParams, schedulesTenantParams, reservationsTenantParams])
 
   const navigateWeek = useCallback((direction: -1 | 1) => {
     setWeekStart((prev) => {
@@ -296,6 +324,16 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
     })
   }
 
+  /** Returns the unexpired holds on a resource that start on a given day. */
+  const getHoldsForResourceDay = (resourceId: string, day: Date) => {
+    const dayKey = getDayKeyInTimezone(day, reservationTimezone)
+    return holds.filter(
+      (h) =>
+        String(h.resource) === String(resourceId) &&
+        getDayKeyInTimezone(new Date(h.startTime), reservationTimezone) === dayKey,
+    )
+  }
+
   if (!slugs) {
     return <div className={styles.noResources}>{t('reservation:availabilityNotConfigured')}</div>
   }
@@ -355,7 +393,9 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
                 {weekDays.map((day, di) => {
                   const slots = getSlotsForResourceDay(resource.id, day)
                   const bookings = getBookingsForResourceDay(resource.id, day)
-                  const bookedCount = bookings.length
+                  const dayHolds = getHoldsForResourceDay(resource.id, day)
+                  // A hold takes a unit exactly as a booking does.
+                  const bookedCount = bookings.length + dayHolds.length
 
                   return (
                     <div className={styles.cell} key={`cell-${resource.id}-${di}`}>
@@ -400,6 +440,17 @@ export const AvailabilityOverview: React.FC<AdminViewServerProps> = () => {
                           </div>
                         ))
                       )}
+                      {quantity <= 1 &&
+                        dayHolds.map((h, hi) => (
+                          <div className={styles.slotHeld} key={`held-${hi}`}>
+                            {new Date(h.startTime).toLocaleTimeString(locale, {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              timeZone: reservationTimezone,
+                            })}{' '}
+                            {t('reservation:availabilityHeld')}
+                          </div>
+                        ))}
                     </div>
                   )
                 })}

@@ -22,7 +22,7 @@ export function createCheckAvailabilityEndpoint(
 
       if (!date || !resource || !service) {
         return Response.json(
-          { message: 'Missing required query params: resource, date, service' },
+          { error: 'Missing required query params: resource, date, service', message: 'Missing required query params: resource, date, service' },
           { status: 400 },
         )
       }

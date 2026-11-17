@@ -83,6 +83,7 @@
   "availabilityNoResources": "Tidak ada sumber daya aktif yang ditemukan.",
   "availabilityNotConfigured": "Plugin reservasi belum dikonfigurasi.",
   "availabilityBooked": "Dipesan",
+  "availabilityHeld": "Ditahan",
   "availabilityXofYBooked": "{{booked}}/{{total}} dipesan",
   "availabilityUnavailable": "Tidak Tersedia",
   "availabilityResource": "Sumber Daya",

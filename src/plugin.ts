@@ -18,6 +18,7 @@ import { createBookingEndpoint } from './endpoints/createBooking.js'
 import { createCustomerSearchEndpoint } from './endpoints/customerSearch.js'
 import { createEffectiveTimezoneEndpoint } from './endpoints/effectiveTimezone.js'
 import { createGetSlotsEndpoint } from './endpoints/getSlots.js'
+import { createHeldSlotsEndpoint } from './endpoints/heldSlots.js'
 import { createHoldSlotEndpoint } from './endpoints/holdSlot.js'
 import { createReleaseSlotEndpoint } from './endpoints/releaseSlot.js'
 import { createResourceAvailabilityEndpoint } from './endpoints/resourceAvailability.js'
@@ -141,6 +142,19 @@ function collectFieldNames(fields: Field[]): Set<string> {
   }
   walk(fields)
   return names
+}
+
+/** One boot-log block for every setup problem the plugin can detect. */
+export function formatSetupCheck(issues: string[], passed: string[]): string {
+  const count = issues.length === 1 ? '1 thing needs' : `${issues.length} things need`
+  const lines = [`payload-reserve setup check: ${count} attention.`, '']
+  issues.forEach((message, index) => {
+    lines.push(`${index + 1}. ${message}`, '')
+  })
+  if (passed.length > 0) {
+    lines.push(`Checked and fine: ${passed.join(', ')}.`)
+  }
+  return lines.join('\n').trimEnd()
 }
 
 export const payloadReserve =
@@ -337,7 +351,25 @@ export const payloadReserve =
           msg: 'payload-reserve: could not add the reservations widget to the dashboard layout.',
         })
       }
+      // Every diagnostic below reports into one list, printed as a single
+      // "setup check" block — a host with three things to fix used to get three
+      // unrelated warning lines scattered through the boot log.
+      const issues: string[] = []
+      const checked: string[] = []
+      const failed = new Set<string>()
+      let current = ''
+      const section = (name: string) => {
+        current = name
+        if (!checked.includes(name)) {
+          checked.push(name)
+        }
+      }
+      const issue = (message: string) => {
+        failed.add(current)
+        issues.push(message.replace(/^payload-reserve: /, ''))
+      }
       try {
+        section('services–resources join')
         // The Services `resources` join is omitted when a collectionOverrides.resources
         // override removed, renamed, or nested `services` inside a NAMED group/tab.
         // hasResourceServicesField is only ever false because of such an override —
@@ -345,7 +377,7 @@ export const payloadReserve =
         // fire spuriously. Warn rather than throw: restructuring your own collection
         // is a supported customization, not invalid config.
         if (!resolved.hasResourceServicesField) {
-          payload.logger.warn(
+          issue(
             `payload-reserve: the "${resolved.slugs.services}" collection's read-only "resources" join was skipped because "${resolved.slugs.resources}.services" is not a top-level relationship field. A collectionOverrides.resources override removed, renamed, or nested it inside a named group or tab.`,
           )
         }
@@ -378,6 +410,7 @@ export const payloadReserve =
           (c) => Boolean(c.auth) && collectionHasArrayField(c, MT_TENANTS_ARRAY_FIELD),
         )
         if (scoped.length > 0 || hasMembershipArray) {
+          section('multi-tenant scoping')
           const candidates = [
             resolved.slugs.reservations,
             resolved.slugs.resources,
@@ -406,7 +439,7 @@ export const payloadReserve =
             return collection && !collectionHasTenantField(collection, tenantField)
           })
           if (unscoped.length > 0) {
-            payload.logger.warn(
+            issue(
               `payload-reserve: these collections are NOT tenant-scoped: ${unscoped.join(', ')}. This config looks like it enables multi-tenancy (another collection carries a "${tenantField}" field, or an auth collection carries a "${MT_TENANTS_ARRAY_FIELD}" membership array) — detection is a heuristic, so disregard this if you are not using multi-tenancy. Otherwise add these slugs to the multi-tenant plugin's "collections" option, or their documents stay readable across tenants.`,
             )
           }
@@ -423,7 +456,7 @@ export const payloadReserve =
           // setting multi-tenant's own `useTenantsCollectionAccess: false`,
           // which is not observable from here), so warn about it.
           if (!resolved.userCollection) {
-            payload.logger.warn(
+            issue(
               `payload-reserve: in standalone mode (no "userCollection"), /reserve/book's tenant-membership check may not actually verify a logged-in customer's membership — customers authenticate against "${resolved.slugs.customers}", a collection multi-tenant never wraps, so its probe read passes for any tenant id. Detection is the same heuristic as the warning above (a top-level "${tenantField}" field is matched by NAME, not by type or relationship target, and the check cannot see whether "${resolved.slugs.customers}" is itself multi-tenant's admin/tenant-owning collection), so disregard this if you are not using multi-tenancy. Otherwise a malicious customer could supply an explicit foreign tenant: set "userCollection" to point at multi-tenant's own admin auth collection, or add your own tenant-membership check in front of /reserve/book.`,
             )
           }
@@ -452,7 +485,7 @@ export const payloadReserve =
               // `collections` (it gets an ordinary flat tenant field there). This
               // plugin cannot tell which case applies from here, so the message
               // explains both rather than asserting the wrong one.
-              payload.logger.warn(
+              issue(
                 `payload-reserve: the "${resolved.slugs.customers}" collection backs userCollection mode and holds the customer PII that /api/reservation-customer-search reads, but it carries neither a "${tenantField}" field nor a "${MT_TENANTS_ARRAY_FIELD}" membership array. Detection is a heuristic, so disregard this if you are not using multi-tenancy, or if you renamed the tenants array field, or set "tenantsArrayField.includeDefaultField: false" — both are supported multi-tenant configurations this check cannot see. Otherwise: multi-tenant does NOT scope an auth collection by listing it in its "collections" option — it rejects that with its own warning and skips the collection entirely. If this is the collection multi-tenant treats as its admin/tenant-owning collection ("admin.user" in your Payload config, or your only auth-enabled collection), it needs the "${MT_TENANTS_ARRAY_FIELD}" array instead, which multi-tenant adds automatically unless disabled. Only a SEPARATE auth collection from that one belongs in the "collections" option, where it gets an ordinary "${tenantField}" field.`,
               )
             }
@@ -463,8 +496,11 @@ export const payloadReserve =
         // standalone mongod Payload skips transactions entirely, so the lock
         // degrades to a no-op and concurrent bookings double-book again — with
         // no error anywhere. Say so at boot; there is no runtime signal.
+        if (!resolved.disabled) {
+          section('database transactions')
+        }
         if (!resolved.disabled && !(await supportsTransactions(payload))) {
-          payload.logger.warn(
+          issue(
             'payload-reserve: this database does not support transactions, so concurrent bookings for the same slot can double-book. MongoDB needs a replica set (even single-node) for transaction support. Postgres supports transactions by default. SQLite requires transactionOptions to be set on the adapter, or it silently runs without them.',
           )
         }
@@ -484,6 +520,7 @@ export const payloadReserve =
         // (`config.admin.user`). When `userCollection` is a different
         // collection the gap is the opposite one: its users are denied every
         // plugin collection, so say that instead of claiming it is open.
+        section('access rules')
         const adminSlug =
           payload.config.admin?.user ?? payload.config.collections?.find((c) => c.auth)?.slug
         const usersAreAdmins =
@@ -493,7 +530,7 @@ export const payloadReserve =
           !resolved.resourceOwnerMode &&
           !resolved.access.reservations?.read
         ) {
-          payload.logger.warn(
+          issue(
             usersAreAdmins
               ? `payload-reserve: "userCollection" is set but no "access.reservations" rule narrows reads, so every user of "${resolved.slugs.customers}" can read, update and delete every reservation through the collection REST API (Payload's default admits any user of the admin collection). Fine if only staff can log in; if customers can, supply "access.reservations" that scopes non-staff users to "customer equals req.user.id" — see docs/configuration.md, "Access control for customers".`
               : `payload-reserve: "userCollection" is "${resolved.slugs.customers}", which is not the admin collection ("${adminSlug}"), and no "access.reservations.read" rule is set. Payload 4's default access only admits admin-collection users, so users of "${resolved.slugs.customers}" cannot read their own reservations (or the services, resources and schedules) through the collection REST API; the /api/reserve endpoints are unaffected. Supply "access" rules for what they should see — see docs/configuration.md, "Access control for customers".`,
@@ -514,7 +551,7 @@ export const payloadReserve =
             .filter(([, a]) => !a?.update || !a?.delete || !a?.create)
             .map(([name]) => name)
           if (openCatalog.length > 0) {
-            payload.logger.warn(
+            issue(
               `payload-reserve: "userCollection" is set but ${openCatalog.join(', ')} have no create/update/delete rule in "access", so every user of "${resolved.slugs.customers}" can create, edit and delete them (deactivate a resource, rewrite buffers, post a years-long exception) through the collection REST API. Fine if only staff can log in; otherwise restrict those operations to staff — see docs/configuration.md, "Access control for customers".`,
             )
           }
@@ -537,7 +574,7 @@ export const payloadReserve =
             // A rule that throws for a userless probe refuses anonymous callers.
           }
           if (anonymousCreate) {
-            payload.logger.warn(
+            issue(
               `payload-reserve: "access.reservations.create" allows anonymous callers, so an unauthenticated POST /api/${resolved.slugs.reservations} can create a reservation on any customer's account. Public booking should go through POST /api/reserve/book, which refuses an anonymous "customer"; restrict the collection rule to authenticated users.`,
             )
           }
@@ -549,9 +586,10 @@ export const payloadReserve =
         // unless it chooses to, and `false` means no plugin calendar renders at all
         // (resolveComponentSlot falls back to Payload's stock list view instead) —
         // both leave reservationDetail silently inert, so both need the warning.
+        section('admin components')
         if (typeof resolved.components.reservationDetail === 'string') {
           if (typeof resolved.components.calendarView === 'string') {
-            payload.logger.warn(
+            issue(
               'payload-reserve: components.reservationDetail is set, but components.calendarView ' +
                 'replaces the calendar that renders it, so the detail component will not appear ' +
                 'unless your calendar renders it itself (import ReservationDetailProvider and ' +
@@ -559,7 +597,7 @@ export const payloadReserve =
                 'if that is not what you intended.',
             )
           } else if (resolved.components.calendarView === false) {
-            payload.logger.warn(
+            issue(
               'payload-reserve: components.reservationDetail is set, but components.calendarView ' +
                 "is false, so Payload's own list view renders instead of the plugin calendar that " +
                 'would have rendered the detail component — it will not appear at all. Remove one ' +
@@ -570,6 +608,13 @@ export const payloadReserve =
       } catch {
         // A diagnostic must never break boot — that is the whole reason these
         // are warnings and not throws. The host onInit await stays OUTSIDE.
+      }
+      try {
+        if (issues.length > 0) {
+          payload.logger.warn(formatSetupCheck(issues, checked.filter((c) => !failed.has(c))))
+        }
+      } catch {
+        // Same rule: a logger that throws must not break boot.
       }
     }
 
@@ -586,7 +631,11 @@ export const payloadReserve =
       // Only when slot holds are enabled — an install that never opts in gets
       // no new routes.
       ...(resolved.slotHolds.enabled
-        ? [createHoldSlotEndpoint(resolved), createReleaseSlotEndpoint(resolved)]
+        ? [
+            createHeldSlotsEndpoint(resolved),
+            createHoldSlotEndpoint(resolved),
+            createReleaseSlotEndpoint(resolved),
+          ]
         : []),
     )
 
@@ -621,6 +670,7 @@ export const payloadReserve =
     config.admin.custom.reservationTenant = resolved.multiTenant
     config.admin.custom.reservationTimezone = resolved.timezone
     config.admin.custom.reservationCalendar = resolved.calendar
+    config.admin.custom.reservationHoldsEnabled = resolved.slotHolds.enabled
 
     // The detail component is resolved at render time by CalendarViewServer, so
     // it lives in admin.custom rather than being written into Payload config as a

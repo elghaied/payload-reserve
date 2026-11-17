@@ -167,6 +167,7 @@ A custom admin view registered at `/admin/reservation-availability`. Displays a 
 - **Gray slots** — exception dates (unavailable), labeled with the exception reason
 - **Single-unit resources** — list individual booking start times for that day
 - **Multi-unit resources (`quantity > 1`)** — show an "X / Y booked" capacity badge with graduated color (low / mid / full)
+- **Held slots** — with [`slotHolds`](./slot-holds.md) enabled, an unexpired hold shows as a dashed amber "Held" entry (single-unit) or counts toward the badge (multi-unit)
 
 Only reservations in a blocking status count toward bookings. Exceptions honor the `date`–`endDate` range — a multi-day time-off block marks every day in the range unavailable, not just the start date. Grid days are keyed in the configured business `timezone`; exception and manual-slot dates are calendar days keyed by their UTC date (see [Booking Features → Exceptions and Time Off](./booking-features.md#exceptions-and-time-off)). Navigate between weeks with previous/next buttons.
 

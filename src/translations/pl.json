@@ -83,6 +83,7 @@
   "availabilityNoResources": "Nie znaleziono aktywnych zasobów.",
   "availabilityNotConfigured": "Wtyczka rezerwacji nie została skonfigurowana.",
   "availabilityBooked": "Zarezerwowano",
+  "availabilityHeld": "Wstrzymane",
   "availabilityXofYBooked": "{{booked}}/{{total}} zarezerwowano",
   "availabilityUnavailable": "Niedostępny",
   "availabilityResource": "Zasób",

@@ -84,6 +84,25 @@ describe('D6: customers can read every reservation in userCollection mode', () =
   })
 })
 
+describe('setup check block', () => {
+  it('prints every problem in one numbered warning, with what passed', async () => {
+    const config = payloadReserve({ userCollection: 'users' })(baseConfig())
+    const { messages, payload } = fakePayload(
+      (config.collections ?? []) as unknown as Array<Record<string, unknown>>,
+    )
+    await config.onInit!(payload)
+    expect(messages).toHaveLength(1)
+    expect(messages[0]).toMatch(/^payload-reserve setup check: 2 things need attention\./)
+    expect(messages[0]).toMatch(/\n1\. "userCollection" is set/)
+    expect(messages[0]).toMatch(/\n2\. /)
+    expect(messages[0]).toMatch(/Checked and fine: .*database transactions/)
+  })
+
+  it('stays silent when nothing needs attention', async () => {
+    expect(await warningsFor({})).toBe('')
+  })
+})
+
 describe('D6b/D7: catalog writes and anonymous create', () => {
   it('warns when userCollection leaves services/resources/schedules writable by every user', async () => {
     const msgs = await warningsFor({ userCollection: 'users' })

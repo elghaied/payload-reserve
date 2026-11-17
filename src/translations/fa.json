@@ -83,6 +83,7 @@
   "availabilityNoResources": "هیچ منبع فعالی یافت نشد.",
   "availabilityNotConfigured": "افزونه رزرو پیکربندی نشده است.",
   "availabilityBooked": "رزرو شده",
+  "availabilityHeld": "نگه‌داشته",
   "availabilityXofYBooked": "{{booked}}/{{total}} رزرو شده",
   "availabilityUnavailable": "در دسترس نیست",
   "availabilityResource": "منبع",

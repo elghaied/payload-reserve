@@ -13,7 +13,7 @@ payloadReserve({
 })
 ```
 
-Disabled by default — when absent, no `reservation-holds` collection is created, neither endpoint below is registered, and availability behaviour is byte-identical to a plugin build without this feature at all. A hold occupies its resource exactly like a blocking reservation (folded into the same availability/conflict calculations); it carries no status, buffer, or `items[]` — one resource, one window, one clock. Expired holds are never trusted and are swept opportunistically, so no background job is required.
+Disabled by default — when absent, no `reservation-holds` collection is created, none of the endpoints below is registered, and availability behaviour is byte-identical to a plugin build without this feature at all. A hold occupies its resource exactly like a blocking reservation (folded into the same availability/conflict calculations); it carries no status, buffer, or `items[]` — one resource, one window, one clock. Expired holds are never trusted and are swept opportunistically, so no background job is required.
 
 | Method | Path | Body | Response |
 |---|---|---|---|
@@ -28,7 +28,7 @@ Pass the token straight through to `POST /api/reserve/book` as `holdToken` to co
 
 **Held slots are excluded from availability, not just from bookings.** `/api/reserve/availability`, `/api/reserve/slots` and `/api/reserve/resource-availability` all treat an unexpired hold as busy, so every customer-facing path agrees with the write path — a customer is never shown a slot the booking endpoint will then refuse with a `409`. That covers the reservation form's slot picker (`AvailabilityTimeField`, which fetches `/reserve/slots`) and the admin **Calendar** view (which fetches `/reserve/resource-availability`). Nothing in that path changes when `slotHolds` is off.
 
-**Known limitation — the admin Availability grid does not show holds.** `AvailabilityOverview` (the weekly grid at `/reservation-availability`) does not use `/reserve/resource-availability`; it queries the `resources`, `schedules` and `reservations` REST endpoints directly and computes the grid in the browser, so an unexpired hold is invisible there and its slot reads as free. This is **display-only and admin-only**: it cannot cause a wrong write, because every write still goes through `checkAvailability`, which does count holds — an admin who books over a held slot from that grid is refused exactly as any other caller would be. Cross-check the Calendar view, or `/reserve/availability`, when holds matter.
+**The admin Availability grid shows holds too.** `AvailabilityOverview` (the weekly grid at `/reservation-availability`) marks a held slot as "Held" (dashed amber) on a single-unit resource and counts it in the "X / Y booked" badge on a multi-unit one. It reads them from `GET /api/reserve/held?resources=<ids>&start=<iso>&end=<iso>` — staff only, limited to resources the caller may read, and it returns `{ holds: [{ resource, startTime, endTime, expiresAt }] }` with no token.
 
 ---
 

@@ -98,6 +98,8 @@ All six admin components (these, plus the detail drawer and the two reservation-
 - `GET /api/reserve/effective-timezone` — the business timezone for the signed-in user's selected tenant
 - `POST /api/reserve/hold` and `/api/reserve/hold/release` — only when [`slotHolds`](./slot-holds.md) is enabled
 
+For your booking frontend, [`payload-reserve/sdk`](./sdk.md) wraps these in a typed client.
+
 > For multi-tenant setups where staff own their own resources, see [`resourceOwnerMode` and `staffProvisioning`](./configuration.md). The admin UI is fully translatable — see [Internationalization](./i18n.md).
 
 ## Using Your Existing Users Collection

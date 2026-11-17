@@ -26,13 +26,13 @@ export function createCustomerSearchEndpoint(
   return {
     handler: async (req) => {
       if (!req.user) {
-        return Response.json({ message: 'Unauthorized' }, { status: 401 })
+        return Response.json({ error: 'Unauthorized', message: 'Unauthorized' }, { status: 401 })
       }
 
       // Only staff/admin may search customers. Role-aware so it works when staff
       // and customers share one auth collection (userCollection set).
       if (!isPrivilegedUser(req.user, config)) {
-        return Response.json({ message: 'Forbidden' }, { status: 403 })
+        return Response.json({ error: 'Forbidden', message: 'Forbidden' }, { status: 403 })
       }
 
       const url = new URL(req.url!)

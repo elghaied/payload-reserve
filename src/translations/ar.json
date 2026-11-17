@@ -83,6 +83,7 @@
   "availabilityNoResources": "لم يتم العثور على موارد نشطة.",
   "availabilityNotConfigured": "لم يتم تكوين إضافة الحجوزات.",
   "availabilityBooked": "محجوز",
+  "availabilityHeld": "محجوز مؤقتًا",
   "availabilityXofYBooked": "{{booked}}/{{total}} محجوز",
   "availabilityUnavailable": "غير متوفر",
   "availabilityResource": "المورد",

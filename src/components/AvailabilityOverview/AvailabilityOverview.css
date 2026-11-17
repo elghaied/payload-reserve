@@ -79,6 +79,17 @@
   color: #1e40af;
 }
 
+/* A slot hold: taken for a few minutes during checkout, not yet a booking. */
+.reserve-availability__slotHeld {
+  font-size: 0.625rem;
+  padding: 2px 4px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+  border: 1px dashed #b45309;
+  background: #fef3c7;
+  color: #92400e;
+}
+
 /* Graduated capacity colors for multi-unit resources */
 /* Green: utilization < 50% */
 .reserve-availability__slotCapacityLow {
