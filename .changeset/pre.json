@@ -1,0 +1,10 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "payload-reserve": "4.4.3"
+  },
+  "changesets": [
+    "payload-4"
+  ]
+}
