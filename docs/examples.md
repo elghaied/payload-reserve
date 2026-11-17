@@ -49,6 +49,7 @@ await payload.create({
     durationType: 'full-day',
     price: 149.00,
   },
+  overrideAccess: true,
 })
 
 // Room resource (10 identical standard doubles)
@@ -60,6 +61,7 @@ await payload.create({
     quantity: 10,
     capacityMode: 'per-reservation',
   },
+  overrideAccess: true,
 })
 ```
 
@@ -84,6 +86,7 @@ await payload.create({
     quantity: 60,
     capacityMode: 'per-guest',
   },
+  overrideAccess: true,
 })
 ```
 
@@ -238,6 +241,7 @@ await payload.create({
     durationType: 'fixed',
     requiredResources: [treatmentRoomPoolId],
   },
+  overrideAccess: true,
 })
 
 // Booking the primary resource — the room pool is expanded automatically
@@ -250,6 +254,7 @@ await payload.create({
     startTime: selectedSlot,
     // items[] is populated automatically with the required room pool
   },
+  overrideAccess: true,
 })
 ```
 
@@ -298,7 +303,7 @@ Both must be non-empty arrays. When `staffProvisioning.resourceType` is set, it 
 
 ### Stripe Payment Gate
 
-Hold the time slot with a `pending` reservation while the customer pays. Confirm on successful payment.
+Hold the time slot with a `pending` reservation while the customer pays. Confirm on successful payment. (If you would rather not create a reservation until payment succeeds, use [Slot Holds](./slot-holds.md) instead: take a hold, then pass its token as `holdToken` to `/api/reserve/book`.)
 
 ```typescript
 // 1. Create reservation on your booking page (slot is held, conflict detection runs)
@@ -311,6 +316,7 @@ const reservation = await payload.create({
     startTime: selectedSlot,
   },
   // status defaults to 'pending'
+  overrideAccess: true,
 })
 
 // 2. Create a Stripe Checkout Session with the reservation ID in metadata
@@ -340,6 +346,7 @@ export async function POST(req: Request) {
         id: reservationId,
         data: { status: 'confirmed' },
         context: { skipReservationHooks: false }, // hooks run — validates transition
+        overrideAccess: true,
       })
     }
   }
@@ -364,6 +371,7 @@ payloadReserve({
           id: doc.customer as string,
           depth: 0,
           req,
+          overrideAccess: true,
         })
         await sendEmail({
           subject: 'Booking received',

@@ -20,7 +20,7 @@ Each hook type is an array — hooks fire sequentially.
 
 ## beforeBookingCreate
 
-Fires before a new reservation is saved via the `POST /api/reserve/book` endpoint. Can modify the booking data. It fires **exactly once** per booking (it is registered as a collection `beforeChange` hook; the endpoint no longer runs it a second time).
+Fires before any new reservation is saved — through `POST /api/reserve/book`, the admin panel, `POST /api/reservations` or the Local API. Can modify the booking data. It fires **exactly once** per booking (it is a collection `beforeChange` hook).
 
 On the `/api/reserve/book` endpoint it therefore runs **inside** the collection `beforeChange` — after Payload's field validation — rather than against the raw request body. A hook that needs to stamp a *required* field should read it off the merged document at that point rather than assume it can inject it before validation runs.
 
@@ -141,7 +141,7 @@ hooks: {
 
 ## afterBookingConfirm
 
-Fires after a reservation transitions to the configured `statusMachine.confirmStatus` (default `'confirmed'`). Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
+Fires after an existing reservation transitions to the configured `statusMachine.confirmStatus` (default `'confirmed'`). It does **not** fire for a reservation that is created already confirmed (by staff, or with `context.allowConfirmedOnCreate`) — use `afterBookingCreate` and check `doc.status` for that case. Errors thrown in after-hooks are caught and logged — they do not cause the API response to fail.
 
 ```typescript
 type afterBookingConfirm = Array<
@@ -234,7 +234,15 @@ On user **create** — or on an **update** that promotes a user into a staff rol
 - **Respects `context.skipReservationHooks`** — exits immediately when set.
 - **`beforeCreate` escape hatch** — `staffProvisioning.beforeCreate({ data, req, user })` may stamp tenant IDs or custom fields onto the Resource before it is saved.
 
-See the **Staff Auto-Provisioning** section of the [README](../README.md#staff-scheduling) and the [Configuration](./configuration.md) docs for the full option list.
+See the **Staff Auto-Provisioning** section of the [README](./staff-scheduling.md) and the [Configuration](./configuration.md) docs for the full option list.
+
+---
+
+## Hook timing: every plugin hook fires before commit, never after
+
+`afterBookingCreate`, `afterBookingConfirm`, `afterBookingCancel`, and `afterStatusChange` all fire **inside** the write's database transaction, not after it commits. Payload runs collection `afterChange` hooks and then commits in the same operation: in Payload's `collections/operations/create.js` the collection's `afterChange` hooks run first and `commitTransaction(req)` is called afterwards (verified on Payload 3.86) — the only things that run in between are Payload's own `afterOperation` hook (which this plugin does not use) and temp-file cleanup. The update path (where a status-change hook typically fires) is structurally identical.
+
+Payload exposes **no** post-commit hook point — `afterOperation` is pre-commit too — so this is a documented constraint, not something a future version can quietly fix. In practice the failure window is narrow: the only way a plugin hook fires for a write that never actually lands is the commit itself failing *after* every hook already ran successfully — a database partition, not a routine validation failure (those throw earlier, from a `beforeChange` hook, before any `afterChange` hook or the commit is ever reached). **If your integration must not act on an uncommitted booking** (e.g. charging a card from `afterBookingConfirm`), make the side effect idempotent and reconcile afterward — upsert by reservation id, or verify the booking still exists before treating a webhook as authoritative — rather than relying on hook-vs-commit ordering to protect you.
 
 ---
 

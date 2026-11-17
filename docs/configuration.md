@@ -155,7 +155,7 @@ payloadReserve({
   // (and optionally Services) so owners only see their own records.
   resourceOwnerMode: {
     // Roles that bypass ownership scoping and see all records.
-    // Default: anyone whose req.user.collection is the admin collection.
+    // Default: [] — nobody is treated as an admin until you list a role.
     adminRoles: ['admin'],
     // User field consulted for admin detection. Defaults to
     // staffProvisioning.roleField, then 'role'. Set this when your users store
@@ -189,7 +189,7 @@ payloadReserve({
   },
 
   // Resolver folding external busy intervals (calendar sync, legacy booking
-  // system, ops tooling, etc.) into availability — see README § External Busy.
+  // system, ops tooling, etc.) into availability — see [External Busy](./external-busy.md).
   // getExternalBusy: async ({ resourceId, start, end, req }) => [],
 
   // Replace any of six admin components with your own, without forking the
@@ -222,7 +222,7 @@ payloadReserve({
 | `maxFlexibleDuration` | `number` | `1440` | Ceiling in minutes on a `flexible` booking or hold window; the service `duration` is the floor (now enforced). Must be positive |
 | `enforceServiceMatch` | `boolean` | `true` | Public actors (same definition as `enforceSchedule`) and slot holds may only book a service the resource lists in `services`. A resource with an empty `services` list is unconstrained, and the pools a service names in `requiredResources` are exempt. Holds answer `409 service_not_offered` |
 | `maxPublicItems` | `number` | `10` | Most `items[]` entries a public actor may send in one booking. Staff and userless Local API calls are not limited. Must be a positive integer. Separately, a public booking whose `items[]` leave out the top-level resource may not span more than `maxFlexibleDuration` minutes |
-| `slotHolds.enabled` | `boolean` | `false` | Create the `reservation-holds` collection and register `/reserve/hold` + `/reserve/hold/release`. See the README's "Slot holds" section |
+| `slotHolds.enabled` | `boolean` | `false` | Create the `reservation-holds` collection and register `/reserve/hold` + `/reserve/hold/release`. See the [Slot Holds](./slot-holds.md) |
 | `slotHolds.ttlMinutes` | `number` | `10` | Minutes an unconverted hold occupies its slot |
 | `slotHolds.requireAuth` | `boolean` | `false` | Refuse `/reserve/hold` to anonymous callers (`401 authentication_required`). Off by default because holds exist so a customer can claim a slot before an account exists — **if you leave it off, rate-limit the endpoint at your proxy or middleware**: an anonymous script can otherwise hold every future slot of a resource and re-hold each as it lapses, and the plugin has no trustworthy client address to throttle on |
 | `slotHolds.maxActivePerCustomer` | `number \| false` | `5` | Ceiling on the unexpired holds one signed-in customer may have at once (`429 hold_limit_reached` past it). Counted for non-staff users of the customers collection only; staff are exempt and an anonymous caller has no identity to count against. Must be a positive integer; `false` disables the cap |
@@ -234,6 +234,7 @@ payloadReserve({
 | `slugs.reservations` | `string` | `'reservations'` | Reservations collection slug |
 | `slugs.customers` | `string` | `'customers'` | Customers collection slug |
 | `slugs.media` | `string` | `'media'` | Media collection slug (used by image fields) |
+| `slugs.holds` | `string` | `'reservation-holds'` | Slot-holds collection slug (only created when `slotHolds.enabled`) |
 | `statusMachine` | `Partial<StatusMachineConfig>` | Default 5-status machine | Custom status machine (validated at init) |
 | `hooks` | `ReservationPluginHooks` | `{}` | Plugin hook callbacks |
 | `collectionOverrides` | `Record<collection, CollectionOverride>` | `{}` | Per-collection overrides (`services`/`resources`/`schedules`/`reservations`/`customers`). `fields` is a function `({ defaultFields }) => Field[]`; `hooks` merge with the plugin's (plugin first); `access` composes per operation; `slug` ignored. `customers` applies only in standalone mode |
@@ -264,14 +265,14 @@ payloadReserve({
 | `staffProvisioning.resourceType` | `string` | `'staff'` | resourceType stamped on the Resource (must be a valid `resourceType`) |
 | `staffProvisioning.nameFrom` | `string` | `'name'` | User field copied into `Resource.name` (falls back to email) |
 | `staffProvisioning.beforeCreate` | `function` | `undefined` | Stamp tenant/custom fields onto the Resource before create |
-| `getExternalBusy` | `GetExternalBusy` | `undefined` | Resolver folding external busy intervals (calendar sync etc.) into availability — see README § External Busy |
+| `getExternalBusy` | `GetExternalBusy` | `undefined` | Resolver folding external busy intervals (calendar sync etc.) into availability — see [External Busy](./external-busy.md) |
 | `components` | `ReservationComponentOverrides` | `{}` | Per-slot overrides for six admin components (`calendarView`, `customerField`, `availabilityTimeField`, `dashboardWidget`, `availabilityOverview`, `reservationDetail`). Each slot is a Payload component path string, `false` to opt out, or unset for the plugin's own component. `false` is asymmetric — it falls back to a genuine Payload default for five slots, but restores only the pre-feature *click* behaviour for `reservationDetail`, which has no Payload default. Setting any slot to a string requires running `payload generate:importmap` afterward. See [Admin UI → Customising the admin components](./admin-ui.md#customising-the-admin-components) |
 
-> **Vocabularies:** `resourceTypes` (default `['staff', 'equipment', 'room']`) and `leaveTypes` (default `['vacation', 'sick', 'personal', 'closure', 'other']`) customize the option lists for `Resource.resourceType` and `Schedule.exceptions[].type`. See [Staff Scheduling](../README.md#staff-scheduling).
+> **Vocabularies:** `resourceTypes` (default `['staff', 'equipment', 'room']`) and `leaveTypes` (default `['vacation', 'sick', 'personal', 'closure', 'other']`) customize the option lists for `Resource.resourceType` and `Schedule.exceptions[].type`. See [Staff Scheduling](./staff-scheduling.md).
 
 ## Access control for customers
 
-Payload's built-in default for a collection with no access rules is `Boolean(user)` on every operation: any authenticated user, from any auth collection, may read, update and delete every document. For a booking system where customers hold logins, that default is a vulnerability, and until 4.1.1 the plugin shipped it (reported privately by an external researcher — see the 4.1.1 changelog).
+A collection with no access rules falls back to Payload's default, which lets any signed-in user, from any auth collection, read, update and delete every document. For a booking system where customers hold logins that is too open, so the plugin ships its own rules below.
 
 ### Standalone mode (default) — scoped out of the box
 
@@ -279,9 +280,9 @@ With no `userCollection`, "staff/admin" is any user of an auth collection other 
 
 | Collection | `read` | `update` | `delete` | `create` |
 |------------|--------|----------|----------|----------|
-| Reservations | staff: all; customer: `customer equals req.user.id` | same as read; a customer cannot re-assign or clear `customer`, attach `guest` data, or change `status` to anything but the cancel status | staff only | Payload default (any authenticated user); `enforceCustomerOwnership` pins `customer` to the caller |
-| Customers | staff: all; customer: own document only | same as read; the `notes` field is additionally staff-only at field level | staff only | Payload default — set `create: () => true` to allow self-registration |
-| Services, Resources, Schedules (4.1.2) | Payload default (any authenticated user; open it with `read: () => true` for public availability pages) | staff only | staff only | staff only |
+| Reservations | staff: all; customer: `customer equals req.user.id` | same as read; a customer cannot re-assign or clear `customer`, attach `guest` data, or change `status` to anything but the cancel status | staff only | any signed-in user; `enforceCustomerOwnership` pins `customer` to the caller |
+| Customers | staff: all; customer: own document only | same as read; the `notes` field is additionally staff-only at field level | staff only | staff only — set `create: () => true` to allow self-registration |
+| Services, Resources, Schedules (4.1.2) | any signed-in user (open it with `read: () => true` for public availability pages) | staff only | staff only | staff only |
 
 Until 4.1.2 the three catalog collections sat on Payload's default for writes too, so a customer login could deactivate a resource, set its quantity to 1, rewrite a service's buffers, delete a schedule or post a years-long exception onto any resource.
 
@@ -289,7 +290,9 @@ Nothing to configure. Anything you pass in `access.reservations` / `access.custo
 
 ### `userCollection` mode — you supply the rule
 
-When staff and customers share one auth collection, the plugin cannot tell them apart without a role, so Reservations — and the writes on Services, Resources and Schedules — stay on Payload's default, and the plugin logs a warning at boot for each whenever `userCollection` is set with no narrowing rule and no `resourceOwnerMode`. If **only staff** can log in to that collection, ignore the warnings. If **customers** can, scope them yourself — the pattern the plugin uses in standalone mode, keyed on your role field:
+When staff and customers share one auth collection, the plugin cannot tell them apart without a role, so Reservations — and the writes on Services, Resources and Schedules — stay on Payload's default, and the plugin logs a warning at boot whenever `userCollection` is set with no narrowing rule and no `resourceOwnerMode`. That default lets every user in the collection read, update and delete every reservation and write the catalog.
+
+If **only staff** can log in to that collection, ignore the warnings. If **customers** can, scope them yourself — the pattern the plugin uses in standalone mode, keyed on your role field:
 
 ```typescript
 import type { Access } from 'payload'
@@ -309,6 +312,7 @@ payloadReserve({
   userCollection: 'users',
   access: {
     reservations: {
+      create: ({ req: { user } }) => Boolean(user), // only needed for POST /api/reservations
       read: ownOrStaff,
       update: ownOrStaff,
       delete: staffOnly,

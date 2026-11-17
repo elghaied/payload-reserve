@@ -77,6 +77,10 @@ Set them on `:root` or on the admin `body` from your own admin stylesheet:
 
 Leave them unset and nothing changes — the defaults are the values the calendar always used. (One exception: as of 4.4.0 the smallest calendar text — event pills, capacity / time-off badges, hour labels, overflow dots — sits at a readability floor of `0.75 × --reserve-calendar-font-size`, 9.75px at Payload's 13px root, where it used to be 8–10px.)
 
+### Mobile layout
+
+At 768px and below the calendar changes shape rather than just shrinking: the create button floats, the month view shows status dots with a list for the selected day, the week view becomes a seven-day strip over a single day column, and the pending list becomes cards. `calendar.mobileDefaultView` picks the tab a phone lands on. The Availability Overview has no mobile layout.
+
 ---
 
 ## Reservation Detail Drawer
@@ -214,7 +218,7 @@ This is deliberately phrased as restoring the previous **click** behaviour, not 
 
 **Whenever you set any slot to a string, run `payload generate:importmap` and restart your app afterward.** Payload resolves every admin component path through an import map generated **into your own app**, not this package. A stale import map means your replacement component silently fails to render — the server logs `PayloadComponent not found in importMap` and, depending on the slot, either nothing renders or Payload's own fallback (from the table above) is shown with no indication anything is misconfigured.
 
-This applies to `calendarView` too, and matters even if you never touch `components` at all: this release changed the *plugin's own* default `calendarView` component from `payload-reserve/client#CalendarView` to `payload-reserve/rsc#CalendarViewServer`, so every existing install needs one `generate:importmap` run after upgrading. See the [Getting Started](./getting-started.md) upgrade note and the README's "⚠️ Upgrading from an earlier version" section for the full failure mode.
+This applies to `calendarView` too, and matters even if you never touch `components` at all: this release changed the *plugin's own* default `calendarView` component from `payload-reserve/client#CalendarView` to `payload-reserve/rsc#CalendarViewServer`, so every existing install needs one `generate:importmap` run after upgrading. See the [Getting Started](./getting-started.md) upgrade note and the [Getting Started → Upgrading](./getting-started.md) for the full failure mode.
 
 ### `reservationDetail` and `calendarView` together
 
@@ -241,7 +245,7 @@ If you also replace `calendarView` with your own component, nothing renders your
 | `useReservationMutations` | hook | `() => { transition, cancel }` — performs a status-change `PATCH` against the reservation and reports the outcome |
 | `StatusBadge` | component | a status pill — `{ label, presentation? }` |
 | `DetailRow` | component | one label/value line — `{ label, value?, children? }` |
-| `StatusActionBar` | component | renders the transition buttons reachable from a status — `{ status, onSelect, busy? }` |
+| `StatusActionBar` | component | renders the transition buttons reachable from a status — `{ status, onSelect, busy?, noActionsFallback? }` |
 | `EventPill` | component | a single reservation as it appears in a calendar cell |
 | `CalendarReservation` | type | the loose, UI-shaped reservation type the calendar/detail components use (see the rename note below) |
 | `ReservationItem` | type | one entry of a multi-resource reservation's `items[]`, UI-shaped |
@@ -249,6 +253,8 @@ If you also replace `calendarView` with your own component, nothing renders your
 | `StatusPresentation` | type | `{ background, foreground }` colour pair for one status |
 | `BUILTIN_STATUSES` | value | the five built-in status strings, for `buildStatusPresentation`/`buildStatusLabels` |
 | `buildStatusLabels` | function | `(statuses, t) => Record<string, string>` — translated labels, falling back to the raw string for a custom status with no translation |
+| `formatReservationTime` | function | `(iso, timeZone, locale?) => string` — a time in the business timezone |
+| `formatReservationDateLabel` | function | `(iso, timeZone, locale?) => string` — a date label in the business timezone |
 | `buildStatusActionLabels` | function | `(statuses, statusLabels, t) => Record<string, string>` — translated action-verb labels (`confirmed` -> "Confirm"), falling back to the already-resolved `statusLabels` entry (never straight to the raw status) for a custom status with no matching translation |
 | `buildStatusPresentation` | function | `(statuses) => Record<string, StatusPresentation>` — colour assignment; see the palette note below |
 
@@ -344,15 +350,19 @@ Components access collection slugs and the status machine via `config.admin.cust
 ```typescript
 // Collection slugs
 config.admin.custom.reservationSlugs
-// { services, resources, schedules, reservations, customers }
+// { services, resources, schedules, reservations, customers, holds, media }
 
 // Status machine (for color coding, transitions, etc.)
 config.admin.custom.reservationStatusMachine
-// { statuses, defaultStatus, terminalStatuses, blockingStatuses, transitions }
+// { statuses, defaultStatus, terminalStatuses, blockingStatuses, transitions, confirmStatus, cancelStatus }
 
 // Business timezone (for keying days and rendering times)
 config.admin.custom.reservationTimezone
 // e.g. 'UTC' or 'America/New_York'
+
+// The resolved `calendar` option
+config.admin.custom.reservationCalendar
+// { defaultView, mobileDefaultView, hiddenViews, statusPresentation, weekStartsOn }
 
 // Tenant scoping (when multiTenant is configured)
 config.admin.custom.reservationTenant

@@ -1,6 +1,6 @@
 # Collections
 
-Schemas for all five collections created by the plugin.
+Schemas for the collections the plugin creates. A sixth, hidden `reservation-holds` collection exists only when `slotHolds` is enabled — see [Slot Holds](./slot-holds.md).
 
 Any of these collections can be customized — fields, hooks, access — via the `collectionOverrides` plugin option (for example, adding a `join` field on Reservations back to an Invoices or Payments collection you maintain for billing). See [Configuration → `collectionOverrides`](./configuration.md) and [Advanced](./advanced.md).
 
@@ -24,6 +24,7 @@ Defines what can be booked (e.g., "Haircut", "Consultation", "Massage").
 | `requiredResources` | Relationship | No | Extra resource pools (hasMany) auto-expanded into the reservation `items[]` at booking time |
 | `allowGuestBooking` | Select | No | `'inherit'`, `'enabled'`, or `'disabled'` (default: `'inherit'`). Controls whether anonymous guest bookings are permitted for this service |
 | `owner` | Relationship | Yes* | *Only present when `resourceOwnerMode.ownedServices` is enabled.* Owner of this service (sidebar). Defaults to the requesting user on create. Relates to `resourceOwnerMode.ownerCollection ?? staffProvisioning.userCollection ?? customers` (not a hardcoded customers slug) |
+| `bookingLock` | Text (hidden) | No | Internal. Written on every booking so the database serializes simultaneous bookers for this resource; its value is never read. Do not edit |
 | `active` | Checkbox | No | Whether service is bookable (default: true) |
 
 ```typescript
@@ -38,6 +39,7 @@ await payload.create({
     bufferTimeAfter: 10,
     active: true,
   },
+  overrideAccess: true,
 })
 ```
 
@@ -73,6 +75,7 @@ await payload.create({
     quantity: 1,
     active: true,
   },
+  overrideAccess: true,
 })
 ```
 
@@ -119,6 +122,7 @@ await payload.create({
     ],
     active: true,
   },
+  overrideAccess: true,
 })
 ```
 
@@ -128,9 +132,9 @@ await payload.create({
 
 | Mode | `read` | `create` / `update` / `delete` |
 |------|--------|--------------------------------|
-| Standalone (default, since 4.1.2) | Payload default: any authenticated user. Open with `read: () => true` for public availability pages | Staff/admin only (any user of an auth collection other than the customers one) |
+| Standalone (default, since 4.1.2) | Any signed-in user. Open with `read: () => true` for public availability pages | Staff/admin only (any user of an auth collection other than the customers one) |
 | `resourceOwnerMode` | Owners: their own resources and the schedules on them; admins: all | Owners: their own; a Schedule may only name a resource the caller owns (checked on create and on a `resource` change); only an admin may re-assign a resource's `owner` |
-| `userCollection` (no `resourceOwnerMode`) | Payload default | Payload default — **every** user may write them unless you supply `access.<collection>`; the plugin warns at boot |
+| `userCollection` (no `resourceOwnerMode`) | Payload default (any signed-in user) | Payload default — **every** user may write them unless you supply `access.<collection>`; the plugin warns at boot |
 
 Any rule you pass in `access.services` / `access.resources` / `access.schedules` replaces the default for that operation only.
 
@@ -146,7 +150,7 @@ Either a standalone auth collection (default) or fields injected into your exist
 
 A dedicated auth collection with `auth: true` for customer JWT login. Has `access.admin: () => false` to block customers from the admin panel.
 
-**Default access (since 4.1.1):** a logged-in customer can `read` and `update` only their own document; `delete` is staff/admin only; `create` is Payload's default (any authenticated user — set `access.customers.create: () => true` to open self-registration). "Staff/admin" means any user of a *different* auth collection. Before 4.1.1 the collection sat on Payload's default `Boolean(user)` for every operation, so any customer could list every other customer's email/phone/notes and — because `update` covers `password` — take over another customer's account through `PATCH /api/customers/:id`. Override per operation via the `access.customers` plugin option; a rule you supply replaces only that operation.
+**Default access (since 4.1.1):** a logged-in customer can `read` and `update` only their own document; `delete` is staff/admin only; `create` is staff/admin only (set `access.customers.create: () => true` to open self-registration). "Staff/admin" means any user of a *different* auth collection. Before 4.1.1 the collection sat on Payload's default `Boolean(user)` for every operation, so any customer could list every other customer's email/phone/notes and — because `update` covers `password` — take over another customer's account through `PATCH /api/customers/:id`. Override per operation via the `access.customers` plugin option; a rule you supply replaces only that operation.
 
 ### User Collection Mode (`userCollection` set)
 
@@ -159,11 +163,11 @@ Field deduplication prevents double-injection — the plugin checks each field's
 | Field | Type | Description |
 |-------|------|-------------|
 | `email` | Email | Customer email (from Payload auth) |
-| `firstName` | Text | First name (standalone mode only) |
-| `lastName` | Text | Last name (standalone mode only) |
-| `name` | Text | Customer name (max 200 chars; required in standalone mode, optional when injected into a user collection). Injected into the user collection so `admin.useAsTitle: 'name'` works out of the box |
+| `firstName` | Text | First name (standalone mode only; required, max 200 chars) |
+| `lastName` | Text | Last name (standalone mode only; required, max 200 chars) |
+| `name` | Text | Customer name (max 200 chars, optional). `userCollection` mode only — injected so `admin.useAsTitle: 'name'` works out of the box |
 | `phone` | Text | Phone number (max 50 chars) |
-| `notes` | Textarea | Internal staff notes. In standalone mode the field carries its own `read`/`update` access restricted to staff/admin, so the customer never sees it — not even on their own document via `/api/customers/me`. In `userCollection` mode the injected field has no field-level access; your collection's rules decide who sees it |
+| `notes` | Textarea | Internal staff notes. In standalone mode the field carries its own `create`/`read`/`update` access restricted to staff/admin, so the customer never sees it — not even on their own document via `/api/customers/me`. In `userCollection` mode the injected field has no field-level access; your collection's rules decide who sees it |
 | `bookings` | Join | Virtual field — all reservations for this customer |
 
 ---
@@ -185,12 +189,12 @@ The core booking records. Each reservation links a service performed by a resour
 | `endTime` | Date | No | Editable. Auto-calculated from service duration and overwritten on save for `fixed`/`full-day` services; for `flexible`-duration services the caller/admin supplies it (required, must be after `startTime`) |
 | `status` | Select | No | Workflow status (default: `'pending'`) |
 | `guestCount` | Number | No | Number of guests (default: 1, min: 1) |
-| `cancellationReason` | Textarea | No | Visible only when status is `'cancelled'` |
+| `cancellationReason` | Textarea | No | Visible only when status is the configured `cancelStatus` (default `'cancelled'`) |
 | `notes` | Textarea | No | Additional notes |
 | `items` | Array | No | Multi-resource booking lines. Each item: `resource` (relationship, required), `service` (relationship, optional), `startTime` (date, optional), `endTime` (date, optional), `guestCount` (number, optional, min 1). Missing values inherit the parent reservation |
 | `idempotencyKey` | Text | No | Unique key to prevent duplicate submissions (sidebar, read-only) |
 
-A reservation must have **either** a `customer` **or** a `guest` — not both, not neither (enforced by the `validateGuestBooking` hook, gated by `allowGuestBooking`). See [Booking Features → Multi-Resource Bookings](./booking-features.md#multi-resource-bookings) for the `items` array and [Guest Bookings](../README.md#guest-bookings) for account-less bookings.
+A reservation must have **either** a `customer` **or** a `guest` — not both, not neither (enforced by the `validateGuestBooking` hook, gated by `allowGuestBooking`). See [Booking Features → Multi-Resource Bookings](./booking-features.md#multi-resource-bookings) for the `items` array and [Guest Bookings](./booking-features.md#guest-bookings) for account-less bookings.
 
 `guestCount` (top-level and per `items[]` entry) must be a whole number — `1.5` is rejected with `guestCount must be a whole number`, the same rule `/api/reserve/hold` applies to its own input.
 
@@ -200,11 +204,51 @@ A `flexible`-duration window must be at least the service `duration` and at most
 
 | Mode | `create` | `read` | `update` | `delete` |
 |------|----------|--------|----------|----------|
-| Standalone (default, since 4.1.1) | Payload default: any authenticated user (the `enforceCustomerOwnership` hook pins `customer` to the caller) | Staff/admin: all. Customer: own rows only (`customer equals req.user.id`). Guest bookings have no `customer`, so no customer can reach them | Same as `read`; a customer cannot re-assign or clear `customer`, attach `guest` data, or set `status` to anything but the cancel status, and may not reschedule or cancel inside the notice period (4.1.2) | Staff/admin only. Customers cancel via `/api/reserve/cancel` |
+| Standalone (default, since 4.1.1) | Any signed-in user (the `enforceCustomerOwnership` hook pins `customer` to the caller) | Staff/admin: all. Customer: own rows only (`customer equals req.user.id`). Guest bookings have no `customer`, so no customer can reach them | Same as `read`; a customer cannot re-assign or clear `customer`, attach `guest` data, or set `status` to anything but the cancel status, and may not reschedule or cancel inside the notice period (4.1.2) | Staff/admin only. Customers cancel via `/api/reserve/cancel` |
 | `resourceOwnerMode` | Admin only | Admin: all. Owner: reservations on their own resources | Admin only | Admin only |
-| `userCollection` (no `resourceOwnerMode`) | Payload default | Payload default (`Boolean(user)`) — **every** user reads, updates and deletes every reservation unless you supply `access.reservations`; see [Configuration → Access control for customers](./configuration.md#access-control-for-customers) | Payload default | Payload default |
+| `userCollection` (no `resourceOwnerMode`) | Payload default | Payload default (any signed-in user) — **every** user reads, updates and deletes every reservation unless you supply `access.reservations`; see [Configuration → Access control for customers](./configuration.md#access-control-for-customers) | Payload default | Payload default |
 
 "Staff/admin" in standalone mode is any user of an auth collection other than the customers one. Any rule you pass in `access.reservations` replaces the default for that operation only.
+
+---
+
+## Services `resources` Join
+
+Services expose a read-only `resources` field — a Payload `join` over `Resources.services` — listing which resources currently perform that service. `Resources.services` remains the single source of truth and the only editable side: assign or remove services from the **Resource**, and the reverse list on the Service updates automatically. There is no way to add or remove a link from the Service side.
+
+Reading (or viewing in the admin) a Service returns the join in Payload's standard join-field shape:
+
+```json
+{
+  "resources": {
+    "docs": [{ "id": "...", "name": "...", "resourceType": "staff", "active": true }],
+    "hasNextPage": false,
+    "totalDocs": 3
+  }
+}
+```
+
+- **`defaultLimit: 100`** — raised from Payload's default of 10, so a service performed by more than 10 resources doesn't silently show a truncated list.
+- **`allowCreate: false`** — the join can only ever create a *brand-new* Resource from the drawer, never link an existing one, and the Resource's `services` field is `hasMany` while the join's create-drawer pre-fill is scalar — so the affordance is disabled. Assign resources on the Resource itself.
+- **`defaultColumns: ['name', 'resourceType', 'active']`** — the `active` column lets an admin see at a glance that a linked resource is disabled.
+
+If a `collectionOverrides.resources` override removes, renames, or nests `services` inside a *named* group/tab, the join is gated off entirely (see the note above) rather than crashing the app at init.
+
+### `joins: false` on hot paths
+
+Payload join fields resolve via a DB-level aggregation (`$lookup`) and ignore `depth`, so every internal `findByID` the plugin makes on Services now passes `joins: false` to avoid that extra query cost. If your own code reads Services on a hot path, consider doing the same — `payload.findByID({ collection: 'services', id, joins: false })`.
+
+One path still pays for the join: when a Reservation is read at `depth >= 1`, Payload populates its `service` relationship through the internal dataloader, which offers no `joins: false` seam from plugin code. If that shows up in your profiles, read Reservations with `depth: 0` and fetch the service yourself.
+
+## Deleting a referenced Service or Resource is blocked
+
+Deleting a Service or Resource that a reservation still references (or, for a Resource, that a Schedule still references) now fails with an actionable `400`:
+
+```
+Cannot delete this resource: 2 reservations and 1 schedule still reference it. Uncheck "active" to retire it instead — that stops new bookings while keeping existing ones intact.
+```
+
+**This is a real behavioural change on MongoDB**, where the same delete previously succeeded silently, leaving the referencing reservation or schedule pointing at a document that no longer exists. On Postgres/SQLite the delete was never silent — it always failed — but with a raw, un-actionable database error (`23502`/`SQLITE_CONSTRAINT_NOTNULL`) rather than this message, because `service`/`resource` are required fields (`NOT NULL` in SQL) while the underlying adapter emits `ON DELETE SET NULL` for the same relationship, a self-contradictory schema only application code can resolve cleanly. The guard checks `items[]` references too, not just the top-level `service`/`resource` field, and covers multi-resource bookings the same way. Set `active: false` instead of deleting to retire a Service or Resource while keeping its booking (or schedule) history intact — this is what the error message points you at.
 
 ---
 
