@@ -7,10 +7,13 @@ import type { SlotState } from '../../utilities/computeSlotStates.js'
 
 import { safeLocale } from '../../utilities/adminLocale.js'
 import { gridInstant } from '../../utilities/calendarGrid.js'
+import { classMap } from '../../utilities/classMap.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { getDayKeyInTimezone } from '../../utilities/timezoneUtils.js'
-import styles from './CalendarView.module.css'
+import './CalendarView.css'
 import { useResourceAvailability } from './useResourceAvailability.js'
+
+const styles = classMap('reserve-calendar')
 
 type LaneResource = { id: string; name: string }
 

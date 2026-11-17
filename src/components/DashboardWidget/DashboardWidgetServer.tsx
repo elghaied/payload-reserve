@@ -4,6 +4,7 @@ import type { PluginT } from '../../translations/index.js'
 import type { StatusMachineConfig } from '../../types.js'
 
 import { safeLocale } from '../../utilities/adminLocale.js'
+import { classMap } from '../../utilities/classMap.js'
 import { buildStatusLabels } from '../../utilities/statusPresentation.js'
 import { collectionHasTenantField, readCookie, tenantWhereClause } from '../../utilities/tenantFilter.js'
 import { getEffectiveTenantTimezone } from '../../utilities/tenantTimezone.js'
@@ -12,8 +13,10 @@ import {
   combineDayKeyAndTime,
   getDayKeyInTimezone,
 } from '../../utilities/timezoneUtils.js'
-import styles from './DashboardWidget.module.css'
+import './DashboardWidget.css'
 import { fetchDashboardStats } from './fetchDashboardStats.js'
+
+const styles = classMap('reserve-dashboard')
 
 export const DashboardWidgetServer = async (props: WidgetServerProps) => {
   const { req } = props

@@ -7,7 +7,10 @@ import React, { useEffect, useState } from 'react'
 import type { PluginT } from '../../translations/index.js'
 
 import { safeLocale } from '../../utilities/adminLocale.js'
-import styles from './AvailabilityTimeField.module.css'
+import { classMap } from '../../utilities/classMap.js'
+import './AvailabilityTimeField.css'
+
+const styles = classMap('reserve-time-field')
 
 type Slot = { end: string; start: string }
 

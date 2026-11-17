@@ -1,8 +1,11 @@
 'use client'
 import React from 'react'
 
+import { classMap } from '../../../utilities/classMap.js'
 import { useReservationStatusMachine } from '../../hooks/useReservationStatusMachine.js'
-import styles from './StatusActionBar.module.css'
+import './StatusActionBar.css'
+
+const styles = classMap('reserve-status-actions')
 
 export type StatusActionBarProps = {
   /** Disables every button — set while a mutation is in flight. */

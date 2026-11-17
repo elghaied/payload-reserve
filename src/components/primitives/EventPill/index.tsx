@@ -4,7 +4,10 @@ import React from 'react'
 import type { StatusPresentation } from '../../../utilities/statusPresentation.js'
 import type { CalendarReservation } from '../../shared/types.js'
 
-import styles from './EventPill.module.css'
+import { classMap } from '../../../utilities/classMap.js'
+import './EventPill.css'
+
+const styles = classMap('reserve-event-pill')
 
 export type EventPillProps = {
   /** Extra content below the label — the plugin renders per-item resource badges here. */

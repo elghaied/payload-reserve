@@ -1,9 +1,9 @@
-.wrapper {
+.reserve-customer-field__wrapper {
   position: relative;
   width: 100%;
 }
 
-.selected {
+.reserve-customer-field__selected {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -15,18 +15,18 @@
   transition: border-color 0.15s;
 }
 
-.selected:hover {
+.reserve-customer-field__selected:hover {
   border-color: var(--color-border-control-strong);
 }
 
-.selectedInfo {
+.reserve-customer-field__selectedInfo {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.selectedName {
+.reserve-customer-field__selectedName {
   font-weight: 600;
   color: var(--color-text);
   white-space: nowrap;
@@ -34,7 +34,7 @@
   text-overflow: ellipsis;
 }
 
-.selectedMeta {
+.reserve-customer-field__selectedMeta {
   font-size: 12px;
   color: var(--color-text-tertiary);
   white-space: nowrap;
@@ -42,7 +42,7 @@
   text-overflow: ellipsis;
 }
 
-.clearButton {
+.reserve-customer-field__clearButton {
   flex-shrink: 0;
   margin-left: 8px;
   padding: 4px 8px;
@@ -55,12 +55,12 @@
   transition: background 0.15s, color 0.15s;
 }
 
-.clearButton:hover {
+.reserve-customer-field__clearButton:hover {
   background: var(--color-bg-secondary-pressed);
   color: var(--color-text);
 }
 
-.searchInput {
+.reserve-customer-field__searchInput {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--color-border);
@@ -72,11 +72,11 @@
   transition: border-color 0.15s;
 }
 
-.searchInput:focus {
+.reserve-customer-field__searchInput:focus {
   border-color: var(--color-border-control-strong);
 }
 
-.dropdown {
+.reserve-customer-field__dropdown {
   position: absolute;
   z-index: 100;
   top: 100%;
@@ -91,7 +91,7 @@
   overflow-y: auto;
 }
 
-.option {
+.reserve-customer-field__option {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -100,28 +100,28 @@
   transition: background 0.1s;
 }
 
-.option:hover {
+.reserve-customer-field__option:hover {
   background: var(--color-bg-secondary);
 }
 
-.optionName {
+.reserve-customer-field__optionName {
   font-weight: 600;
   color: var(--color-text);
 }
 
-.optionMeta {
+.reserve-customer-field__optionMeta {
   font-size: 12px;
   color: var(--color-text-tertiary);
 }
 
-.noResults {
+.reserve-customer-field__noResults {
   padding: 12px;
   text-align: center;
   color: var(--color-text-tertiary);
   font-size: 13px;
 }
 
-.createButton {
+.reserve-customer-field__createButton {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -136,11 +136,11 @@
   transition: background 0.1s;
 }
 
-.createButton:hover {
+.reserve-customer-field__createButton:hover {
   background: var(--color-bg-secondary);
 }
 
-.error {
+.reserve-customer-field__error {
   margin-top: 4px;
   color: var(--color-text-danger);
   font-size: 12px;

@@ -22,6 +22,27 @@ Designed for salons, clinics, hotels, restaurants, event venues, and any busines
 | 5.x (`next`) | 4.x (currently `^4.0.0-beta.9`) | Node `^24.22.3 \|\| >=26.13.1` |
 | 4.x | 3.x (`^3.86.0`) | Security fixes continue on this line |
 
+### TanStack Start
+
+Payload 4 also runs on TanStack Start. The admin components work there, with one line of host config: Payload's adapter bundles `@payloadcms/plugin-*` packages for the server automatically, but not third-party plugins, so add the plugin to `noExternal` in `vite.config.ts`:
+
+```ts
+export default defineConfig(
+  withPayload(
+    ({ pluginOptions }) => ({
+      plugins: [/* rsc, tanstackStart, viteReact — as in the template */],
+      environments: {
+        rsc: { resolve: { noExternal: ['payload-reserve'] } },
+        ssr: { resolve: { noExternal: ['payload-reserve'] } },
+      },
+    }),
+    { payloadConfigPath: './src/payload.config.ts' },
+  ),
+)
+```
+
+Without it the admin fails with `Unknown file extension ".css"`. Next.js needs no extra config.
+
 ## Features
 
 - **5 Domain Collections** — Services, Resources, Schedules, Reservations, and Customers (standalone or user-collection extension)

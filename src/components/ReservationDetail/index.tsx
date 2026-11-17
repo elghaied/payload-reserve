@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { PluginT } from '../../translations/index.js'
 
 import { safeLocale } from '../../utilities/adminLocale.js'
+import { classMap } from '../../utilities/classMap.js'
 import { useReservationMutations } from '../hooks/useReservationMutations.js'
 import { useReservationStatusMachine } from '../hooks/useReservationStatusMachine.js'
 import { DetailRow } from '../primitives/DetailRow/index.js'
@@ -17,7 +18,9 @@ import {
   formatReservationTime,
   formatResourceNames,
 } from './formatters.js'
-import styles from './ReservationDetail.module.css'
+import './ReservationDetail.css'
+
+const styles = classMap('reserve-detail')
 
 export type ReservationDetailProps = {
   /** Called when the user chooses Edit; the calendar swaps to the document drawer. */

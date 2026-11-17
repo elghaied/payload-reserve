@@ -3,7 +3,10 @@ import React from 'react'
 
 import type { StatusPresentation } from '../../../utilities/statusPresentation.js'
 
-import styles from './StatusBadge.module.css'
+import { classMap } from '../../../utilities/classMap.js'
+import './StatusBadge.css'
+
+const styles = classMap('reserve-status-badge')
 
 export type StatusBadgeProps = {
   /** Human-readable status label, already translated. */

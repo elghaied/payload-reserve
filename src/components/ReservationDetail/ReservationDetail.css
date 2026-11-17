@@ -1,37 +1,37 @@
-.wrapper {
+.reserve-detail__wrapper {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.header {
+.reserve-detail__header {
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 12px;
 }
 
-.service {
+.reserve-detail__service {
   font-size: 17px;
   font-weight: 650;
   letter-spacing: -0.01em;
 }
 
-.when {
+.reserve-detail__when {
   color: var(--color-text-tertiary);
   margin-top: 3px;
 }
 
-.badgeRow {
+.reserve-detail__badgeRow {
   margin-top: 7px;
 }
 
-.pills {
+.reserve-detail__pills {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
   justify-content: flex-end;
 }
 
-.pill {
+.reserve-detail__pill {
   background: var(--color-bg-tertiary);
   border-radius: 5px;
   font-size: 11px;
@@ -48,7 +48,7 @@
    `align-items: baseline` handles the rest: without it, flex's default
    `stretch` still lets each child's OWN content sit at a different height
    inside its stretched box (a `<button>`'s text baseline isn't its box top). */
-.footer {
+.reserve-detail__footer {
   align-items: baseline;
   border-top: 1px solid var(--color-border);
   display: flex;
@@ -57,23 +57,23 @@
   padding-top: 11px;
 }
 
-.feedback {
+.reserve-detail__feedback {
   border-radius: 6px;
   font-size: 12px;
   padding: 8px 10px;
 }
 
-.feedbackError {
+.reserve-detail__feedbackError {
   background: #fee2e2;
   color: #991b1b;
 }
 
-.feedbackSuccess {
+.reserve-detail__feedbackSuccess {
   background: #d1fae5;
   color: #065f46;
 }
 
-.editButton {
+.reserve-detail__editButton {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -83,7 +83,7 @@
   padding: 5px 11px;
 }
 
-.noActions {
+.reserve-detail__noActions {
   color: var(--color-text-tertiary);
   font-size: 12px;
 }

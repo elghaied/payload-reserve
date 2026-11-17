@@ -1,21 +1,21 @@
-.wrapper {
+.reserve-dashboard__wrapper {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.title {
+.reserve-dashboard__title {
   margin: 0;
   font-size: 1.25rem;
 }
 
-.statsGrid {
+.reserve-dashboard__statsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px;
 }
 
-.statCard {
+.reserve-dashboard__statCard {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -24,30 +24,30 @@
   border-radius: 4px;
 }
 
-.statValue {
+.reserve-dashboard__statValue {
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1;
 }
 
-.statLabel {
+.reserve-dashboard__statLabel {
   font-size: 0.75rem;
   color: var(--color-text-tertiary);
   margin-top: 4px;
   text-transform: uppercase;
 }
 
-.nextAppointment {
+.reserve-dashboard__nextAppointment {
   padding: 12px;
   background: var(--color-bg-secondary);
   border-radius: 4px;
 }
 
-.nextAppointment p {
+.reserve-dashboard__nextAppointment p {
   margin: 4px 0;
 }
 
-.noData {
+.reserve-dashboard__noData {
   color: var(--color-text-tertiary);
   font-style: italic;
 }

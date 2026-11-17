@@ -1,20 +1,20 @@
-.wrapper {
+.reserve-availability__wrapper {
   padding: 20px;
 }
 
-.title {
+.reserve-availability__title {
   margin: 0 0 16px;
   font-size: 1.25rem;
 }
 
-.navigation {
+.reserve-availability__navigation {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
 }
 
-.navButton {
+.reserve-availability__navButton {
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
   border-radius: 4px;
@@ -23,22 +23,22 @@
   font-size: 0.875rem;
 }
 
-.navButton:hover {
+.reserve-availability__navButton:hover {
   background: var(--color-bg-secondary-pressed);
 }
 
-.weekLabel {
+.reserve-availability__weekLabel {
   font-weight: 600;
 }
 
-.grid {
+.reserve-availability__grid {
   display: grid;
   gap: 1px;
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border);
 }
 
-.headerCell {
+.reserve-availability__headerCell {
   padding: 8px;
   text-align: center;
   font-size: 0.75rem;
@@ -46,7 +46,7 @@
   background: var(--color-bg-secondary);
 }
 
-.resourceName {
+.reserve-availability__resourceName {
   padding: 8px;
   font-weight: 600;
   font-size: 0.8125rem;
@@ -55,13 +55,13 @@
   align-items: center;
 }
 
-.cell {
+.reserve-availability__cell {
   padding: 4px;
   background: var(--color-bg);
   min-height: 60px;
 }
 
-.slotAvailable {
+.reserve-availability__slotAvailable {
   font-size: 0.625rem;
   padding: 2px 4px;
   margin-bottom: 1px;
@@ -70,7 +70,7 @@
   color: #065f46;
 }
 
-.slotBooked {
+.reserve-availability__slotBooked {
   font-size: 0.625rem;
   padding: 2px 4px;
   margin-bottom: 1px;
@@ -81,7 +81,7 @@
 
 /* Graduated capacity colors for multi-unit resources */
 /* Green: utilization < 50% */
-.slotCapacityLow {
+.reserve-availability__slotCapacityLow {
   font-size: 0.625rem;
   padding: 2px 4px;
   margin-bottom: 1px;
@@ -91,7 +91,7 @@
 }
 
 /* Yellow: utilization 50–99% */
-.slotCapacityMid {
+.reserve-availability__slotCapacityMid {
   font-size: 0.625rem;
   padding: 2px 4px;
   margin-bottom: 1px;
@@ -101,7 +101,7 @@
 }
 
 /* Red: utilization 100% (fully booked) */
-.slotCapacityFull {
+.reserve-availability__slotCapacityFull {
   font-size: 0.625rem;
   padding: 2px 4px;
   margin-bottom: 1px;
@@ -110,7 +110,7 @@
   color: #991b1b;
 }
 
-.slotException {
+.reserve-availability__slotException {
   font-size: 0.625rem;
   padding: 2px 4px;
   margin-bottom: 1px;
@@ -120,13 +120,13 @@
   font-style: italic;
 }
 
-.loading {
+.reserve-availability__loading {
   text-align: center;
   padding: 40px;
   color: var(--color-text-tertiary);
 }
 
-.noResources {
+.reserve-availability__noResources {
   text-align: center;
   padding: 40px;
   color: var(--color-text-tertiary);

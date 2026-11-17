@@ -34,6 +34,7 @@ import {
   visibleCalendarViews,
   weekdayLabels,
 } from '../../utilities/calendarViews.js'
+import { classMap } from '../../utilities/classMap.js'
 import { computeSlotStates } from '../../utilities/computeSlotStates.js'
 import { externalPillLabel } from '../../utilities/externalPillLabel.js'
 import { reservationMatchesResource, sameId } from '../../utilities/reservationResourceFilter.js'
@@ -46,13 +47,17 @@ import { useTenantFilter } from '../../utilities/useTenantFilter.js'
 import { useIsMobile } from '../hooks/useIsMobile.js'
 import { useReservationMutations } from '../hooks/useReservationMutations.js'
 import { useReservationStatusMachine } from '../hooks/useReservationStatusMachine.js'
-import eventPillStyles from '../primitives/EventPill/EventPill.module.css'
+import '../primitives/EventPill/EventPill.css'
 import { EventPill } from '../primitives/EventPill/index.js'
 import { ReservationDetailProvider } from '../ReservationDetail/context.js'
 import { ReservationDetail } from '../ReservationDetail/index.js'
-import styles from './CalendarView.module.css'
+import './CalendarView.css'
 import { LaneTimelineView } from './LaneTimelineView.js'
 import { useResourceAvailability } from './useResourceAvailability.js'
+
+const eventPillStyles = classMap('reserve-event-pill')
+
+const styles = classMap('reserve-calendar')
 
 type ViewMode = ReservationCalendarViewMode
 
@@ -950,7 +955,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ detailDisabled, deta
     return (
       <section aria-label={title} className={styles.dayList}>
         <div className={styles.dayListHeader}>
-          <span className={styles.dayListTitle}>{title}</span>
+          <span>{title}</span>
           <button
             aria-label={t('reservation:calendarCreateNew')}
             className={styles.dayListAdd}

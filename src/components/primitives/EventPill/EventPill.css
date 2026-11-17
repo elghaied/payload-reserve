@@ -1,4 +1,4 @@
-.eventItem {
+.reserve-event-pill__eventItem {
   border-radius: 2px;
   cursor: pointer;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
@@ -9,11 +9,11 @@
   white-space: nowrap;
 }
 
-.eventItem:hover {
+.reserve-event-pill__eventItem:hover {
   opacity: 0.8;
 }
 
-.eventItemExpanded {
+.reserve-event-pill__eventItemExpanded {
   overflow: visible;
   white-space: normal;
 }

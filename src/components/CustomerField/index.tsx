@@ -6,7 +6,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { PluginT } from '../../translations/index.js'
 
-import styles from './CustomerField.module.css'
+import { classMap } from '../../utilities/classMap.js'
+import './CustomerField.css'
+
+const styles = classMap('reserve-customer-field')
 
 type CustomerDoc = {
   email: string

@@ -8,7 +8,7 @@ export type StatusPresentation = {
 /**
  * Colours for the five statuses the plugin ships by default. These pairs are
  * lifted verbatim from the `.statusX` rules that used to live in
- * `CalendarView.module.css`, so built-in statuses render identically.
+ * `CalendarView.css`, so built-in statuses render identically.
  */
 const BUILTIN_STATUS_PRESENTATION: Record<string, StatusPresentation> = {
   cancelled: { background: '#e5e7eb', foreground: '#6b7280' },

@@ -1,9 +1,9 @@
-.wrapper {
+.reserve-calendar__wrapper {
   /* Hosts align the calendar with their own page gutter via this property. */
   padding: var(--reserve-calendar-padding, 20px);
 }
 
-.header {
+.reserve-calendar__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -12,13 +12,13 @@
   gap: 8px;
 }
 
-.navButtons {
+.reserve-calendar__navButtons {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.navButton {
+.reserve-calendar__navButton {
   background: transparent;
   border: none;
   border-radius: 3px;
@@ -31,26 +31,26 @@
   transition: box-shadow 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
-.navButton:hover {
+.reserve-calendar__navButton:hover {
   box-shadow: inset 0 0 0 1px var(--color-border-control-strong);
 }
 
-.navButton:focus-visible {
+.reserve-calendar__navButton:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
-.currentDate {
+.reserve-calendar__currentDate {
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 1.125);
   font-weight: 600;
 }
 
-.viewToggle {
+.reserve-calendar__viewToggle {
   display: flex;
   gap: 0;
 }
 
-.createButton {
+.reserve-calendar__createButton {
   background: var(--color-bg-inverse);
   color: var(--color-bg);
   border: none;
@@ -64,16 +64,16 @@
   transition: background-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
-.createButton:hover {
+.reserve-calendar__createButton:hover {
   background: var(--color-bg-inverse);
 }
 
-.createButton:focus-visible {
+.reserve-calendar__createButton:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
-.viewToggleButton {
+.reserve-calendar__viewToggleButton {
   background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
   border: none;
@@ -85,37 +85,37 @@
   transition: background-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
-.createButton + .viewToggleButton {
+.reserve-calendar__createButton + .reserve-calendar__viewToggleButton {
   border-radius: 3px 0 0 3px;
 }
 
-.viewToggleButton + .viewToggleButton {
+.reserve-calendar__viewToggleButton + .reserve-calendar__viewToggleButton {
   box-shadow: inset 1px 0 0 var(--color-border);
 }
 
-.viewToggleButton:last-child {
+.reserve-calendar__viewToggleButton:last-child {
   border-radius: 0 3px 3px 0;
 }
 
-.viewToggleButton:hover {
+.reserve-calendar__viewToggleButton:hover {
   background: var(--color-bg-tertiary);
 }
 
-.viewToggleButton.viewToggleButtonActive {
+.reserve-calendar__viewToggleButton.reserve-calendar__viewToggleButtonActive {
   background: var(--color-bg-inverse);
   color: var(--color-bg);
 }
 
-.viewToggleButton.viewToggleButtonActive:hover {
+.reserve-calendar__viewToggleButton.reserve-calendar__viewToggleButtonActive:hover {
   background: var(--color-bg-inverse);
 }
 
-.viewToggleButton:focus-visible {
+.reserve-calendar__viewToggleButton:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
-.monthGrid {
+.reserve-calendar__monthGrid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
@@ -123,7 +123,7 @@
   border: 1px solid var(--color-border);
 }
 
-.dayHeader {
+.reserve-calendar__dayHeader {
   padding: 8px 4px;
   text-align: center;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
@@ -132,7 +132,7 @@
   background: var(--color-bg-secondary);
 }
 
-.dayCell {
+.reserve-calendar__dayCell {
   min-height: 80px;
   /* Let the column shrink below a nowrap pill's text; the pill ellipsizes. */
   min-width: 0;
@@ -142,19 +142,19 @@
   cursor: pointer;
 }
 
-.dayCell:hover {
+.reserve-calendar__dayCell:hover {
   background: var(--color-bg-secondary);
 }
 
-.dayCellOtherMonth {
+.reserve-calendar__dayCellOtherMonth {
   opacity: 0.4;
 }
 
-.dayCellToday {
+.reserve-calendar__dayCellToday {
   background: var(--color-bg-secondary);
 }
 
-.dayNumber {
+.reserve-calendar__dayNumber {
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   font-weight: 600;
   margin-bottom: 2px;
@@ -163,7 +163,7 @@
 /*
  * Doubled selector (`.eventItemExternal.eventItemExternal`) is deliberate, not
  * a typo: this overrides `.eventItem`/`.eventItem:hover` from
- * `EventPill.module.css`, which is a DIFFERENT stylesheet. An element carries
+ * `EventPill.css`, which is a DIFFERENT stylesheet. An element carries
  * both classes at once, and a single-class selector here has the exact same
  * specificity as `.eventItem` there, so without this the winner would be
  * decided by stylesheet emission order — correct today only because of
@@ -171,7 +171,7 @@
  * the class raises specificity from (0,1,0) to (0,2,0), so this always wins
  * regardless of order.
  */
-.eventItemExternal.eventItemExternal {
+.reserve-calendar__eventItemExternal.reserve-calendar__eventItemExternal {
   background: repeating-linear-gradient(
     45deg,
     var(--color-bg-tertiary),
@@ -183,11 +183,11 @@
   cursor: default;
 }
 
-.eventItemExternal.eventItemExternal:hover {
+.reserve-calendar__eventItemExternal.reserve-calendar__eventItemExternal:hover {
   opacity: 1;
 }
 
-.weekView {
+.reserve-calendar__weekView {
   display: grid;
   grid-template-columns: 60px repeat(7, minmax(0, 1fr));
   gap: 1px;
@@ -195,7 +195,7 @@
   border: 1px solid var(--color-border);
 }
 
-.timeLabel {
+.reserve-calendar__timeLabel {
   padding: 4px;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   text-align: right;
@@ -203,7 +203,7 @@
   min-height: 40px;
 }
 
-.weekCell {
+.reserve-calendar__weekCell {
   min-width: 0;
   padding: 2px;
   background: var(--color-bg);
@@ -212,11 +212,11 @@
   cursor: pointer;
 }
 
-.weekCell:hover {
+.reserve-calendar__weekCell:hover {
   background: var(--color-bg-secondary);
 }
 
-.dayView {
+.reserve-calendar__dayView {
   display: grid;
   grid-template-columns: 60px 1fr;
   gap: 1px;
@@ -224,7 +224,7 @@
   border: 1px solid var(--color-border);
 }
 
-.dayViewCell {
+.reserve-calendar__dayViewCell {
   padding: 4px;
   background: var(--color-bg);
   min-height: 48px;
@@ -232,38 +232,38 @@
   cursor: pointer;
 }
 
-.dayViewCell:hover {
+.reserve-calendar__dayViewCell:hover {
   background: var(--color-bg-secondary);
 }
 
-.loading {
+.reserve-calendar__loading {
   text-align: center;
   padding: 40px;
   color: var(--color-text-tertiary);
 }
 
-.statusLegend {
+.reserve-calendar__statusLegend {
   display: flex;
   gap: 12px;
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
 
-.legendItem {
+.reserve-calendar__legendItem {
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
 }
 
-.legendDot {
+.reserve-calendar__legendDot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.currentTimeLine {
+.reserve-calendar__currentTimeLine {
   position: absolute;
   left: 0;
   right: 0;
@@ -274,7 +274,7 @@
 }
 
 /* Pending badge on toggle button */
-.pendingBadge {
+.reserve-calendar__pendingBadge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -290,23 +290,23 @@
   color: #fff;
 }
 
-.viewToggleButtonActive .pendingBadge {
+.reserve-calendar__viewToggleButtonActive .reserve-calendar__pendingBadge {
   background: #f59e0b;
 }
 
 /* Pending view layout */
-.pendingView {
+.reserve-calendar__pendingView {
   margin-top: 4px;
 }
 
-.pendingToolbar {
+.reserve-calendar__pendingToolbar {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
 }
 
-.selectAllLabel {
+.reserve-calendar__selectAllLabel {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -315,7 +315,7 @@
   user-select: none;
 }
 
-.bulkConfirmButton {
+.reserve-calendar__bulkConfirmButton {
   background: transparent;
   border: none;
   box-shadow: inset 0 0 0 1px #16a34a;
@@ -329,17 +329,17 @@
   transition: background-color 100ms ease, opacity 100ms ease;
 }
 
-.bulkConfirmButton:hover {
+.reserve-calendar__bulkConfirmButton:hover {
   background: #f0fdf4;
 }
 
-.bulkConfirmButton:disabled {
+.reserve-calendar__bulkConfirmButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* Feedback toast */
-.feedbackToast {
+.reserve-calendar__feedbackToast {
   padding: 8px 14px;
   border-radius: 4px;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
@@ -347,24 +347,24 @@
   margin-bottom: 12px;
 }
 
-.feedbackSuccess {
+.reserve-calendar__feedbackSuccess {
   background: #dcfce7;
   color: #166534;
 }
 
-.feedbackError {
+.reserve-calendar__feedbackError {
   background: #fee2e2;
   color: #991b1b;
 }
 
 /* Pending table */
-.pendingTable {
+.reserve-calendar__pendingTable {
   width: 100%;
   border-collapse: collapse;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
 }
 
-.pendingTh {
+.reserve-calendar__pendingTh {
   text-align: left;
   padding: 8px 10px;
   font-weight: 600;
@@ -374,33 +374,33 @@
   border-bottom: 2px solid var(--color-border);
 }
 
-.pendingRow {
+.reserve-calendar__pendingRow {
   border-bottom: 1px solid var(--color-border);
   transition: background-color 100ms ease;
 }
 
-.pendingRow:hover {
+.reserve-calendar__pendingRow:hover {
   background: var(--color-bg-secondary);
 }
 
-.pendingTd {
+.reserve-calendar__pendingTd {
   padding: 8px 10px;
   vertical-align: middle;
 }
 
-.pendingCustomerLink {
+.reserve-calendar__pendingCustomerLink {
   cursor: pointer;
   color: var(--color-text);
   text-decoration: none;
 }
 
-.pendingCustomerLink:hover {
+.reserve-calendar__pendingCustomerLink:hover {
   text-decoration: underline;
 }
 
 /* Action buttons */
-.confirmButton,
-.cancelButton {
+.reserve-calendar__confirmButton,
+.reserve-calendar__cancelButton {
   background: transparent;
   border: none;
   border-radius: 3px;
@@ -411,33 +411,33 @@
   transition: background-color 100ms ease, opacity 100ms ease;
 }
 
-.confirmButton {
+.reserve-calendar__confirmButton {
   box-shadow: inset 0 0 0 1px #16a34a;
   color: #16a34a;
 }
 
-.confirmButton:hover {
+.reserve-calendar__confirmButton:hover {
   background: #f0fdf4;
 }
 
-.cancelButton {
+.reserve-calendar__cancelButton {
   box-shadow: inset 0 0 0 1px #dc2626;
   color: #dc2626;
   margin-left: 4px;
 }
 
-.cancelButton:hover {
+.reserve-calendar__cancelButton:hover {
   background: #fef2f2;
 }
 
-.confirmButton:disabled,
-.cancelButton:disabled {
+.reserve-calendar__confirmButton:disabled,
+.reserve-calendar__cancelButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* Empty state */
-.pendingEmpty {
+.reserve-calendar__pendingEmpty {
   text-align: center;
   padding: 48px 20px;
   color: var(--color-text-tertiary);
@@ -445,14 +445,14 @@
 }
 
 /* Resource filter */
-.filterBar {
+.reserve-calendar__filterBar {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.truncationNotice {
+.reserve-calendar__truncationNotice {
   margin-bottom: 12px;
   padding: 8px 12px;
   border-radius: 4px;
@@ -461,7 +461,7 @@
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.85);
 }
 
-.resourceFilter {
+.reserve-calendar__resourceFilter {
   appearance: none;
   background: var(--color-bg);
   border: none;
@@ -479,23 +479,23 @@
   transition: box-shadow 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 
-.resourceFilter:hover {
+.reserve-calendar__resourceFilter:hover {
   box-shadow: inset 0 0 0 1px var(--color-border-control-strong);
 }
 
-.resourceFilter:focus-visible {
+.reserve-calendar__resourceFilter:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
 /* Availability shading (week/day views, resource selected) */
-.slotOffShift {
+.reserve-calendar__slotOffShift {
   background: var(--color-bg-secondary);
   opacity: 0.5;
   pointer-events: none;
 }
 
-.slotTimeOff {
+.reserve-calendar__slotTimeOff {
   background: repeating-linear-gradient(
     45deg,
     var(--color-bg-secondary),
@@ -506,12 +506,12 @@
   pointer-events: none;
 }
 
-.slotFull {
+.reserve-calendar__slotFull {
   background: var(--color-bg-danger-tertiary);
   cursor: not-allowed;
 }
 
-.slotExternal {
+.reserve-calendar__slotExternal {
   background: repeating-linear-gradient(
     45deg,
     var(--color-bg-tertiary),
@@ -522,11 +522,11 @@
   cursor: not-allowed;
 }
 
-.slotFree {
+.reserve-calendar__slotFree {
   cursor: pointer;
 }
 
-.capacityBadge {
+.reserve-calendar__capacityBadge {
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   opacity: 0.7;
   position: absolute;
@@ -534,70 +534,70 @@
   top: 2px;
 }
 
-.timeOffLabel {
+.reserve-calendar__timeOffLabel {
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   opacity: 0.7;
 }
 
 /* Lane timeline view */
-.lanes {
+.reserve-calendar__lanes {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.lane {
+.reserve-calendar__lane {
   align-items: stretch;
   display: flex;
   gap: 8px;
 }
 
-.laneLabel {
+.reserve-calendar__laneLabel {
   flex: 0 0 120px;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 1);
   font-weight: 600;
   padding-top: 4px;
 }
 
-.laneTrack {
+.reserve-calendar__laneTrack {
   display: grid;
   flex: 1;
   grid-auto-columns: 1fr;
   grid-auto-flow: column;
 }
 
-.laneCell {
+.reserve-calendar__laneCell {
   border: 1px solid var(--color-border);
   min-height: 32px;
 }
 
-.laneHeader {
+.reserve-calendar__laneHeader {
   align-items: stretch;
   display: flex;
   gap: 8px;
 }
 
-.laneTime {
+.reserve-calendar__laneTime {
   border-left: 1px solid var(--color-border);
   color: var(--color-text-tertiary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   padding: 2px 0 2px 3px;
 }
 
-.hint {
+.reserve-calendar__hint {
   color: var(--color-text-tertiary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9231);
 }
 
 /* Multi-resource item badges inside event blocks */
-.itemBadges {
+.reserve-calendar__itemBadges {
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
   margin-top: 2px;
 }
 
-.itemBadge {
+.reserve-calendar__itemBadge {
   /* Events have fixed light status backgrounds, so the badge must use
      theme-independent colors — a subtle dark overlay + the event's own (dark)
      text — to stay readable in both light and dark mode. */
@@ -637,7 +637,7 @@
 
    Scoped under `.detailDrawer` so it can only ever affect this plugin's own
    detail drawer, never the document drawer or a host's. */
-.detailDrawer :global(.drawer__content) {
+.reserve-calendar__detailDrawer .drawer__content {
   max-width: 720px;
 }
 
@@ -646,14 +646,14 @@
    would otherwise render — so the close affordance has to be ours. The title
    inside it stays visually hidden (see .detailDrawerTitle); the button is the
    only thing that shows, pinned to the end of the row. */
-.detailDrawerHeader {
+.reserve-calendar__detailDrawerHeader {
   display: flex;
   justify-content: flex-end;
   /* Payload 4's Drawer no longer pads its children; it only defines --gutter-h. */
   padding: 12px var(--gutter-h) 0;
 }
 
-.detailDrawerClose {
+.reserve-calendar__detailDrawerClose {
   align-items: center;
   background: transparent;
   border: 1px solid var(--color-border);
@@ -667,16 +667,16 @@
   width: 32px;
 }
 
-.detailDrawerClose:hover {
+.reserve-calendar__detailDrawerClose:hover {
   background: var(--color-bg-secondary);
 }
 
-.detailDrawerClose:focus-visible {
+.reserve-calendar__detailDrawerClose:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
-.detailDrawerBody {
+.reserve-calendar__detailDrawerBody {
   /* Slightly under the panel cap above, minus Payload's gutters, so the rows
      stay bounded even if a consumer's detailSlot renders something wider. */
   max-width: 600px;
@@ -688,7 +688,7 @@
    only so the dialog has a real title in the accessibility tree instead of
    Payload's slug-based fallback, without drawing a second, duplicate-looking
    header bar above it. */
-.detailDrawerTitle {
+.reserve-calendar__detailDrawerTitle {
   clip: rect(0 0 0 0);
   clip-path: inset(50%);
   height: 1px;
@@ -706,7 +706,7 @@
    The breakpoint is Payload's `s` (768px), the same one `useIsMobile` reads.
    --------------------------------------------------------------------------- */
 
-.fab {
+.reserve-calendar__fab {
   align-items: center;
   background: var(--color-bg-inverse);
   border: none;
@@ -727,13 +727,13 @@
   z-index: 5;
 }
 
-.fab:focus-visible {
+.reserve-calendar__fab:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
 /* Mobile month: dots per day + the selected day's list. */
-.dayCellMobile {
+.reserve-calendar__dayCellMobile {
   align-items: center;
   border: none;
   color: inherit;
@@ -746,21 +746,21 @@
   text-align: center;
 }
 
-.dayCellMobile .dayNumber {
+.reserve-calendar__dayCellMobile .reserve-calendar__dayNumber {
   margin-bottom: 4px;
 }
 
-.dayCellSelected {
+.reserve-calendar__dayCellSelected {
   box-shadow: inset 0 0 0 2px var(--color-border-strong);
 }
 
-.dayCellMobile:focus-visible,
-.dayListAdd:focus-visible {
+.reserve-calendar__dayCellMobile:focus-visible,
+.reserve-calendar__dayListAdd:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: -2px;
 }
 
-.dotRow {
+.reserve-calendar__dotRow {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
@@ -769,7 +769,7 @@
   min-height: 8px;
 }
 
-.dot {
+.reserve-calendar__dot {
   background: var(--color-text-tertiary);
   border-radius: 50%;
   flex: 0 0 auto;
@@ -777,22 +777,22 @@
   width: 7px;
 }
 
-.dotExternal {
+.reserve-calendar__dotExternal {
   background: var(--color-bg-secondary-pressed);
 }
 
-.dotOverflow {
+.reserve-calendar__dotOverflow {
   color: var(--color-text-tertiary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   line-height: 1;
 }
 
-.dayList {
+.reserve-calendar__dayList {
   border-top: 1px solid var(--color-border);
   margin-top: 12px;
 }
 
-.dayListHeader {
+.reserve-calendar__dayListHeader {
   align-items: center;
   display: flex;
   font-weight: 600;
@@ -800,7 +800,7 @@
   padding: 8px 0;
 }
 
-.dayListAdd {
+.reserve-calendar__dayListAdd {
   background: transparent;
   border: none;
   border-radius: 3px;
@@ -814,7 +814,7 @@
   width: 44px;
 }
 
-.dayListRow {
+.reserve-calendar__dayListRow {
   align-items: center;
   border-bottom: 1px solid var(--color-border);
   cursor: pointer;
@@ -824,19 +824,19 @@
   padding: 8px 4px;
 }
 
-.dayListRowExternal {
+.reserve-calendar__dayListRowExternal {
   color: var(--color-text-tertiary);
   cursor: default;
 }
 
-.dayListTime {
+.reserve-calendar__dayListTime {
   color: var(--color-text-secondary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
   font-variant-numeric: tabular-nums;
   min-width: 44px;
 }
 
-.dayListLabel {
+.reserve-calendar__dayListLabel {
   flex: 1;
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.875);
   min-width: 0;
@@ -845,7 +845,7 @@
   white-space: nowrap;
 }
 
-.dayListEmpty {
+.reserve-calendar__dayListEmpty {
   color: var(--color-text-tertiary);
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.8125);
   margin: 0;
@@ -853,14 +853,14 @@
 }
 
 /* Mobile week: the day strip. */
-.dayStrip {
+.reserve-calendar__dayStrip {
   display: grid;
   gap: 4px;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   margin-bottom: 8px;
 }
 
-.dayStripChip {
+.reserve-calendar__dayStripChip {
   align-items: center;
   /* A visible edge and surface: without them the chips read as a static
      weekday header, not seven buttons. */
@@ -877,11 +877,11 @@
   padding: 6px 0;
 }
 
-.dayStripChipToday {
+.reserve-calendar__dayStripChipToday {
   box-shadow: inset 0 0 0 1px var(--color-border-strong);
 }
 
-.dayStripChipSelected {
+.reserve-calendar__dayStripChipSelected {
   background: var(--color-bg-inverse);
   border-color: var(--color-border-strong);
   color: var(--color-bg);
@@ -889,66 +889,66 @@
 
 /* Status dots keep their colour on the dark selected chip; the "+N" and the
    external-busy dot inherit/lighten so they stay legible. */
-.dayStripChipSelected .dotOverflow {
+.reserve-calendar__dayStripChipSelected .reserve-calendar__dotOverflow {
   color: var(--color-text-disabled);
 }
 
-.dayStripChipSelected .dotExternal {
+.reserve-calendar__dayStripChipSelected .reserve-calendar__dotExternal {
   background: var(--color-text-tertiary);
 }
 
-.dayStripChip .dotRow {
+.reserve-calendar__dayStripChip .reserve-calendar__dotRow {
   min-height: 7px;
 }
 
-.dayStripChip:focus-visible {
+.reserve-calendar__dayStripChip:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
-.dayStripWeekday {
+.reserve-calendar__dayStripWeekday {
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
   text-transform: uppercase;
 }
 
-.dayStripDay {
+.reserve-calendar__dayStripDay {
   font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9375);
   font-weight: 600;
 }
 
 @media (max-width: 768px) {
-  .wrapper {
+  .reserve-calendar__wrapper {
     padding: var(--reserve-calendar-padding-mobile, 12px);
     /* Bottom room so the FAB never covers the last row (88px at the default). */
     padding-bottom: calc(var(--reserve-calendar-padding-mobile, 12px) + 76px);
   }
 
-  .header {
+  .reserve-calendar__header {
     align-items: stretch;
     flex-direction: column;
     gap: 10px;
   }
 
-  .navButtons {
+  .reserve-calendar__navButtons {
     flex-wrap: wrap;
     gap: 8px;
     justify-content: center;
   }
 
   /* Date label on its own line above the arrows. */
-  .currentDate {
+  .reserve-calendar__currentDate {
     flex-basis: 100%;
     font-size: calc(var(--reserve-calendar-font-size, 1rem) * 1);
     order: -1;
     text-align: center;
   }
 
-  .navButton {
+  .reserve-calendar__navButton {
     min-height: 44px;
     min-width: 44px;
   }
 
-  .viewToggle {
+  .reserve-calendar__viewToggle {
     -webkit-overflow-scrolling: touch;
     overflow-x: auto;
     /* Room for the focus ring, which the scroll container would otherwise clip. */
@@ -957,15 +957,15 @@
     scrollbar-width: none;
   }
 
-  .viewToggleButton {
+  .reserve-calendar__viewToggleButton {
     scroll-snap-align: start;
   }
 
-  .viewToggle::-webkit-scrollbar {
+  .reserve-calendar__viewToggle::-webkit-scrollbar {
     display: none;
   }
 
-  .viewToggleButton {
+  .reserve-calendar__viewToggleButton {
     flex: 0 0 auto;
     min-height: 44px;
     padding: 0 14px;
@@ -974,52 +974,52 @@
   /* The toolbar create button isn't rendered on mobile, so
      `.createButton + .viewToggleButton` never matches to round the first
      tab's left corners. */
-  .viewToggleButton:first-child {
+  .reserve-calendar__viewToggleButton:first-child {
     border-radius: 3px 0 0 3px;
   }
 
-  .statusLegend {
+  .reserve-calendar__statusLegend {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
   }
 
-  .statusLegend::-webkit-scrollbar {
+  .reserve-calendar__statusLegend::-webkit-scrollbar {
     display: none;
   }
 
-  .legendItem {
+  .reserve-calendar__legendItem {
     flex: 0 0 auto;
   }
 
-  .filterBar {
+  .reserve-calendar__filterBar {
     width: 100%;
   }
 
-  .resourceFilter {
+  .reserve-calendar__resourceFilter {
     min-height: 44px;
     min-width: 0;
     width: 100%;
   }
 
-  .dayCell {
+  .reserve-calendar__dayCell {
     min-height: 44px;
   }
 
-  .dayHeader {
+  .reserve-calendar__dayHeader {
     font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
     padding: 6px 2px;
   }
 
-  .dayView {
+  .reserve-calendar__dayView {
     grid-template-columns: 44px 1fr;
   }
 
-  .dayViewCell {
+  .reserve-calendar__dayViewCell {
     min-height: 44px;
   }
 
-  .timeLabel {
+  .reserve-calendar__timeLabel {
     font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.75);
     padding: 4px 2px;
   }
@@ -1027,7 +1027,7 @@
   /* Lanes: a timeline is allowed to be wider than the phone — but it scrolls
      inside its own track, never the page. Header and rows share this one
      scroll container so hour labels stay aligned with cells. */
-  .lanes {
+  .reserve-calendar__lanes {
     -webkit-overflow-scrolling: touch;
     overflow-x: auto;
   }
@@ -1037,16 +1037,16 @@
      min-width overflows out of them — and a sticky `.laneLabel` is confined
      to its containing block, so it would leave the screen after ~278px of
      scroll instead of staying pinned. */
-  .lane,
-  .laneHeader {
+  .reserve-calendar__lane,
+  .reserve-calendar__laneHeader {
     min-width: max-content;
   }
 
-  .laneTrack {
+  .reserve-calendar__laneTrack {
     min-width: var(--lane-track-min);
   }
 
-  .laneLabel {
+  .reserve-calendar__laneLabel {
     background: var(--color-bg);
     flex-basis: 88px;
     font-size: calc(var(--reserve-calendar-font-size, 1rem) * 0.9231);
@@ -1055,31 +1055,31 @@
     z-index: 1;
   }
 
-  .laneCell {
+  .reserve-calendar__laneCell {
     min-height: 44px;
   }
 
   /* Pending: table → stacked cards. `data-label` (set on each labelled <td>)
      becomes the row caption; the checkbox and actions cells have none. */
-  .pendingTable thead {
+  .reserve-calendar__pendingTable thead {
     display: none;
   }
 
-  .pendingTable,
-  .pendingTable tbody,
-  .pendingRow,
-  .pendingTd {
+  .reserve-calendar__pendingTable,
+  .reserve-calendar__pendingTable tbody,
+  .reserve-calendar__pendingRow,
+  .reserve-calendar__pendingTd {
     display: block;
   }
 
-  .pendingRow {
+  .reserve-calendar__pendingRow {
     border: 1px solid var(--color-border);
     border-radius: 6px;
     margin-bottom: 8px;
     padding: 4px 0;
   }
 
-  .pendingTd {
+  .reserve-calendar__pendingTd {
     align-items: center;
     display: flex;
     gap: 12px;
@@ -1087,7 +1087,7 @@
     padding: 6px 12px;
   }
 
-  .pendingTd[data-label]::before {
+  .reserve-calendar__pendingTd[data-label]::before {
     color: var(--color-text-tertiary);
     content: attr(data-label);
     flex: 0 0 auto;
@@ -1096,27 +1096,27 @@
     text-transform: uppercase;
   }
 
-  .pendingTd:last-child {
+  .reserve-calendar__pendingTd:last-child {
     justify-content: flex-end;
   }
 
-  .pendingToolbar {
+  .reserve-calendar__pendingToolbar {
     flex-wrap: wrap;
   }
 
-  .bulkConfirmButton,
-  .confirmButton,
-  .cancelButton {
+  .reserve-calendar__bulkConfirmButton,
+  .reserve-calendar__confirmButton,
+  .reserve-calendar__cancelButton {
     min-height: 44px;
     min-width: 44px;
   }
 
   /* Detail drawer: full width on a phone. */
-  .detailDrawer :global(.drawer__content) {
+  .reserve-calendar__detailDrawer .drawer__content {
     max-width: 100vw;
   }
 
-  .detailDrawerBody {
+  .reserve-calendar__detailDrawerBody {
     max-width: none;
   }
 }

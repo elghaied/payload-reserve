@@ -4,13 +4,13 @@
    sibling above it. A caller that renders this next to other footer content
    (see `ReservationDetail`'s `.footer`) is the one who owns the rule that
    spans the whole row. */
-.bar {
+.reserve-status-actions__bar {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
 }
 
-.button {
+.reserve-status-actions__button {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -20,13 +20,13 @@
   padding: 5px 11px;
 }
 
-.button:disabled {
+.reserve-status-actions__button:disabled {
   cursor: default;
   opacity: 0.5;
 }
 
 @media (max-width: 768px) {
-  .button {
+  .reserve-status-actions__button {
     flex: 1 1 100%;
     min-height: 44px;
   }

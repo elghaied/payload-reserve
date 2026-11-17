@@ -1,4 +1,4 @@
-.row {
+.reserve-detail-row__row {
   border-bottom: 1px solid var(--color-border);
   display: flex;
   gap: 12px;
@@ -6,16 +6,16 @@
   padding: 7px 0;
 }
 
-.row:last-child {
+.reserve-detail-row__row:last-child {
   border-bottom: 0;
 }
 
-.key {
+.reserve-detail-row__key {
   color: var(--color-text-tertiary);
   flex: 0 0 auto;
 }
 
-.value {
+.reserve-detail-row__value {
   font-weight: 550;
   text-align: right;
   word-break: break-word;

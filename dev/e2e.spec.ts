@@ -26,7 +26,7 @@ async function waitForAvailabilityLoaded(page: Page) {
 }
 
 // this is an example Playwright e2e test
-test('should render admin panel logo', async ({ page }) => {
+test('should render admin panel after login', async ({ page }) => {
   await page.goto('/admin')
 
   // login
@@ -36,7 +36,8 @@ test('should render admin panel logo', async ({ page }) => {
 
   // should show dashboard
   await expect(page).toHaveTitle(/Dashboard/)
-  await expect(page.locator('.graphic-icon')).toBeVisible()
+  // Payload 4's dashboard no longer renders the `.graphic-icon` logo.
+  await expect(page.locator('nav.nav__wrap')).toBeVisible()
 })
 
 // ---------------------------------------------------------------------------
@@ -653,7 +654,7 @@ test('CalendarView opens the reservation detail drawer instead of the edit form'
   await expect(drawer.getByRole('button', { name: 'Save' })).toHaveCount(0)
 
   // The panel-width cap (`.detailDrawer :global(.drawer__content)` in
-  // CalendarView.module.css, max-width: 720px) is invisible to jsdom, which
+  // CalendarView.css, max-width: 720px) is invisible to jsdom, which
   // does no layout — this is the only place it's observable. Assert a bound,
   // not an exact pixel value, so a Payload gutter/border tweak doesn't make
   // this brittle; the point is "bounded", not "exactly 720px".

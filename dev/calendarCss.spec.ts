@@ -15,13 +15,13 @@ import { describe, expect, it } from 'vitest'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(dirname, '..')
-const cssPath = path.resolve(repoRoot, 'src/components/CalendarView/CalendarView.module.css')
+const cssPath = path.resolve(repoRoot, 'src/components/CalendarView/CalendarView.css')
 const eventPillCssPath = path.resolve(
   repoRoot,
-  'src/components/primitives/EventPill/EventPill.module.css',
+  'src/components/primitives/EventPill/EventPill.css',
 )
 
-describe('CalendarView.module.css host-fit hooks', () => {
+describe('CalendarView.css host-fit hooks', () => {
   it('exposes the outer padding as --reserve-calendar-padding with the 20px default', async () => {
     const css = await readFile(cssPath, 'utf8')
     expect(css).toContain('var(--reserve-calendar-padding, 20px)')
@@ -56,7 +56,7 @@ describe('CalendarView.module.css host-fit hooks', () => {
   })
 })
 
-describe('CalendarView.module.css day columns never grow past the viewport', () => {
+describe('CalendarView.css day columns never grow past the viewport', () => {
   /**
    * `repeat(7, 1fr)` is `repeat(7, minmax(auto, 1fr))`: a nowrap event pill
    * widens its column to the pill's full text and pushes Friday–Sunday off the
@@ -76,7 +76,7 @@ describe('CalendarView.module.css day columns never grow past the viewport', () 
 
   it('lets week and month cells shrink below their pill text (min-width: 0)', async () => {
     const css = await readFile(cssPath, 'utf8')
-    for (const cls of ['.weekCell', '.dayCell']) {
+    for (const cls of ['.reserve-calendar__weekCell', '.reserve-calendar__dayCell']) {
       const block = css.match(new RegExp(`\\${cls} \\{([^}]*)\\}`))?.[1] ?? ''
       expect(block, cls).toContain('min-width: 0')
     }

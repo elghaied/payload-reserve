@@ -10,6 +10,8 @@ Payload 4 support. This major requires `payload`, `@payloadcms/ui` and `@payload
 - Standalone-mode access rules that used to rely on Payload's default are now explicit, because Payload 4's default admits only the admin user collection: customers may still `create` their own reservation through the collection API and `read` Services, Resources and Schedules.
 - Plugin collections set `versions: false` and `authorship: false`, so installing or upgrading adds no version tables or `createdBy`/`updatedBy` columns. Opt back in through `collectionOverrides`.
 - Admin styles use Payload 4's `--color-*` tokens in place of the retired `--theme-*` variables, and the reservation detail drawer pads its own content (Payload 4's `Drawer` no longer does).
+- Admin stylesheets are plain CSS with fixed class names (`reserve-calendar__toolbar`, `reserve-detail__…`, …) instead of CSS modules, the pattern Payload's own plugins use. This is what makes the admin components render on TanStack Start, and it gives hosts stable class names to style against. Hashed class names from 4.x no longer exist.
+- Works on TanStack Start (`@payloadcms/tanstack-start`) as well as Next.js; TanStack hosts add `payload-reserve` to `noExternal` (see README).
 - `acquireBookingLock` and `validateConflicts` handle Payload 4's on-demand `validate` operation (no lock is taken; an existing reservation does not conflict with itself).
 - `CustomerField` and `AvailabilityTimeField` are typed with Payload 4's field props types.
 

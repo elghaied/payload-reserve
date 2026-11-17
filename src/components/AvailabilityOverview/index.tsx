@@ -9,13 +9,16 @@ import type { ReservationCalendarConfig } from '../../types.js'
 
 import { safeLocale } from '../../utilities/adminLocale.js'
 import { weekdayLabels } from '../../utilities/calendarViews.js'
+import { classMap } from '../../utilities/classMap.js'
 import {
   dateFieldToDayKey,
   getDayKeyInTimezone,
   getDayOfWeekFromDayKey,
 } from '../../utilities/timezoneUtils.js'
 import { useTenantFilter } from '../../utilities/useTenantFilter.js'
-import styles from './AvailabilityOverview.module.css'
+import './AvailabilityOverview.css'
+
+const styles = classMap('reserve-availability')
 
 type Resource = {
   active?: boolean

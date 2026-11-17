@@ -1,7 +1,10 @@
 'use client'
 import React from 'react'
 
-import styles from './DetailRow.module.css'
+import { classMap } from '../../../utilities/classMap.js'
+import './DetailRow.css'
+
+const styles = classMap('reserve-detail-row')
 
 export type DetailRowProps = {
   /** Rendered in the value column; use instead of `value` for rich content. */
