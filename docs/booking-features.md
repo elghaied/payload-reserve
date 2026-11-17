@@ -40,12 +40,13 @@ await payload.create({
     startTime: '2025-06-15T10:00:00.000Z',
     endTime: '2025-06-15T12:30:00.000Z', // 2.5 hours
   },
+  overrideAccess: true,
 })
 ```
 
 ### Full-Day
 
-`endTime = end of the calendar day (23:59:59)` relative to `startTime`.
+`endTime` = the end of that calendar day (23:59:59.999) in the business `timezone`.
 
 Used for day-rate resources: hotel rooms, venue hire, equipment daily rental.
 
@@ -84,12 +85,13 @@ await payload.create({
       },
     ],
   },
+  overrideAccess: true,
 })
 ```
 
 Each item in the `items` array has its own `resource`, optional `service`, optional `startTime`/`endTime` (for staggered scheduling), and optional `guestCount`.
 
-**Inheritance rules:** Items missing `startTime`, `endTime`, `service`, or `guestCount` inherit the parent reservation's values.
+**Inheritance rules:** Items missing `startTime`, `service`, or `guestCount` inherit the parent reservation's values. An item's `endTime` is computed from its own service's duration (for a `flexible` service it inherits the parent's `endTime`), and the reservation's top-level `endTime` is widened to cover every item.
 
 **Validation:**
 - Every item must have a `resource` and `startTime` (either its own or inherited from the parent). Items missing required fields throw a `ValidationError` identifying which item is incomplete (e.g., `items.1.resource`).
@@ -104,7 +106,7 @@ Two items in the **same** booking that target the same resource are also checked
 
 ### Auto-expanded required resources
 
-A service can declare `requiredResources` (a `hasMany` relationship to additional resource pools it always needs — e.g. a treatment that also consumes a shared room or a salon haircut that occupies a chair). On create, the `expandRequiredResources` hook automatically appends those resources to the reservation's `items[]` before conflict detection and `endTime` calculation run, so the caller doesn't have to list them manually.
+A service can declare `requiredResources` (a `hasMany` relationship to additional resource pools it always needs — e.g. a treatment that also consumes a shared room or a salon haircut that occupies a chair). On create (and on update when `service` changes), the `expandRequiredResources` hook automatically appends those resources to the reservation's `items[]` before conflict detection and `endTime` calculation run, so the caller doesn't have to list them manually.
 
 ```typescript
 // Service with a required shared room pool
@@ -114,6 +116,7 @@ A service can declare `requiredResources` (a `hasMany` relationship to additiona
 await payload.create({
   collection: 'reservations',
   data: { service: massageId, resource: therapistId, customer, startTime },
+  overrideAccess: true,
 })
 ```
 
@@ -138,6 +141,7 @@ await payload.create({
     quantity: 20, // 20 identical rooms
     capacityMode: 'per-reservation',
   },
+  overrideAccess: true,
 })
 ```
 
@@ -165,6 +169,7 @@ await payload.create({
     quantity: 20,       // 20 total spots
     capacityMode: 'per-guest',
   },
+  overrideAccess: true,
 })
 
 // Booking with guestCount: 3 occupies 3 of the 20 spots
@@ -203,7 +208,79 @@ This means a reservation booked under an older buffer or schedule configuration 
 
 ## Guest Bookings
 
-Reservations can be made without a customer account. Enable globally with the `allowGuestBooking` plugin option, or per-service via the service's `allowGuestBooking` field (`inherit` / `enabled` / `disabled`). A guest booking captures inline contact details (`guest.name` plus at least one of `guest.email` / `guest.phone`) instead of a `customer`, and the plugin generates a `cancellationToken` for self-service cancellation (delivered via the `afterBookingCreate` hook, never over the API). See [Guest Bookings](../README.md#guest-bookings) and [Examples](./examples.md).
+Enable `allowGuestBooking` to accept reservations from users who don't have a customer account. Guests provide inline contact details (name + email or phone) instead of linking to a customer record.
+
+```typescript
+payloadReserve({
+  allowGuestBooking: true,   // enable guest bookings globally (default: false)
+})
+```
+
+### Per-service override
+
+Each Service has its own `allowGuestBooking` select field that overrides the plugin-level default:
+
+| Value | Behaviour |
+|-------|-----------|
+| `inherit` | Use the plugin-level `allowGuestBooking` value *(default)* |
+| `enabled` | Allow guest bookings for this service regardless of the global setting |
+| `disabled` | Require a customer account for this service regardless of the global setting |
+
+> **Note:** For multi-resource bookings (the `items` array), the gate is checked for every service the booking touches — the top-level `service` and each `items[].service`.
+
+### Customer vs. guest
+
+The `customer` relationship field on Reservations is optional. A reservation must have **either** a `customer` **or** a `guest` block — not both, not neither.
+
+The `guest` block requires `name` and at least one of `email` or `phone`:
+
+```typescript
+// POST /api/reserve/book
+{
+  "service": "...",
+  "resource": "...",
+  "startTime": "2026-06-01T10:00:00.000Z",
+  "guest": {
+    "name": "Jane Smith",
+    "email": "jane@example.com"   // or "phone": "+1-555-0100"
+  }
+}
+```
+
+### Cancellation token
+
+When a guest booking is created the plugin generates a `cancellationToken` (random UUID). It is **not** returned in the `/api/reserve/book` HTTP response. It is exposed server-side via the `afterBookingCreate` plugin hook so the host project can deliver a cancel link by email or an SMS code:
+
+```typescript
+payloadReserve({
+  allowGuestBooking: true,
+  hooks: {
+    afterBookingCreate: [
+      async ({ doc, req }) => {
+        if (doc.guest && doc.cancellationToken) {
+          // Send the token however you like — the plugin sends nothing itself
+          await sendEmail({
+            to: (doc.guest as { email?: string }).email,
+            cancelUrl: `https://example.com/cancel?reservationId=${doc.id}&token=${doc.cancellationToken}`,
+          })
+        }
+      },
+    ],
+  },
+})
+```
+
+To cancel with the token, POST to `/api/reserve/cancel` without authentication:
+
+```typescript
+// POST /api/reserve/cancel
+{
+  "reservationId": "...",
+  "token": "<cancellationToken>"
+}
+```
+
+Authenticated owner/admin cancellation (without a token) is unchanged.
 
 ---
 

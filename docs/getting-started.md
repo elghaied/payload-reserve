@@ -15,7 +15,17 @@ pnpm add payload-reserve@4
 
 ### ⚠️ Upgrading from an earlier version
 
-**Run `payload generate:importmap`, then restart your app, after upgrading — even if you never touch the new `components` option.** The Reservations list view's default component changed from `payload-reserve/client#CalendarView` to `payload-reserve/rsc#CalendarViewServer`. Payload resolves admin component paths through an import map generated **into your own app**, not this package, so restarting on the new version without regenerating it leaves the old key in place and the new one missing — silently: a missing import-map key logs a `console.error` server-side, and the admin just shows a plain reservations table where the calendar used to be, with nothing explaining why. See the README's "⚠️ Upgrading from an earlier version" section and [Admin UI → Customising the admin components](./admin-ui.md#customising-the-admin-components) for the full detail, including the new reservation detail drawer this release adds.
+**Run `payload generate:importmap`, then restart your app, after upgrading — even if you never touch the new `components` option.** The Reservations list view's default component changed from `payload-reserve/client#CalendarView` to `payload-reserve/rsc#CalendarViewServer`. Payload resolves admin component paths through an import map generated **into your own app**, not this package, so restarting on the new version without regenerating it leaves the old key in place and the new one missing — silently: a missing import-map key logs a `console.error` server-side, and the admin just shows a plain reservations table where the calendar used to be, with nothing explaining why. See the [Admin UI → Customising the admin components](./admin-ui.md#customising-the-admin-components) for the full detail, including the new reservation detail drawer this release adds.
+
+### Upgrading to 5.x (Payload 4)
+
+5.x requires Payload 4. Upgrade Payload first (its codemod, `npx @payloadcms/codemod`, handles most of it), then:
+
+- **Local API calls on the plugin's collections from your own code** need `overrideAccess: true` wherever you relied on the old default. Payload 4 access-checks the Local API unless told otherwise.
+- **`userCollection` pointing at a collection that is not your admin collection:** Payload 4's default access only admits users of the admin collection, so those users can no longer read reservations, services, resources or schedules through the collection REST API until you supply `access` rules. The `/api/reserve/*` endpoints are unaffected. The plugin warns about this at boot.
+- **Custom CSS aimed at the plugin's admin components:** class names are now fixed and readable (`reserve-calendar__toolbar`, `reserve-detail__…`) instead of hashed, and colours use Payload 4's `--color-*` variables.
+- **No new tables:** the plugin's collections opt out of Payload 4's default versions and `createdBy`/`updatedBy` columns. Turn them back on per collection with `collectionOverrides` if you want them.
+- Run `payload generate:importmap` and restart.
 
 ## Quick Start
 
@@ -37,6 +47,29 @@ export default buildConfig({
 
 That's it. The plugin registers the domain collections, adds a dashboard widget, replaces the reservations list view with a calendar, and mounts the public API endpoints. All plugin collections appear under the **"Reservations"** admin group by default.
 
+## TanStack Start
+
+Payload 4 also runs on TanStack Start. The admin components work there, with one line of host config: Payload's adapter bundles `@payloadcms/plugin-*` packages for the server automatically, but not third-party plugins, so add the plugin to `noExternal` in `vite.config.ts`:
+
+```ts
+export default defineConfig(
+  withPayload(
+    ({ pluginOptions }) => ({
+      plugins: [/* rsc, tanstackStart, viteReact — as in the template */],
+      environments: {
+        rsc: { resolve: { noExternal: ['payload-reserve'] } },
+        ssr: { resolve: { noExternal: ['payload-reserve'] } },
+      },
+    }),
+    { payloadConfigPath: './src/payload.config.ts' },
+  ),
+)
+```
+
+Without it the admin fails with `Unknown file extension ".css"`. Next.js needs no extra config.
+
+> **Using SQLite?** Set `transactionOptions` on the adapter, or concurrent bookings can double-book — see [Concurrent Bookings](./concurrency.md).
+
 ## What Gets Created
 
 By default, with no options set, the plugin creates:
@@ -48,20 +81,22 @@ By default, with no options set, the plugin creates:
 - `customers` — a standalone auth collection for customers to log in (a customer can read and update only their own document and their own reservations; staff see everything — see [Configuration → Access control for customers](./configuration.md#access-control-for-customers))
 - `reservations` — the core booking records
 
-**3 admin UI components:**
+**Admin UI:**
 - Calendar view replacing the default reservations list (month/week/day/lanes/pending, with availability shading and click-to-book). Clicking a reservation opens a read-optimized detail drawer (status, key fields, and status actions) before the full edit form — see [Admin UI → Reservation Detail Drawer](./admin-ui.md#reservation-detail-drawer)
 - Dashboard widget showing today's booking stats
 - Availability overview at `/admin/reservation-availability`
 
-All six of the admin components above (including the detail drawer) can be replaced with your own via the `components` plugin option — see [Admin UI → Customising the admin components](./admin-ui.md#customising-the-admin-components).
+All six admin components (these, plus the detail drawer and the two reservation-form fields) can be replaced with your own via the `components` plugin option — see [Admin UI → Customising the admin components](./admin-ui.md#customising-the-admin-components).
 
-**6 public REST endpoints:**
+**REST endpoints:**
 - `GET /api/reserve/availability` — available slots for a date (guest-count and multi-resource aware)
 - `GET /api/reserve/slots` — slots with richer metadata + guest count support
 - `GET /api/reserve/resource-availability` — a resource's shift windows, time-off, and busy intervals over a date range (backs the calendar shading)
 - `POST /api/reserve/book` — create a booking (supports account-less `guest` bookings and multi-resource `items`)
 - `POST /api/reserve/cancel` — cancel a booking (authenticated owner/admin, or guest via cancellation token)
 - `GET /api/reservation-customer-search` — customer search (privileged staff/admin only)
+- `GET /api/reserve/effective-timezone` — the business timezone for the signed-in user's selected tenant
+- `POST /api/reserve/hold` and `/api/reserve/hold/release` — only when [`slotHolds`](./slot-holds.md) is enabled
 
 > For multi-tenant setups where staff own their own resources, see [`resourceOwnerMode` and `staffProvisioning`](./configuration.md). The admin UI is fully translatable — see [Internationalization](./i18n.md).
 

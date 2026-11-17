@@ -27,18 +27,18 @@ db.reservations.createIndex(
 
 ```sql
 CREATE INDEX reservation_conflict_lookup
-  ON reservations (resource, status, "startTime", "endTime");
+  ON reservations (resource_id, status, start_time, end_time);
 CREATE INDEX reservation_customer_history
-  ON reservations (customer, "startTime" DESC);
+  ON reservations (customer_id, start_time DESC);
 CREATE UNIQUE INDEX reservation_idempotency
-  ON reservations ("idempotencyKey") WHERE "idempotencyKey" IS NOT NULL;
+  ON reservations (idempotency_key) WHERE idempotency_key IS NOT NULL;
 ```
 
 ### SQLite
 
 ```sql
 CREATE INDEX reservation_conflict_lookup
-  ON reservations (resource, status, startTime, endTime);
+  ON reservations (resource_id, status, start_time, end_time);
 ```
 
 > **Note:** The `idempotencyKey` field has `unique: true` in the Payload schema definition, so Payload-managed databases will have this automatically. The snippets above are for manually adding it if your database was created before this field was introduced.
@@ -77,6 +77,29 @@ payloadReserve({
 
 ---
 
+```typescript
+payloadReserve({
+  collectionOverrides: {
+    services: {
+      // Generic illustration of appending a field via collectionOverrides — not
+      // the way to get a services↔resources view: Services already ships that
+      // built in as a read-only `resources` join (see below). Don't name your
+      // own appended field `resources` on `services`, or it collides with it.
+      fields: ({ defaultFields }) => [
+        ...defaultFields,
+        { name: 'referencedResources', type: 'join', collection: 'resources', on: 'services' },
+      ],
+    },
+    reservations: {
+      admin: { group: 'Bookings' },               // shallow-merged
+      hooks: { afterChange: [sendConfirmationEmail] }, // MERGED with the plugin's hooks
+    },
+  },
+})
+```
+
+> **Note:** a `collectionOverrides.resources` override that removes, renames, or nests the `services` field inside a *named* group or tab causes the Services `resources` join (below) to be silently skipped rather than erroring — the app still boots, the field simply doesn't appear.
+
 ## Disabling the Plugin
 
 Setting `disabled: true` keeps all collections **registered** so the database schema stays stable — it does not drop tables/collections. Only the behavior goes inert: hooks, endpoints, admin components, and staff provisioning are removed. This matters for migrations and DB tooling: a disabled install still owns the same schema, so toggling `disabled` does not require a migration.
@@ -87,7 +110,7 @@ Because the stripped hooks are what validate customer writes (ownership pinning,
 
 ## Reconciliation Job
 
-For high-concurrency deployments, rare race conditions between two simultaneous bookings can slip past the hook-level conflict check. A background reconciliation job can detect and flag these after the fact.
+Simultaneous bookings are serialized by a database lock (see [Concurrent Bookings](./concurrency.md)), so on a database with transactions this job should find nothing. It is still a useful safety net: it catches overlaps created on a database **without** transactions (a standalone MongoDB, or SQLite without `transactionOptions`), by code that used `context.skipReservationHooks`, or by direct database writes.
 
 Add this to your Payload config's `jobs.tasks` array:
 
@@ -147,15 +170,9 @@ Run this job on a schedule (e.g., hourly) using Payload's job queue. The job doe
 
 ---
 
-## Capacity & Quantity Race Considerations
+## Capacity and simultaneous bookings
 
-For resources with `quantity > 1` (or `capacityMode: 'per-guest'`), the hook-level check counts existing blocking reservations (or sums `guestCount`) and compares against `quantity`. Under high concurrency, two simultaneous bookings can each read capacity-not-yet-full and both succeed, briefly overbooking. The hook check is best-effort, not a transactional lock.
-
-Mitigations:
-
-- Add the conflict-lookup index above so the capacity read is fast (shrinks the race window).
-- Extend the reconciliation job to sum occupancy per resource per time window and compare against `quantity` / per-guest capacity, flagging windows where occupancy exceeds capacity.
-- For strict guarantees, enforce capacity at the database layer (e.g. a unique partial index on `(resource, startTime)` for `per-reservation, quantity: 1` resources, or an application-level lock keyed by resource).
+Capacity is checked as peak concurrency: the most units (bookings, or guests in `per-guest` mode) in use at any one instant of the requested window, compared against `quantity`. Simultaneous bookers for the same resource are serialized by a database lock inside the booking's transaction, so capacity is not exceeded — provided the database has transactions. See [Concurrent Bookings](./concurrency.md) for what each adapter needs and how it behaves under load.
 
 ## Multi-Resource Conflict Notes
 
@@ -163,7 +180,15 @@ When a service has `requiredResources`, the plugin expands them into `items[]` a
 
 - Conflict detection fetches the blocking reservations via a coarse superset query, then computes **true per-item occupancy** in memory: each occupying item's `[startTime, endTime)` window is expanded by *that item's own* service buffers. Multi-item bookings therefore no longer over-block (only the windows their items actually occupy count), and a neighbor's buffer is enforced against the candidate.
 - Conflict detection matches reservations that reference a resource **either** at the top level (`resource`) **or** inside another booking's `items[]` — a resource held only in another booking's items is not invisible.
-- A partial overbooking is possible if the primary resource is free but a required pool is full; the create is rejected atomically per booking. The reconciliation job should iterate `items[]` (not just the top-level `resource`) when grouping reservations by resource.
+- If the primary resource is free but a required pool is full, the whole booking is rejected. The reconciliation job should iterate `items[]` (not just the top-level `resource`) when grouping reservations by resource.
+
+---
+
+## The top-level `resource` is always conflict-checked
+
+A booking's top-level `resource` field is now conflict-checked even when the request also supplies an explicit `items[]` that never names it. Previously, a caller could put resource A in the top-level fields and only *other* resources in `items[]`, and A itself was never checked for overlaps — even though every other booking's conflict check already treats A as occupied by this one. Overlaps against the top-level resource that were previously accepted are now rejected.
+
+If you call `resolveReservationItems` directly (it's exported from the package root), note that its returned array can now contain one more entry than before — one synthesized from the top-level `resource`/`startTime`/`endTime` and flagged `fromParent: true` — unless an `items[]` entry for that same resource already, demonstrably, covers the same window.
 
 ---
 

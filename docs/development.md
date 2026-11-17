@@ -4,13 +4,13 @@ Guide for contributors and local development of the plugin itself.
 
 ## Prerequisites
 
-- Node.js `^18.20.2` or `>=20.9.0`
+- Node.js `^24.22.3` or `>=26.13.1` (Payload 4)
 - pnpm `^9` or `^10`
 
 ## Commands
 
 ```bash
-pnpm dev                    # Start dev server (Next.js + in-memory MongoDB)
+pnpm dev                    # Start dev server (needs DATABASE_URL pointing at a MongoDB replica set)
 pnpm build                  # Build for distribution
 pnpm test:int               # Run integration tests (Vitest)
 pnpm test:e2e               # Run E2E tests (Playwright, requires dev server)
@@ -69,23 +69,33 @@ src/
     Schedules.ts        # Availability schedules (recurring/manual + exceptions w/ endDate + leave type)
     Reservations.ts     # Bookings (hooks, guest, cancellationToken, guestCount, items, idempotencyKey)
     Customers.ts        # Standalone customer auth collection
+    Holds.ts            # reservation-holds (only when slotHolds is enabled)
 
   hooks/
-    index.ts                    # Wires reservation hooks onto the collection
+    index.ts                    # Barrel export (the hooks are wired in collections/Reservations.ts)
     reservations/
+      enforceCustomerOwnership.ts # A customer can only book for themselves
       checkIdempotency.ts       # Duplicate submission prevention
       validateGuestBooking.ts   # Guest vs customer validation + cancellation token
       expandRequiredResources.ts # Auto-expand service.requiredResources into items[]
+      validateActive.ts         # Rejects inactive services/resources
       calculateEndTime.ts       # Auto end time from service duration
+      validateBookingWindow.ts  # Public callers: no past starts, inside the schedule, item cap
+      acquireBookingLock.ts     # Serializes simultaneous bookers per resource
       validateConflicts.ts      # Double-booking prevention (per item)
       validateStatusTransition.ts # Status machine enforcement
       validateCancellation.ts   # Cancellation notice period
       onStatusChange.ts         # afterChange — fires plugin hook callbacks
+    holds/
+      validateHoldSlot.ts       # Slot-hold validation
+    shared/
+      preventDeleteWhenReferenced.ts # Delete guard for Services/Resources
     users/
       provisionStaffResource.ts # afterChange — auto-provision Resource for staff users
 
   services/
     AvailabilityService.ts    # computeEndTime, checkAvailability, getAvailableSlots, ...
+    HoldService.ts            # takeHold, releaseHold
     index.ts                  # Barrel re-export of availability functions
 
   endpoints/
@@ -95,6 +105,9 @@ src/
     createBooking.ts          # POST /api/reserve/book
     cancelBooking.ts          # POST /api/reserve/cancel
     customerSearch.ts         # GET /api/reservation-customer-search
+    effectiveTimezone.ts      # GET /api/reserve/effective-timezone
+    holdSlot.ts               # POST /api/reserve/hold (slotHolds)
+    releaseSlot.ts            # POST /api/reserve/hold/release (slotHolds)
 
   utilities/
     slotUtils.ts              # addMinutes, doRangesOverlap, computeBlockedWindow, hoursUntil, localDayKey
@@ -123,8 +136,8 @@ src/
     AvailabilityOverview/     # Client: weekly resource grid
 
   exports/
-    client.ts                 # CalendarView, AvailabilityOverview, CustomerField, AvailabilityTimeField
-    rsc.ts                    # DashboardWidgetServer
+    client.ts                 # Calendar, fields, detail drawer, primitives, hooks, formatters
+    rsc.ts                    # CalendarViewServer, DashboardWidgetServer
 
 dev/
   payload.config.ts           # Dev Payload config (MongoDB Memory Server)
@@ -141,6 +154,56 @@ dev/
 - **TypeScript strict mode** — types-only emit via `tsc`; actual transpilation via SWC.
 - **Peer dependencies** — all peer dependencies (payload, react, next) are devDependencies — peer dependencies are `payload`, `@payloadcms/ui`, `@payloadcms/translations` `^4.0.0-beta.9` on `next` (`^3.86.0` on `main`).
 - **Object property ordering** — alphabetically ordered (enforced by `perfectionist/sort-objects`). Note: `id` is treated as a top group and sorts before all other keys.
+
+---
+
+## Running the test suite against every adapter
+
+The integration suite defaults to an in-memory MongoDB replica set. Run it against Postgres or SQLite with an env var — no code changes needed:
+
+```bash
+# Postgres — point PG_URL at a real, empty database
+PG_URL="postgres://user:password@localhost:5432/reserve_test" CI=true pnpm test:int
+
+# SQLite — in-memory by default
+SQLITE=1 CI=true pnpm test:int
+```
+
+Both are opt-in dev/CI conveniences, not something a consumer's app needs to configure — they exist so this plugin's own suite can be verified against every adapter it claims to support. **Neither run is expected to be fully green by construction, and this is known, not a regression to chase.** Last measured on Payload 4.0.0-beta.9 (70 files, 829 tests):
+
+| Run | Result | The gaps |
+|---|---|---|
+| MongoDB (default) | 829 passed, 0 skipped | none |
+| `PG_URL=…` | 828 passed, 1 skipped | the `bufferFor error trace` skip below |
+| `SQLITE=1` | 825 passed, 3 failed, 1 skipped | the same `bufferFor` skip, plus **3 failures that are all one accepted upstream limitation**: `dev/concurrency.int.spec.ts`'s `quantity: 3` capacity recovery, `dev/holds.int.spec.ts`'s `quantity: 3` capacity recovery, and `dev/bookingRetry.int.spec.ts`'s no-500 assertion. All three trace to `@payloadcms/drizzle` discarding the driver's structured error code at `beginTransaction` (see [Concurrent Bookings](./concurrency.md)) — never "fix" any of them by matching on message text. |
+
+The `bufferFor error trace` skip manufactures a dangling reference via `context.skipReservationHooks` to exercise a code path that the delete guard makes structurally unreachable on a schema-enforced SQL database, so the scenario is MongoDB-only by construction.
+
+---
+
+## Contributing and Releasing
+
+This project uses [Changesets](https://github.com/changesets/changesets) for versioning and changelogs.
+
+When making a change that should appear in the release notes, run:
+
+```bash
+pnpm changeset
+```
+
+This prompts for the semver bump type (patch/minor/major) and a summary. Commit the generated changeset file with your PR.
+
+**Releasing:**
+
+```bash
+pnpm changeset:version   # consume changesets, bump version, update CHANGELOG.md
+# then fix the new CHANGELOG heading to `## [X.Y.Z] - YYYY-MM-DD` (the release workflow extracts it)
+git add -A && git commit -m "chore: release v<version>"
+git tag v<version>
+git push && git push --tags
+```
+
+The GitHub Action will create a release with the changelog content and publish to npm.
 
 ---
 

@@ -114,7 +114,7 @@ export function isTransientWriteConflict(error: unknown): boolean {
  * drizzle` rethrows the driver's error as a bare `Error`, so
  * `isTransientWriteConflict` returns FALSE and this loop throws on attempt 1 —
  * attempts 2..N never happen, and poisoning never gets a chance to matter. See
- * README's "Concurrent booking: database adapter support". The shape this
+ * docs/concurrency.md. The shape this
  * clearing actually protects is any caller that swallows a
  * begin-transaction failure and then keeps using the same req (see the expiry
  * sweep in HoldService.takeHold).

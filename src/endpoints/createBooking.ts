@@ -66,7 +66,7 @@ export function createBookingEndpoint(config: ResolvedReservationPluginConfig): 
       // access check only tests the TRUTHINESS of an access function's result —
       // a returned `Where` (how multi-tenant scopes access) is discarded, so
       // `overrideAccess: false` cannot constrain WHICH tenant is written to.
-      // Only the probe can. See README, "/api/reserve/book: the tenant probe is
+      // Only the probe can. See docs/access-control.md, "/api/reserve/book: the tenant probe is
       // the gate, not overrideAccess".
 
       // See callerMayUseTenant's doc comment (src/utilities/tenantTimezone.ts)

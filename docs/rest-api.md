@@ -1,6 +1,6 @@
 # REST API
 
-The plugin mounts seven endpoints. Six are under `/api/reserve/`; the customer-search endpoint is mounted at `/api/reservation-customer-search`. These are Payload custom endpoints — they respect the same access control as the rest of the API.
+The plugin mounts seven endpoints, plus two more when `slotHolds` is enabled. All but one are under `/api/reserve/`; the customer-search endpoint is mounted at `/api/reservation-customer-search`. Each endpoint authorizes the request itself — some then write with access overridden, so a collection `access` rule is not always what decides. See [Access Control](./access-control.md#endpoints-enforce-collection-access-control).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -11,6 +11,8 @@ The plugin mounts seven endpoints. Six are under `/api/reserve/`; the customer-s
 | POST | `/api/reserve/book` | Create a booking (supports `guest` and `items`); fires `beforeBookingCreate` hooks |
 | POST | `/api/reserve/cancel` | Cancel a booking (authenticated owner/admin, or guest via `token`) |
 | GET | `/api/reservation-customer-search` | Search customers by name/email/phone; privileged staff/admin only |
+| POST | `/api/reserve/hold` | Only with `slotHolds.enabled`: hold a slot during checkout — see [Slot Holds](./slot-holds.md) |
+| POST | `/api/reserve/hold/release` | Only with `slotHolds.enabled`: release a hold by token |
 
 ---
 
@@ -34,6 +36,9 @@ The resolved resource set is the union of the caller resource(s) and the service
 - `400 { "message": "Missing required query params: resource, date, service" }` when a required param is missing.
 - `400 { "error": "Invalid date format. Expected YYYY-MM-DD" }` when `date` is unparseable or an impossible calendar date (e.g. `2026-13-45`).
 - `400 { "error": "Invalid guestCount" }` when `guestCount` is non-numeric.
+- `400 { "error": "resources accepts at most 20 ids" }` when `resources` lists more than 20.
+
+With `slotHolds` enabled, an unexpired hold counts as busy here.
 - `404 { "error": "Service not found" }` / `404 { "error": "Resource not found" }` for an unknown or malformed `service`/`resource` id.
 
 **Example request:**
@@ -121,6 +126,9 @@ As with `/availability`, an empty `slots` array is accompanied by a `reason` fie
 - `400 { "error": "Missing required query params: resource, date, service" }` when a required param is missing.
 - `400 { "error": "Invalid date format. Expected YYYY-MM-DD" }` when `date` is unparseable or an impossible calendar date (e.g. `2026-13-45`).
 - `400 { "error": "Invalid guestCount" }` when `guestCount` is non-numeric.
+- `400 { "error": "resources accepts at most 20 ids" }` when `resources` lists more than 20.
+
+With `slotHolds` enabled, an unexpired hold counts as busy here.
 - `404 { "error": "Service not found" }` / `404 { "error": "Resource not found" }` for an unknown or malformed `service`/`resource` id.
 
 ---
@@ -223,6 +231,7 @@ Creates a new reservation. All Payload collection hooks (guest validation, requi
 - `items[]` — optional array for multi-resource bookings (`{ resource, service?, startTime?, endTime?, guestCount? }`).
 - `guestCount` — number of guests (default 1).
 - `idempotencyKey` — prevents duplicate submissions; a reused key is rejected with a validation error.
+- `holdToken` — optional; the token from `POST /api/reserve/hold`. The caller's own hold is ignored by the conflict check and deleted once the booking is created. Never stored on the reservation.
 - `cancellationToken` — **ignored.** Any caller-supplied value is stripped from the body; the token is always server-generated (it is a secret).
 
 ```json
@@ -237,7 +246,7 @@ Creates a new reservation. All Payload collection hooks (guest validation, requi
 }
 ```
 
-**Response:** `201` with the created reservation document **at depth 0** (relationships as ids — since 4.1.2; the populated document leaked the customer's staff-only `notes` and, under `resourceOwnerMode`, the resource owner's user record), or `400`/`409` if validation fails. A body that is not a JSON object is `400`. An anonymous caller that supplies a `customer` gets `403 { "error": "Anonymous bookings cannot set a customer" }`. The `cancellationToken` field is **stripped** from the response — it is never echoed over HTTP, and is delivered to the guest by the host project via the `afterBookingCreate` hook.
+**Response:** `201` with the created reservation document **at depth 0** (relationships as ids — since 4.1.2; the populated document leaked the customer's staff-only `notes` and, under `resourceOwnerMode`, the resource owner's user record), or `400`/`409` if validation fails. A body that is not a JSON object is `400`. An anonymous caller that supplies a `customer` gets `403 { "error": "Anonymous bookings cannot set a customer" }`. A caller naming a `tenant` they do not belong to, or refused by access rules under the create, gets `403 { "error": "Not permitted to create this booking" }`. When several people book the same slot at once and the retries run out, the response is `409 { "error": "That slot is being booked by someone else. Please try again.", "retryable": true }` — safe to retry. The `cancellationToken` field is **stripped** from the response — it is never echoed over HTTP, and is delivered to the guest by the host project via the `afterBookingCreate` hook.
 
 This endpoint is the public booking surface: for every caller that is not staff it also enforces `enforceSchedule` (no past start; inside the resource's schedule when it has one) and the per-service guest gate on every service the booking touches, `items[]` included. Since 4.4.3 it also applies `enforceServiceMatch` (a resource that lists `services` can only be booked with one of them), caps `items[]` at `maxPublicItems` (default 10), and rejects a booking whose `items[]` leave out the top-level resource while spanning more than `maxFlexibleDuration` minutes.
 
@@ -282,11 +291,12 @@ Cancels a reservation. Works in two modes:
 **Response:** `200` with the updated reservation document at depth 0 (relationships as ids, `cancellationToken` stripped). The reservation's status is set to the configured `statusMachine.cancelStatus` (default `'cancelled'`), not a hardcoded value — so custom status vocabularies cancel correctly.
 
 **Errors:**
-- `400 { "message": "reservationId is required" }` when `reservationId` is missing; `400 { "message": "Invalid JSON body" }` for an unparseable body.
+- `400 { "message": "reservationId is required" }` when `reservationId` is missing; `400 { "message": "Invalid JSON body" }` for an unparseable body; `400 { "message": "token and reason must be strings" }` for a non-string `token` or `reason`.
 - `404 { "message": "Reservation not found" }` for an unknown or malformed id (previously a 500 on Postgres/SQLite).
-- `403 { "message": "Forbidden" }` when an authenticated user is neither the owner nor privileged, or when a guest supplies a missing/invalid `token`.
+- `403 { "message": "Forbidden" }` when an authenticated user is neither the owner nor privileged, when a guest supplies a missing/invalid `token`, or when a staff user's cancel is refused by the collection's access rules.
+- `409 { "error": "That booking is being modified. Please try again.", "retryable": true }` when a concurrent write outlasts the retries (note the key is `error`).
 
-There is no `401` response — guest cancellation is supported. The `validateCancellation` hook enforces the minimum notice period configured in `cancellationNoticePeriod`.
+There is no `401` response — guest cancellation is supported. The `validateCancellation` hook enforces the minimum notice period configured in `cancellationNoticePeriod`. A guest cancelling by token is treated as a customer: the notice period applies and a booking that has already started cannot be cancelled.
 
 **Example fetch (guest):**
 

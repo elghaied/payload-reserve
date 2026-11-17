@@ -80,20 +80,28 @@ type StatusMachineConfig = {
 
 ## Business Logic Hooks
 
-Seven `beforeChange` hooks run on the Reservations collection. They fire in this order (after the plugin's `beforeBookingCreate` integration hooks):
+Thirteen `beforeChange` hooks run on the Reservations collection, in this order:
 
-1. **`checkIdempotency`** — On create, rejects creates where `idempotencyKey` has already been used
-2. **`validateGuestBooking`** — On create, requires either a `customer` or guest contact details (and rejects supplying both); driven by the `allowGuestBooking` config and per-service overrides
-3. **`expandRequiredResources`** — On create, expands the service's `requiredResources` into the reservation's `items[]` so every required resource pool is occupied (runs before `calculateEndTime`/`validateConflicts` so appended items get end times and are conflict-checked)
-4. **`calculateEndTime`** — Computes `endTime` from `startTime + service.duration` (respects `durationType`)
-5. **`validateConflicts`** — Checks for overlapping reservations per item using blocking statuses and buffer times
-6. **`validateStatusTransition`** — Enforces allowed transitions defined in the status machine; on create, enforces that new bookings start in `defaultStatus` (admin/staff users can also use statuses reachable from `defaultStatus`; use `context.allowConfirmedOnCreate` for programmatic bypass)
-7. **`validateCancellation`** — When transitioning to `cancelled`, verifies the appointment is at least `cancellationNoticePeriod` hours away
+1. **`limitPublicItems`** — public callers may send at most `maxPublicItems` (default 10) `items[]`
+2. **`beforeBookingCreate` plugin hooks** — your own hooks, on create
+3. **`enforceCustomerOwnership`** — a signed-in non-staff user can only book, or keep a booking, for themselves; a different `customer` is rewritten to their own id
+4. **`checkIdempotency`** — on create, rejects an `idempotencyKey` that has already been used
+5. **`validateGuestBooking`** — requires either a `customer` or guest contact details, never both (checked on create and update); on create also applies `allowGuestBooking` and the per-service overrides to every service the booking touches
+6. **`expandRequiredResources`** — on create, and on update when `service` changes, adds the service's `requiredResources` to `items[]` so every required pool is occupied
+7. **`validateActive`** — rejects a booking, or a reschedule, onto an inactive service or resource (`enforceActive`)
+8. **`calculateEndTime`** — computes `endTime` from `startTime + service.duration` (respects `durationType`); validates a `flexible` window; refuses a booking whose end cannot be determined
+9. **`validateBookingWindow`** — public callers may not book in the past or outside the resource's schedule (`enforceSchedule`), and a resource that lists `services` can only be booked with one of them (`enforceServiceMatch`)
+10. **`acquireBookingLock`** — locks each claimed resource inside the transaction so simultaneous bookers are serialized (see [Concurrent Bookings](./concurrency.md))
+11. **`validateConflicts`** — checks each item for overlapping reservations, using blocking statuses, buffer times and capacity
+12. **`validateCancellation`** — when moving to `cancelStatus`, the stored start time must be at least `cancellationNoticePeriod` hours away. A customer also may not reschedule inside that window or cancel after the booking has started. Staff are exempt
+13. **`validateStatusTransition`** — enforces the transitions in the status machine and fires `beforeBookingConfirm` / `beforeBookingCancel`. On create, new bookings start in `defaultStatus` (staff can also use statuses reachable from it; use `context.allowConfirmedOnCreate` for programmatic bypass). On update, a signed-in non-staff user may only move a booking to `cancelStatus`
 
 Two `afterChange` hooks also run:
 
-8. **`createPluginHooksAfterCreate`** — On create, fires the `afterBookingCreate` plugin hooks
-9. **`onStatusChange`** — Detects status changes; fires `afterStatusChange`, `afterBookingConfirm`, and `afterBookingCancel` plugin hooks (each wrapped in try-catch — errors are logged, not thrown)
+- **`createPluginHooksAfterCreate`** — on create, fires the `afterBookingCreate` plugin hooks
+- **`onStatusChange`** — on update, detects status changes and fires `afterStatusChange`, `afterBookingConfirm` and `afterBookingCancel` (each wrapped in try-catch — errors are logged, not thrown)
+
+On a validation dry run (`payload.validate`, Payload 4) the same checks run and nothing is saved; `beforeBookingConfirm` / `beforeBookingCancel` are not fired.
 
 ## Escape Hatch
 
@@ -110,6 +118,7 @@ await payload.create({
     status: 'completed', // bypasses status transition check
   },
   context: { skipReservationHooks: true },
+  overrideAccess: true,
 })
 ```
 
@@ -123,6 +132,7 @@ await req.payload.update({
   data: { status: 'cancelled' },
   context: { skipReservationHooks: true },
   req,
+  overrideAccess: true,
 })
 // Now send your own cancellation email
 await sendCancellationEmail(reservation)
