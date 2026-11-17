@@ -139,7 +139,7 @@ dev/
 - **ESM throughout** — `"type": "module"` in package.json. Use `.js` extensions in import paths even for TypeScript files.
 - **Prettier** — single quotes, no semicolons, trailing commas, 100-char line width.
 - **TypeScript strict mode** — types-only emit via `tsc`; actual transpilation via SWC.
-- **Peer dependencies** — all peer dependencies (payload, react, next) are devDependencies — peer dependencies are `payload ^3.79.0`, `@payloadcms/ui ^3.79.0`, `@payloadcms/translations ^3.79.0`.
+- **Peer dependencies** — all peer dependencies (payload, react, next) are devDependencies — peer dependencies are `payload`, `@payloadcms/ui`, `@payloadcms/translations` `^4.0.0-beta.9` on `next` (`^3.86.0` on `main`).
 - **Object property ordering** — alphabetically ordered (enforced by `perfectionist/sort-objects`). Note: `id` is treated as a top group and sorts before all other keys.
 
 ---

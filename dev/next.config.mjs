@@ -16,6 +16,10 @@ const nextConfig = {
     return webpackConfig
   },
   serverExternalPackages: ['mongodb-memory-server'],
+  // This app compiles the plugin's `src` against its own generated
+  // payload-types, which narrows `CollectionSlug` and rejects the plugin's
+  // slug-agnostic code. The plugin is type-checked by the root `tsc` instead.
+  typescript: { ignoreBuildErrors: true },
 }
 
 export default withPayload(nextConfig, { devBundleServerPackages: false })

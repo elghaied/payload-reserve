@@ -95,6 +95,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body_path: /tmp/release-body.md
+          # A prerelease tag (v5.0.0-next.0) must not become the "Latest" release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
 
       # OIDC trusted publishing needs a modern npm (>=11.5.1); the runner's
       # bundled npm is older. npm@latest requires Node>=22, which the jobs now use.
@@ -118,5 +120,15 @@ jobs:
       # flag is not merely moved to a config file, it stops being needed.
       - name: Pack (applies publishConfig exports remapping)
         run: pnpm pack
+      # A prerelease goes out under the `next` dist-tag. Without it npm would
+      # either refuse the publish or move `latest`, and `npm install
+      # payload-reserve` would hand Payload 3 users a build that needs Payload 4.
       - name: Publish to npm
-        run: npm publish payload-reserve-*.tgz --provenance --access public
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          case "$TAG_NAME" in
+            *-*) dist_tag=next ;;
+            *) dist_tag=latest ;;
+          esac
+          npm publish payload-reserve-*.tgz --provenance --access public --tag "$dist_tag"

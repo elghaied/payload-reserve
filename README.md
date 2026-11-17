@@ -83,12 +83,13 @@ Without it the admin fails with `Unknown file extension ".css"`. Next.js needs n
 ## Install
 
 ```bash
-pnpm add payload-reserve
-# or
-npm install payload-reserve
+# Payload 4
+pnpm add payload-reserve@next
+# Payload 3
+pnpm add payload-reserve@4
 ```
 
-**Peer dependencies:** `payload ^3.86.0`, `@payloadcms/ui ^3.86.0`, `@payloadcms/translations ^3.86.0`
+**Peer dependencies:** `payload`, `@payloadcms/ui`, `@payloadcms/translations` — `^4.0.0-beta.9` for 5.x (`next`), `^3.86.0` for 4.x
 
 ### ⚠️ Upgrading from an earlier version
 
