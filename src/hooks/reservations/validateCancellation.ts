@@ -5,7 +5,7 @@ import { ValidationError } from 'payload'
 import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
-import { schedulingFieldsChanged } from '../../utilities/reservationChanges.js'
+import { resolveOperation, schedulingFieldsChanged } from '../../utilities/reservationChanges.js'
 import { hoursUntil } from '../../utilities/slotUtils.js'
 import { isPrivilegedUser } from '../../utilities/userRoles.js'
 
@@ -28,7 +28,8 @@ import { isPrivilegedUser } from '../../utilities/userRoles.js'
  */
 export const validateCancellation =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
-  ({ context, data, operation, originalDoc, req }) => {
+  ({ context, data, operation: rawOperation, originalDoc, req }) => {
+    const operation = resolveOperation(rawOperation, originalDoc)
     if (context?.skipReservationHooks) {return data}
     if (operation !== 'update') {return data}
     if (isPrivilegedUser(req.user, config)) {return data}

@@ -20,7 +20,7 @@ export function composeAccess(
 ): CollectionAccess {
   // An explicit `undefined` in the override (`read: cond ? fn : undefined`)
   // must not clobber the base rule: a spread would set `read: undefined`,
-  // which Payload treats as "no rule" and falls back to `Boolean(user)` —
+  // which Payload treats as "no rule" and falls back to its default —
   // silently reopening what the base closed.
   const defined = Object.fromEntries(
     Object.entries(override ?? {}).filter(([, v]) => v !== undefined),

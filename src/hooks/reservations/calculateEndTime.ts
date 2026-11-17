@@ -6,15 +6,13 @@ import type { DurationType, ResolvedReservationPluginConfig } from '../../types.
 
 import { computeEndTime } from '../../services/AvailabilityService.js'
 import { flexibleWindowProblem } from '../../utilities/flexibleWindow.js'
-import {
-  mergeReservationData,
-  schedulingFieldsChanged,
-} from '../../utilities/reservationChanges.js'
+import { mergeReservationData, resolveOperation, schedulingFieldsChanged } from '../../utilities/reservationChanges.js'
 import { extractId, resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 
 export const calculateEndTime =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
-  async ({ context, data, operation, originalDoc, req }) => {
+  async ({ context, data, operation: rawOperation, originalDoc, req }) => {
+    const operation = resolveOperation(rawOperation, originalDoc)
     if (context?.skipReservationHooks) {
       return data
     }

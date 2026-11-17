@@ -7,7 +7,7 @@ import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { resolveGuestBookingAllowed } from '../../utilities/guestBooking.js'
-import { mergeReservationData } from '../../utilities/reservationChanges.js'
+import { mergeReservationData, resolveOperation } from '../../utilities/reservationChanges.js'
 import { extractId } from '../../utilities/resolveReservationItems.js'
 import { isPrivilegedUser } from '../../utilities/userRoles.js'
 
@@ -15,7 +15,8 @@ type GuestData = { email?: string; name?: string; phone?: string }
 
 export const validateGuestBooking =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
-  async ({ context, data, operation, originalDoc, req }) => {
+  async ({ context, data, operation: rawOperation, originalDoc, req }) => {
+    const operation = resolveOperation(rawOperation, originalDoc)
     if (context?.skipReservationHooks) {
       return data
     }

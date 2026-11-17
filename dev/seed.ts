@@ -232,11 +232,23 @@ export const seed = async (payload: Payload) => {
 
   // ---- SCHEDULES ----
 
+  // The dev plugin runs in UTC, so "today" is the UTC day — a local-time seed
+  // put every booking on the wrong calendar day between local and UTC midnight.
   const today = new Date()
-  const exceptionDate1 = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 10)
-  const exceptionDate2 = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 20)
-  const nextWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7)
-  const weekAfter = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 14)
+  const utcDay = (offsetDays: number, hour = 0, minute = 0) =>
+    new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        today.getUTCDate() + offsetDays,
+        hour,
+        minute,
+      ),
+    )
+  const exceptionDate1 = utcDay(10)
+  const exceptionDate2 = utcDay(20)
+  const nextWeek = utcDay(7)
+  const weekAfter = utcDay(14)
 
   await create('schedules', {
     name: 'Alice - Weekday Schedule',
@@ -317,7 +329,7 @@ export const seed = async (payload: Payload) => {
   // ---- RESERVATIONS ----
 
   const makeTime = (hour: number, minute = 0) =>
-    new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute).toISOString()
+    utcDay(0, hour, minute).toISOString()
 
   // Single-resource reservation → confirmed via status transition
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -424,11 +436,11 @@ export const seed = async (payload: Payload) => {
     context: { skipReservationHooks: true },
     data: {
       customer: customer1.id,
-      endTime: new Date(nextWeek.getFullYear(), nextWeek.getMonth(), nextWeek.getDate(), 14, 0).toISOString(),
+      endTime: utcDay(7, 14).toISOString(),
       notes: 'Corporate team-building event (3 hours)',
       resource: eventRoom.id,
       service: eventSpace.id,
-      startTime: new Date(nextWeek.getFullYear(), nextWeek.getMonth(), nextWeek.getDate(), 11, 0).toISOString(),
+      startTime: utcDay(7, 11).toISOString(),
       status: 'confirmed',
     },
     overrideAccess: true,
@@ -437,7 +449,7 @@ export const seed = async (payload: Payload) => {
   // ---- GUEST RESERVATIONS (account-less; for testing email + OTP cancellation) ----
   // Scheduled next week so they're outside the 24h cancellation notice window.
   const guestSlot = (hour: number) =>
-    new Date(nextWeek.getFullYear(), nextWeek.getMonth(), nextWeek.getDate(), hour, 0).toISOString()
+    utcDay(7, hour).toISOString()
 
   // Guest with EMAIL → afterBookingCreate emails a cancel link (see dev console).
   await create('reservations', {
@@ -474,7 +486,15 @@ export const seed = async (payload: Payload) => {
 const seedMultiTenant = async (payload: Payload) => {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const payloadAny = payload as any
+    const raw = payload as any
+    // Payload 4 access-checks the Local API by default; a seed has no user.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const privileged = (op: string) => (args: any) => raw[op]({ ...args, overrideAccess: true })
+    const payloadAny = {
+      create: privileged('create'),
+      find: privileged('find'),
+      update: privileged('update'),
+    }
 
     // Ensure two tenants exist (idempotent by name)
     const { docs: existingTenants } = await payloadAny.find({
@@ -550,7 +570,7 @@ const seedMultiTenant = async (payload: Payload) => {
 
     // Create one reservation per tenant (find-or-create by idempotencyKey)
     const todayNoon = new Date()
-    todayNoon.setHours(12, 0, 0, 0)
+    todayNoon.setUTCHours(12, 0, 0, 0)
 
     const findOrCreateReservation = async (
       idempotencyKey: string,
@@ -565,6 +585,10 @@ const seedMultiTenant = async (payload: Payload) => {
         collection: 'reservations',
         context: { skipReservationHooks: true },
         data,
+        // With the hooks skipped nothing reads before validation, so
+        // multi-tenant's filterOptions on `service` and `resource` (validated
+        // in parallel by Payload) would both try to open the transaction.
+        disableTransaction: true,
       })
     }
 

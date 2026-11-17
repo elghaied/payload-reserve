@@ -120,3 +120,17 @@ export function schedulingFieldsChanged({
 
   return false
 }
+
+/**
+ * Payload 4 runs the hook chain with `operation: 'validate'` (a dry run that
+ * never saves). Hooks branch on create vs update, so map it: a stored document
+ * means an update dry run, none means a create dry run. Without this a
+ * validate run on an existing row was checked as a brand-new booking (or, in
+ * the status hooks, not checked at all) and disagreed with the real save.
+ */
+export function resolveOperation(operation: string, originalDoc: unknown): 'create' | 'update' {
+  if (operation !== 'validate') {
+    return operation as 'create' | 'update'
+  }
+  return (originalDoc as { id?: unknown } | undefined)?.id != null ? 'update' : 'create'
+}

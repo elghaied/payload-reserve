@@ -46,6 +46,24 @@ describe('D6: customers can read every reservation in userCollection mode', () =
     expect(await warningsFor({ userCollection: 'users' })).toMatch(D6)
   })
 
+  it('says users are locked out, not open, when userCollection is not the admin collection', async () => {
+    const members = { slug: 'members', auth: true, fields: [] }
+    const config = payloadReserve({ userCollection: 'members' })({
+      admin: { user: 'users' },
+      collections: [users, members],
+      endpoints: [],
+    } as unknown as Config)
+    const { messages, payload } = fakePayload(
+      (config.collections ?? []) as unknown as Array<Record<string, unknown>>,
+    )
+    ;(payload.config as unknown as { admin: unknown }).admin = { user: 'users' }
+    await config.onInit!(payload)
+    const out = messages.join('\n')
+    expect(out).toMatch(/not the admin collection \("users"\)/)
+    expect(out).not.toMatch(D6)
+    expect(out).not.toMatch(/have no create\/update\/delete rule/)
+  })
+
   it('stays silent when the host supplies access.reservations.read', async () => {
     expect(
       await warningsFor({

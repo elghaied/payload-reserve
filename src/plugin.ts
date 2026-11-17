@@ -470,7 +470,7 @@ export const payloadReserve =
         }
 
         // D6: userCollection mode keeps Payload's default access on Reservations
-        // (`Boolean(user)` for read/update/delete) because staff and customers
+        // (any admin-collection user for read/update/delete) because staff and customers
         // share one collection there and, without configured roles, the plugin
         // cannot tell them apart — locking reads to `customer equals self` would
         // blank the admin calendar for every host without roles. Standalone mode
@@ -479,20 +479,31 @@ export const payloadReserve =
         // `access.reservations`, or every user can read, rewrite and delete every
         // other user's reservation through /api/<reservations>. Warn when nothing
         // narrows `read` — a host whose users are all staff can ignore it.
+        //
+        // Payload 4's default only admits users of the ADMIN collection
+        // (`config.admin.user`). When `userCollection` is a different
+        // collection the gap is the opposite one: its users are denied every
+        // plugin collection, so say that instead of claiming it is open.
+        const adminSlug =
+          payload.config.admin?.user ?? payload.config.collections?.find((c) => c.auth)?.slug
+        const usersAreAdmins =
+          Boolean(resolved.userCollection) && resolved.userCollection === adminSlug
         if (
           resolved.userCollection &&
           !resolved.resourceOwnerMode &&
           !resolved.access.reservations?.read
         ) {
           payload.logger.warn(
-            `payload-reserve: "userCollection" is set but no "access.reservations" rule narrows reads, so every user of "${resolved.slugs.customers}" can read, update and delete every reservation through the collection REST API (Payload's default is any authenticated user). Fine if only staff can log in; if customers can, supply "access.reservations" that scopes non-staff users to "customer equals req.user.id" — see docs/configuration.md, "Access control for customers".`,
+            usersAreAdmins
+              ? `payload-reserve: "userCollection" is set but no "access.reservations" rule narrows reads, so every user of "${resolved.slugs.customers}" can read, update and delete every reservation through the collection REST API (Payload's default admits any user of the admin collection). Fine if only staff can log in; if customers can, supply "access.reservations" that scopes non-staff users to "customer equals req.user.id" — see docs/configuration.md, "Access control for customers".`
+              : `payload-reserve: "userCollection" is "${resolved.slugs.customers}", which is not the admin collection ("${adminSlug}"), and no "access.reservations.read" rule is set. Payload 4's default access only admits admin-collection users, so users of "${resolved.slugs.customers}" cannot read their own reservations (or the services, resources and schedules) through the collection REST API; the /api/reserve endpoints are unaffected. Supply "access" rules for what they should see — see docs/configuration.md, "Access control for customers".`,
           )
         }
         // D6b: same gap on the catalog collections. In standalone mode their
         // writes are staff-only (makeStandaloneCatalogAccess); under
         // userCollection the plugin cannot tell staff from customers, so a host
         // whose customers log in there must close create/update/delete itself.
-        if (resolved.userCollection && !resolved.resourceOwnerMode) {
+        if (usersAreAdmins && !resolved.resourceOwnerMode) {
           const openCatalog = (
             [
               ['services', resolved.access.services],

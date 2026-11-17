@@ -6,10 +6,7 @@ import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 import type { ResolvedItem } from '../../utilities/resolveReservationItems.js'
 
-import {
-  mergeReservationData,
-  schedulingFieldsChanged,
-} from '../../utilities/reservationChanges.js'
+import { mergeReservationData, resolveOperation, schedulingFieldsChanged } from '../../utilities/reservationChanges.js'
 import { extractId, resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 
 /**
@@ -22,7 +19,8 @@ import { extractId, resolveReservationItems } from '../../utilities/resolveReser
  */
 export const validateActive =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
-  async ({ context, data, operation, originalDoc, req }) => {
+  async ({ context, data, operation: rawOperation, originalDoc, req }) => {
+    const operation = resolveOperation(rawOperation, originalDoc)
     if (context?.skipReservationHooks || !config.enforceActive) {
       return data
     }

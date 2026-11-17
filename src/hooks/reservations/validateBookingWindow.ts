@@ -4,7 +4,7 @@ import { ValidationError } from 'payload'
 
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
-import { mergeReservationData, schedulingFieldsChanged } from '../../utilities/reservationChanges.js'
+import { mergeReservationData, resolveOperation, schedulingFieldsChanged } from '../../utilities/reservationChanges.js'
 import { extractId, resolveReservationItems } from '../../utilities/resolveReservationItems.js'
 import { isWithinSchedule } from '../../utilities/scheduleWindow.js'
 import { isPrivilegedUser } from '../../utilities/userRoles.js'
@@ -76,7 +76,8 @@ export const limitPublicItems =
  */
 export const validateBookingWindow =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
-  async ({ context, data, operation, originalDoc, req }) => {
+  async ({ context, data, operation: rawOperation, originalDoc, req }) => {
+    const operation = resolveOperation(rawOperation, originalDoc)
     if (context?.skipReservationHooks) {return data}
 
     const publicActor =

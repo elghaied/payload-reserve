@@ -6,11 +6,13 @@ import type { PluginT } from '../../translations/index.js'
 import type { ResolvedReservationPluginConfig } from '../../types.js'
 
 import { validateTransition } from '../../services/AvailabilityService.js'
+import { resolveOperation } from '../../utilities/reservationChanges.js'
 import { isPrivilegedUser } from '../../utilities/userRoles.js'
 
 export const validateStatusTransition =
   (config: ResolvedReservationPluginConfig): CollectionBeforeChangeHook =>
-  async ({ context, data, operation, originalDoc, req }) => {
+  async ({ context, data, operation: rawOperation, originalDoc, req }) => {
+    const operation = resolveOperation(rawOperation, originalDoc)
     if (context?.skipReservationHooks) {return data}
 
     const newStatus = data?.status as string | undefined
@@ -78,6 +80,12 @@ export const validateStatusTransition =
               },
             ],
           })
+        }
+
+        // A dry run validates the transition but must not fire the host's
+        // confirm/cancel hooks (payments, refunds) for a save that never happens.
+        if (rawOperation === 'validate') {
+          return data
         }
 
         // Call beforeBookingConfirm plugin hooks
