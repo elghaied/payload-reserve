@@ -133,7 +133,8 @@ describe('tenant-scoping diagnostic (D2)', () => {
   // collection, which multi-tenant scopes with a `tenants` ARRAY rather than a
   // flat `tenant` field — so a flat-field check would false-positive on it.
   it('does not flag the user collection in userCollection mode', async () => {
-    const config = payloadReserve({ userCollection: 'users' })({
+    // `staff` keeps the no-staff-rule warning (D8) out of this D2-only assertion.
+    const config = payloadReserve({ staff: { roles: ['admin'] }, userCollection: 'users' })({
       collections: [usersWithTenantsArray],
       endpoints: [],
     } as unknown as Config)

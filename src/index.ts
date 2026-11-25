@@ -24,6 +24,7 @@ export type {
   ReservationPluginConfig,
   ReservationPluginHooks,
   ResolvedReservationPluginConfig,
+  StaffConfig,
   StaffProvisioningConfig,
   StatusMachineConfig,
 } from './types.js'

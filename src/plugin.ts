@@ -28,6 +28,7 @@ import { resolveComponentSlot } from './utilities/componentSlots.js'
 import { makeDisabledWriteAccess } from './utilities/ownerAccess.js'
 import { collectionHasTenantField } from './utilities/tenantFilter.js'
 import { supportsTransactions } from './utilities/transactionSupport.js'
+import { hasStaffRule } from './utilities/userRoles.js'
 
 /**
  * The array field `@payloadcms/plugin-multi-tenant` pushes onto the admin users
@@ -466,6 +467,15 @@ export const payloadReserve =
         if (!resolved.disabled && !(await supportsTransactions(payload))) {
           payload.logger.warn(
             'payload-reserve: this database does not support transactions, so concurrent bookings for the same slot can double-book. MongoDB needs a replica set (even single-node) for transaction support. Postgres supports transactions by default. SQLite requires transactionOptions to be set on the adapter, or it silently runs without them.',
+          )
+        }
+
+        // D8: in userCollection mode staff and customers share one collection, so
+        // only a configured rule tells them apart. With none, admins are
+        // customers to every plugin check (status changes, schedule, notice).
+        if (!resolved.disabled && resolved.userCollection && !hasStaffRule(resolved)) {
+          payload.logger.warn(
+            `payload-reserve: "userCollection" is set but no staff rule is configured, so every user of "${resolved.slugs.customers}" — admins included — is treated as a customer: they cannot change a reservation's status, are held to the schedule and the cancellation notice, bookings they make for someone else are reassigned to themselves, and the staff endpoints (customer search, resource availability) answer 403. Set "staff: { roleField, roles }" or "staff.isStaff" — see docs/configuration.md, "userCollection mode — telling staff from customers".`,
           )
         }
 

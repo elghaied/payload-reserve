@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [4.5.0] - 2026-11-25
+
+Backport of the staff-detection change from 5.0.0-next.1 (Payload 4) to the Payload 3 line.
+
+### Added
+- `staff` option for `userCollection` mode: `staff: { roleField: 'roles', roles: ['admin'] }` (and/or `staff.isStaff: (user) => boolean`) tells the plugin which users of the shared collection are staff, without `resourceOwnerMode` or `staffProvisioning`. `roleField` may hold a string or an array of strings. Those users can change reservation status, book for others, skip the schedule and cancellation-notice rules, and use the staff endpoints (customer search, resource availability).
+- Boot warning when `userCollection` is set with no staff rule, since every user there — admins included — is then treated as a customer.
+
+### Fixed
+- `resourceOwnerMode.roleField` is now the field `adminRoles` are matched against for staff detection too. It was ignored there (only `staffProvisioning.roleField` was read), so an admin whose role lived in a differently named field was treated as a customer. Configs where the two fields are the same, or `resourceOwnerMode.roleField` is unset, behave as before.
+
 ## [4.4.3] - 2026-11-16
 
 Security and correctness fixes from an audit of 4.4.2.

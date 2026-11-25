@@ -39,7 +39,7 @@ Then run `payload generate:importmap` and restart. You get Services, Resources, 
 Two things to know before going live:
 
 - **Database:** MongoDB needs a replica set and SQLite needs `transactionOptions` on the adapter, or simultaneous bookings can double-book. Postgres works as is. See [Concurrent Bookings](./docs/concurrency.md).
-- **Your own users collection:** set `userCollection` and supply an access rule for customers. See [Access control for customers](./docs/configuration.md#access-control-for-customers).
+- **Your own users collection:** set `userCollection`, tell the plugin who is staff (`staff: { roleField: 'roles', roles: ['admin'] }`) and supply an access rule for customers. See [Access control for customers](./docs/configuration.md#access-control-for-customers).
 
 ## Features
 

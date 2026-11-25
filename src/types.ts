@@ -110,7 +110,7 @@ export type ResourceOwnerModeConfig = {
   ownerCollection?: string
   /** Field name for the owner relationship on Resources (default: 'owner') */
   ownerField?: string
-  /** User field holding the role for admin detection (default: staffProvisioning.roleField or 'role') */
+  /** User field holding the role that `adminRoles` is matched against (default: staffProvisioning.roleField or 'role') */
   roleField?: string
 }
 
@@ -150,6 +150,29 @@ export type ResolvedStaffProvisioningConfig = {
   roleField: string
   staffRoles: string[]
   userCollection: string
+}
+
+// --- Staff detection (userCollection mode) ---
+
+/**
+ * How to tell staff/admins from customers when both log in to the same auth
+ * collection (`userCollection`). A user there is staff when ANY rule matches:
+ * these `roles`, `isStaff`, `resourceOwnerMode.adminRoles` or
+ * `staffProvisioning.staffRoles` — each list read from its own `roleField`.
+ */
+export type StaffConfig = {
+  /** Custom test, for when the role is not a plain field value. */
+  isStaff?: (user: Record<string, unknown>) => boolean
+  /** User field holding the role — a string or an array of strings (default 'role'). */
+  roleField?: string
+  /** Role values that mark a user as staff. */
+  roles?: string[]
+}
+
+export type ResolvedStaffConfig = {
+  isStaff?: StaffConfig['isStaff']
+  roleField: string
+  roles: string[]
 }
 
 // --- Plugin configuration ---
@@ -374,6 +397,8 @@ export type ReservationPluginConfig = {
     schedules?: string
     services?: string
   }
+  /** Who counts as staff when staff and customers share `userCollection` (see StaffConfig) */
+  staff?: StaffConfig
   /** Auto-provision a Resource from staff-role users (opt-in; requires resourceOwnerMode) */
   staffProvisioning?: StaffProvisioningConfig
   /** Configurable status machine (defaults to current behavior) */
@@ -445,6 +470,7 @@ export type ResolvedReservationPluginConfig = {
     schedules: string
     services: string
   }
+  staff: ResolvedStaffConfig | undefined
   staffProvisioning: ResolvedStaffProvisioningConfig | undefined
   statusMachine: StatusMachineConfig
   timezone: string

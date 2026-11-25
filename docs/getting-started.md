@@ -75,8 +75,11 @@ By default the plugin creates a standalone `customers` auth collection. To exten
 ```typescript
 payloadReserve({
   userCollection: 'users', // your existing auth collection slug
+  staff: { roleField: 'roles', roles: ['admin'] }, // who in it is staff
 })
 ```
+
+Staff and customers then share one collection, so `staff` tells the plugin which users are staff; without it every user is treated as a customer. See [Telling staff from customers](./configuration.md#usercollection-mode--telling-staff-from-customers).
 
 When `userCollection` is set, the plugin injects `name`, `phone`, `notes`, and a `bookings` join field into your existing collection rather than creating a separate Customers collection. Existing fields with the same name are preserved (the plugin only injects what's missing). See [Collections → Customers](./collections.md#customers) for details.
 

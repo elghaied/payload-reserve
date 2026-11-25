@@ -3,7 +3,7 @@ import type { CollectionSlug, Endpoint, Field, Where } from 'payload'
 import type { ResolvedReservationPluginConfig } from '../types.js'
 
 import { collectionHasTenantField, readCookie, tenantWhereClause } from '../utilities/tenantFilter.js'
-import { isPrivilegedUser, privilegedRoles } from '../utilities/userRoles.js'
+import { isPrivilegedUser, staffRoleRules } from '../utilities/userRoles.js'
 
 /**
  * Inspect a collection's field list and return the set of top-level named
@@ -80,11 +80,11 @@ export function createCustomerSearchEndpoint(
       // Single-collection mode: staff/admin live in the same collection as
       // customers, so exclude privileged roles — the dropdown should list only
       // actual customers, not bookable-looking staff.
+      // shortcut: a `staff.isStaff` function cannot become a DB filter, so users it
+      // alone marks as staff still appear; add `staff.roles` if that matters.
       if (config.userCollection) {
-        const roleField = config.staffProvisioning?.roleField ?? 'role'
-        const priv = privilegedRoles(config)
-        if (priv.length > 0) {
-          andClauses.push({ [roleField]: { not_in: priv } })
+        for (const { field, roles } of staffRoleRules(config)) {
+          andClauses.push({ [field]: { not_in: roles } })
         }
       }
 
