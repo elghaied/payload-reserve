@@ -5,6 +5,7 @@
     "payload-reserve": "4.4.3"
   },
   "changesets": [
-    "payload-4"
+    "payload-4",
+    "staff-option"
   ]
 }

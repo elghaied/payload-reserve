@@ -3,6 +3,7 @@ import type {
   ReservationCalendarViewMode,
   ReservationPluginConfig,
   ResolvedReservationPluginConfig,
+  ResolvedStaffConfig,
   ResolvedStaffProvisioningConfig,
   StatusMachineConfig,
 } from './types.js'
@@ -58,6 +59,20 @@ function validateStatusMachine(sm: StatusMachineConfig): void {
 
 export const DEFAULT_RESOURCE_TYPES = ['staff', 'equipment', 'room']
 export const DEFAULT_LEAVE_TYPES = ['vacation', 'sick', 'personal', 'closure', 'other']
+
+function resolveStaff(staff: ReservationPluginConfig['staff']): ResolvedStaffConfig | undefined {
+  if (!staff) {
+    return undefined
+  }
+  const roles = staff.roles ?? []
+  if (!Array.isArray(roles) || roles.some((r) => typeof r !== 'string')) {
+    throw new Error('payload-reserve: staff.roles must be an array of strings')
+  }
+  if (roles.length === 0 && typeof staff.isStaff !== 'function') {
+    throw new Error('payload-reserve: staff needs a non-empty "roles" array or an "isStaff" function')
+  }
+  return { isStaff: staff.isStaff, roleField: staff.roleField ?? 'role', roles }
+}
 
 function resolveStaffProvisioning(
   pluginOptions: ReservationPluginConfig,
@@ -241,6 +256,7 @@ export function resolveConfig(
       schedules: pluginOptions.slugs?.schedules ?? DEFAULT_SLUGS.schedules,
       services: pluginOptions.slugs?.services ?? DEFAULT_SLUGS.services,
     },
+    staff: disabled ? undefined : resolveStaff(pluginOptions.staff),
     staffProvisioning: disabled
       ? undefined
       : resolveStaffProvisioning(pluginOptions, resourceTypes),

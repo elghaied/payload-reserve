@@ -61,6 +61,14 @@ payloadReserve({
   // The named collection must exist in your Payload config before the plugin runs.
   userCollection: 'users',
 
+  // userCollection mode only: which users of that collection are staff/admins.
+  // Without a rule every user there is treated as a customer.
+  staff: {
+    roleField: 'roles', // string or string[] field (default: 'role')
+    roles: ['admin'],
+    // isStaff: (user) => user.isOwner === true, // optional custom test
+  },
+
   // Override collection slugs
   slugs: {
     services: 'services',
@@ -157,7 +165,7 @@ payloadReserve({
     // Roles that bypass ownership scoping and see all records.
     // Default: [] — nobody is treated as an admin until you list a role.
     adminRoles: ['admin'],
-    // User field consulted for admin detection. Defaults to
+    // User field adminRoles are matched against. Defaults to
     // staffProvisioning.roleField, then 'role'. Set this when your users store
     // roles in a `roles: string[]` field so they aren't mis-detected.
     roleField: 'role',
@@ -227,6 +235,10 @@ payloadReserve({
 | `slotHolds.requireAuth` | `boolean` | `false` | Refuse `/reserve/hold` to anonymous callers (`401 authentication_required`). Off by default because holds exist so a customer can claim a slot before an account exists — **if you leave it off, rate-limit the endpoint at your proxy or middleware**: an anonymous script can otherwise hold every future slot of a resource and re-hold each as it lapses, and the plugin has no trustworthy client address to throttle on |
 | `slotHolds.maxActivePerCustomer` | `number \| false` | `5` | Ceiling on the unexpired holds one signed-in customer may have at once (`429 hold_limit_reached` past it). Counted for non-staff users of the customers collection only; staff are exempt and an anonymous caller has no identity to count against. Must be a positive integer; `false` disables the cap |
 | `userCollection` | `string` | `undefined` | Existing auth collection slug to extend. Leaves Reservations on Payload's default access — supply `access.reservations` if customers log in there (see [Access control for customers](#access-control-for-customers)) |
+| `staff` | `StaffConfig` | `undefined` | `userCollection` mode: which users of that collection are staff/admins. Without `staff`, `resourceOwnerMode.adminRoles` or `staffProvisioning.staffRoles`, everyone there is a customer and the boot setup check warns (see [Telling staff from customers](#usercollection-mode--telling-staff-from-customers)). Needs `roles` or `isStaff`, or it throws at init |
+| `staff.roles` | `string[]` | `[]` | Role values that mark a user as staff |
+| `staff.roleField` | `string` | `'role'` | User field holding the role — a string or an array of strings (`roles: ['admin']`) |
+| `staff.isStaff` | `(user) => boolean` | `undefined` | Custom test, OR-ed with `roles`. Customer search cannot turn it into a database filter, so users only it marks as staff still appear there — prefer `roles` when you can |
 | `access` | `Record<collection, CollectionConfig['access']>` | `{}` | Per-collection, per-operation access overrides. A rule you supply replaces the plugin's default for that operation only |
 | `slugs.services` | `string` | `'services'` | Services collection slug |
 | `slugs.resources` | `string` | `'resources'` | Resources collection slug |
@@ -254,7 +266,7 @@ payloadReserve({
 | `leaveTypes` | `string[]` | `['vacation', 'sick', 'personal', 'closure', 'other']` | Option list for `Schedule.exceptions[].type`. Empty array throws |
 | `resourceOwnerMode` | `ResourceOwnerModeConfig` | `undefined` | Opt-in resource-owner multi-tenancy (see sub-options below) |
 | `resourceOwnerMode.adminRoles` | `string[]` | `[]` | Roles that bypass ownership scoping. **Fails closed:** with no admin roles nobody is an admin, so reservation create/update/delete are refused for everyone — set it |
-| `resourceOwnerMode.roleField` | `string` | `staffProvisioning.roleField` ?? `'role'` | User field consulted for admin detection (supports `roles: string[]` fields) |
+| `resourceOwnerMode.roleField` | `string` | `staffProvisioning.roleField` ?? `'role'` | User field `adminRoles` are matched against, both for ownership scoping and for staff detection (supports `roles: string[]` fields). Before 5.0.0-next.1 staff detection ignored it and read `staffProvisioning.roleField` |
 | `resourceOwnerMode.ownedServices` | `boolean` | `false` | Also add an owner field to Services |
 | `resourceOwnerMode.ownerField` | `string` | `'owner'` | Owner relationship field name on Resources |
 | `resourceOwnerMode.ownerCollection` | `string` | `staffProvisioning.userCollection` ?? `slugs.customers` | Collection the owner field relates to |
@@ -288,6 +300,22 @@ Until 4.1.2 the three catalog collections sat on Payload's default for writes to
 
 Nothing to configure. Anything you pass in `access.reservations` / `access.customers` replaces the default for that operation only, so `customers: { create: () => true }` opens registration without reopening reads.
 
+### `userCollection` mode — telling staff from customers
+
+When staff and customers log in to the same collection, the plugin needs a rule to know who is staff. Without one, every user there — admins included — is a customer to every plugin check: they cannot change a reservation's status ("Only staff can change a reservation status"), are held to `enforceSchedule` and `cancellationNoticePeriod`, a booking they make for someone else is reassigned to themselves, and the staff endpoints (customer search, held slots, resource availability) answer 403. The boot setup check warns about this.
+
+Give the rule with `staff`:
+
+```typescript
+payloadReserve({
+  userCollection: 'users',
+  // users.roles is a hasMany select: ['admin'] or ['customer']
+  staff: { roleField: 'roles', roles: ['admin'] },
+})
+```
+
+A user is staff when **any** rule matches, each list read from its own field: `staff.roles` on `staff.roleField`, `staff.isStaff(user)`, `resourceOwnerMode.adminRoles` on `resourceOwnerMode.roleField`, and `staffProvisioning.staffRoles` on `staffProvisioning.roleField`. So a host already on `resourceOwnerMode` or `staffProvisioning` needs nothing new. `staff` only decides who the plugin's hooks and endpoints treat as staff; it does not change `resourceOwnerMode`'s ownership scoping (that stays on `adminRoles`) or any collection access rule — those are next.
+
 ### `userCollection` mode — you supply the rule
 
 When staff and customers share one auth collection, the plugin cannot tell them apart without a role, so Reservations — and the writes on Services, Resources and Schedules — stay on Payload's default, and the plugin logs a warning at boot whenever `userCollection` is set with no narrowing rule and no `resourceOwnerMode`. What that default means depends on the collection:
@@ -295,7 +323,7 @@ When staff and customers share one auth collection, the plugin cannot tell them 
 - **`userCollection` is your admin collection** (the usual `users` setup): every user in it can read, update and delete every reservation and write the catalog.
 - **`userCollection` is a separate collection:** its users are denied every plugin collection through the collection REST API (the `/api/reserve/*` endpoints still work).
 
-If **only staff** can log in to that collection, ignore the warnings. If **customers** can, scope them yourself — the pattern the plugin uses in standalone mode, keyed on your role field:
+If **only staff** can log in to that collection, ignore the warnings. If **customers** can, scope them yourself — the pattern the plugin uses in standalone mode, keyed on your role field (keep it in step with your `staff` rule):
 
 ```typescript
 import type { Access } from 'payload'

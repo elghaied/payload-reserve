@@ -42,7 +42,7 @@ Three things to know before going live:
 
 - **Database:** MongoDB needs a replica set and SQLite needs `transactionOptions` on the adapter, or simultaneous bookings can double-book. Postgres works as is. See [Concurrent Bookings](./docs/concurrency.md).
 - **TanStack Start:** add `payload-reserve` to `noExternal` in `vite.config.ts`. See [Getting Started](./docs/getting-started.md#tanstack-start).
-- **Your own users collection:** set `userCollection` and supply an access rule for customers. See [Access control for customers](./docs/configuration.md#access-control-for-customers).
+- **Your own users collection:** set `userCollection`, tell the plugin who is staff (`staff: { roleField: 'roles', roles: ['admin'] }`) and supply an access rule for customers. See [Access control for customers](./docs/configuration.md#access-control-for-customers).
 
 ## Features
 

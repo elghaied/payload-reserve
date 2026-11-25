@@ -92,9 +92,10 @@ describe('setup check block', () => {
     )
     await config.onInit!(payload)
     expect(messages).toHaveLength(1)
-    expect(messages[0]).toMatch(/^payload-reserve setup check: 2 things need attention\./)
-    expect(messages[0]).toMatch(/\n1\. "userCollection" is set/)
-    expect(messages[0]).toMatch(/\n2\. /)
+    // staff detection (D8), access rules (D6), catalog writes (D6b)
+    expect(messages[0]).toMatch(/^payload-reserve setup check: 3 things need attention\./)
+    expect(messages[0]).toMatch(/\n1\. "userCollection" is set but no staff rule/)
+    expect(messages[0]).toMatch(/\n3\. /)
     expect(messages[0]).toMatch(/Checked and fine: .*database transactions/)
   })
 
